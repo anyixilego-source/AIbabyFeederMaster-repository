@@ -1,6 +1,6 @@
 Page({
   data: {
-    photo: '/assets/home-banner-cropped.png', samplePhoto: true, saving: false,
+    photo: '/assets/camera-food-guide-v5.jpg', samplePhoto: true, saving: false,
     foods: [
       { badge: '肉', name: '牛肉碎', amount: '40g', tone: 'protein' },
       { badge: '米', name: '米饭', amount: '80g', tone: 'grain' },

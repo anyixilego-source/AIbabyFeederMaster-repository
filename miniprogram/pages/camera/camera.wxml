@@ -4,7 +4,7 @@
 </navigation-bar>
 <view class="camera-page">
   <view class="steps"><view class="step active"><view class="step-node"><view class="mini-camera"><view class="mini-lens"></view></view></view><text>1 拍照/上传</text></view><view class="step-line active"></view><view class="step"><view class="step-node bowl-node"><view class="bowl"></view></view><text>2 AI识别</text></view><view class="step-line"></view><view class="step"><view class="step-node result-node"><view class="doc-lines"></view></view><text>3 分析结果</text></view></view>
-  <view wx:if="{{tipVisible}}" class="tip"><image src="/assets/baby-eating-focus-v2.png" mode="aspectFill"></image><view class="tip-copy"><text class="tip-title">小贴士</text><text>尽量拍清楚食物整体，光线充足，识别更准确哦~</text></view><view class="tip-close" bindtap="dismissTip"><view></view></view></view>
+  <view wx:if="{{tipVisible}}" class="tip"><image src="/assets/baby-eating-focus-v3.jpg" mode="aspectFill"></image><view class="tip-copy"><text class="tip-title">小贴士</text><text>尽量拍清楚食物整体，光线充足，识别更准确哦~</text></view><view class="tip-close" bindtap="dismissTip"><view></view></view></view>
   <view class="viewfinder">
     <camera wx:if="{{cameraEnabled}}" class="camera" device-position="{{position}}" flash="{{flash}}" binderror="cameraFailed"></camera>
     <view wx:else class="camera-fallback"><image src="/assets/camera-food-guide-v5.jpg" mode="aspectFill"></image></view>

@@ -2,7 +2,7 @@
 <scroll-view class="home-scroll" scroll-y enhanced show-scrollbar="{{false}}">
   <view class="page-shell home-page">
     <view class="profile-row" bindtap="openProfile" aria-role="button" aria-label="查看宝宝档案">
-      <image class="avatar" src="/assets/baby-avatar-v1.png" mode="aspectFill"></image>
+      <image class="avatar" src="/assets/baby-avatar-v2.jpg" mode="aspectFill"></image>
       <view class="profile-copy"><view class="name-row"><text class="baby-name">小米</text><text class="gender-mark">女</text></view><text class="baby-age">10个月23天</text></view>
       <view class="notice" catchtap="showNotice" aria-role="button" aria-label="消息提醒"><view class="bell"><view class="bell-clapper"></view></view><view class="notice-dot"></view></view>
     </view>
