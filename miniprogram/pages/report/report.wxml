@@ -7,4 +7,4 @@
   <view class="meal-strip ui-card"><view class="strip-heading"><text class="section-title">今日饮食记录</text><text class="muted">共4餐</text><view bindtap="openRecords"><text>查看全部记录</text><view class="chevron"></view></view></view><view class="strip-meals"><view wx:for="{{['早餐','午餐','加餐','晚餐']}}" wx:key="*this"><view class="meal-dot"></view><text>{{item}}</text><image src="/assets/home-banner.png" mode="aspectFill"></image></view></view></view>
   <view class="streak-card"><image src="/assets/baby-avatar-v1.png" mode="aspectFill"></image><view><text>坚持记录是科学喂养的第一步，爸爸妈妈辛苦啦！</text><text>连续记录 7 天，解锁更多营养分析哦~</text></view><button bindtap="openRecords">去打卡</button></view>
 </view></scroll-view>
-<app-tabbar active="report"></app-tabbar>
+<app-tabbar active="report" showCamera="{{true}}"></app-tabbar>
