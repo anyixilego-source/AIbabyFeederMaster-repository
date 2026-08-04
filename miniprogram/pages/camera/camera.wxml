@@ -7,7 +7,7 @@
   <view wx:if="{{tipVisible}}" class="tip"><image src="/assets/baby-eating-focus-v2.png" mode="aspectFill"></image><view class="tip-copy"><text class="tip-title">小贴士</text><text>尽量拍清楚食物整体，光线充足，识别更准确哦~</text></view><view class="tip-close" bindtap="dismissTip"><view></view></view></view>
   <view class="viewfinder">
     <camera wx:if="{{cameraEnabled}}" class="camera" device-position="{{position}}" flash="{{flash}}" binderror="cameraFailed"></camera>
-    <view wx:else class="camera-fallback"><image src="/assets/home-banner-cropped.png" mode="heightFix"></image></view>
+    <view wx:else class="camera-fallback"><image src="/assets/camera-food-guide-v5.jpg" mode="aspectFill"></image></view>
     <view class="grid vertical one"></view><view class="grid vertical two"></view><view class="grid horizontal one"></view><view class="grid horizontal two"></view>
     <view class="corner tl"></view><view class="corner tr"></view><view class="corner bl"></view><view class="corner br"></view>
     <view class="frame-note">请将食物置于取景框内</view>
