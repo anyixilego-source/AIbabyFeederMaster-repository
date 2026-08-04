@@ -1,0 +1,20 @@
+<navigation-bar title="" back="{{false}}" color="#2d2623" background="transparent"></navigation-bar>
+<scroll-view class="home-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+  <view class="page-shell home-page">
+    <view class="profile-row" bindtap="openProfile" aria-role="button" aria-label="查看宝宝档案">
+      <image class="avatar" src="/assets/baby-avatar-v1.png" mode="aspectFill"></image>
+      <view class="profile-copy"><view class="name-row"><text class="baby-name">小米</text><text class="gender-mark">女</text></view><text class="baby-age">10个月23天</text></view>
+      <view class="notice" catchtap="showNotice" aria-role="button" aria-label="消息提醒"><view class="bell"><view class="bell-clapper"></view></view><view class="notice-dot"></view></view>
+    </view>
+    <view class="hero ui-card" bindtap="openCamera" aria-role="button" aria-label="拍照记录饮食"><image src="/assets/home-banner-cropped.png" mode="aspectFill"></image></view>
+    <view class="nutrition-card ui-card">
+      <view class="card-heading"><view class="heading-with-info"><text class="section-title">今日营养状况</text><view class="info-icon">i</view></view><view class="detail-link" bindtap="openReport"><text>营养详情</text><view class="chevron"></view></view></view>
+      <view class="nutrition-body">
+        <view class="score-panel"><view class="score-arc"><view class="score-number"><text>{{score}}</text><text class="score-unit">分</text></view></view><text class="score-label">营养均衡</text><view class="score-tip"><view class="bulb-icon"></view><text>营养摄入充足，继续保持哦~</text></view></view>
+        <view class="nutrient-panel"><view class="nutrient-item" wx:for="{{nutrients}}" wx:key="name"><text class="nutrient-name">{{item.name}}</text><view class="nutrient-ring" style="background: conic-gradient({{item.color}} {{item.value}}%, #edf3e9 0)"><view class="ring-inner">{{item.value}}%</view></view><text class="status-pill {{item.state === '偏低' ? 'warn' : ''}}">{{item.state}}</text></view></view>
+      </view>
+    </view>
+    <view class="advice-card ui-card"><view class="advice-title"><view class="spark-icon"></view><text class="section-title">AI营养建议</text></view><image class="advice-baby" src="/assets/baby-eating-focus-v2.png" mode="aspectFill"></image><view class="advice-list"><view class="advice-row" wx:for="{{advice}}" wx:key="title"><view class="food-badge {{item.tone}}">{{item.badge}}</view><view class="advice-copy"><text class="advice-row-title">{{item.title}}</text><text class="advice-desc">{{item.description}}</text></view><view class="chevron"></view></view></view></view>
+  </view>
+</scroll-view>
+<app-tabbar active="home"></app-tabbar>

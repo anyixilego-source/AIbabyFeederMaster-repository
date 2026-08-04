@@ -1,0 +1,25 @@
+.tabbar { position: fixed; z-index: 40; left: 24rpx; right: 24rpx; bottom: 16rpx; min-height: 116rpx; padding-left: 18rpx; padding-right: 18rpx; display: flex; align-items: center; justify-content: space-around; border: 1rpx solid rgba(244,229,220,.8); border-radius: 28rpx; background: rgba(255,255,255,.97); box-shadow: 0 12rpx 32rpx rgba(136,89,65,.1); }
+.tab { min-width: 96rpx; min-height: 88rpx; display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 8rpx; color: #96959b; font-size: 21rpx; font-weight: 600; }
+.tab.active { color: #ff686a; }
+.tab-icon { position: relative; width: 42rpx; height: 42rpx; color: currentColor; }
+.icon-home::before { content: ''; position: absolute; left: 5rpx; top: 13rpx; width: 30rpx; height: 25rpx; border-radius: 4rpx; background: currentColor; }
+.icon-home::after { content: ''; position: absolute; left: 5rpx; top: 1rpx; width: 30rpx; height: 30rpx; border-radius: 5rpx; background: currentColor; transform: rotate(45deg) scale(.72); }
+.home-door { position: absolute; z-index: 1; left: 17rpx; bottom: 3rpx; width: 9rpx; height: 16rpx; border-radius: 5rpx 5rpx 0 0; background: #fff; }
+.icon-calendar { border: 5rpx solid currentColor; border-radius: 7rpx; }
+.icon-calendar::before,.icon-calendar::after { content: ''; position: absolute; top: -10rpx; width: 5rpx; height: 12rpx; border-radius: 3rpx; background: currentColor; }
+.icon-calendar::before { left: 7rpx; }.icon-calendar::after { right: 7rpx; }
+.calendar-line { position: absolute; left: 0; right: 0; top: 8rpx; height: 4rpx; background: currentColor; }
+.calendar-dot { position: absolute; top: 18rpx; width: 6rpx; height: 6rpx; border-radius: 50%; background: currentColor; }.calendar-dot.one { left: 8rpx; }.calendar-dot.two { right: 8rpx; }
+.icon-report { border: 5rpx solid currentColor; border-radius: 50%; overflow: hidden; }
+.icon-report::before { content: ''; position: absolute; left: 17rpx; top: -5rpx; width: 5rpx; height: 24rpx; background: currentColor; }
+.icon-report::after { content: ''; position: absolute; left: 18rpx; top: 17rpx; width: 21rpx; height: 5rpx; background: currentColor; transform: rotate(-18deg); transform-origin: left center; }
+.report-cut { position: absolute; right: -5rpx; top: -5rpx; width: 17rpx; height: 17rpx; background: #fff; border-left: 5rpx solid currentColor; border-bottom: 5rpx solid currentColor; }
+.icon-face { border: 5rpx solid currentColor; border-radius: 48% 48% 46% 46%; }
+.face-eye { position: absolute; top: 10rpx; width: 5rpx; height: 5rpx; border-radius: 50%; background: currentColor; }.face-eye.left { left: 8rpx; }.face-eye.right { right: 8rpx; }
+.face-smile { position: absolute; left: 9rpx; top: 19rpx; width: 15rpx; height: 8rpx; border-bottom: 4rpx solid currentColor; border-radius: 0 0 14rpx 14rpx; }
+.camera-tab { margin-top: -48rpx; color: #5f5754; }
+.camera-button { width: 90rpx; height: 90rpx; margin-bottom: -2rpx; border: 7rpx solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(135deg,#ff8987,#ff6267); box-shadow: 0 10rpx 24rpx rgba(255,98,103,.3); }
+.camera-shape { position: relative; width: 42rpx; height: 30rpx; border-radius: 7rpx; background: currentColor; }
+.camera-shape::before { content: ''; position: absolute; left: 8rpx; top: -8rpx; width: 17rpx; height: 9rpx; border-radius: 5rpx 5rpx 0 0; background: currentColor; }
+.camera-lens { position: absolute; left: 11rpx; top: 6rpx; width: 13rpx; height: 13rpx; border: 5rpx solid #ff6f70; border-radius: 50%; }
+.five .tab { min-width: 78rpx; }

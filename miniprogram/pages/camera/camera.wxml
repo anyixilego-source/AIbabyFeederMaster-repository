@@ -1,0 +1,17 @@
+<navigation-bar title="拍照记录" back="{{false}}" color="#2d2623" background="transparent">
+  <view slot="left" class="nav-circle" bindtap="goBack"><view class="back-icon"></view></view>
+  <view slot="right" class="album-button" bindtap="chooseAlbum"><view class="album-icon"><view class="album-mountain"></view></view><text>相册</text></view>
+</navigation-bar>
+<view class="camera-page">
+  <view class="steps"><view class="step active"><view class="step-node"><view class="mini-camera"><view class="mini-lens"></view></view></view><text>1 拍照/上传</text></view><view class="step-line active"></view><view class="step"><view class="step-node bowl-node"><view class="bowl"></view></view><text>2 AI识别</text></view><view class="step-line"></view><view class="step"><view class="step-node result-node"><view class="doc-lines"></view></view><text>3 分析结果</text></view></view>
+  <view wx:if="{{tipVisible}}" class="tip"><image src="/assets/baby-eating-focus-v2.png" mode="aspectFill"></image><view class="tip-copy"><text class="tip-title">小贴士</text><text>尽量拍清楚食物整体，光线充足，识别更准确哦~</text></view><view class="tip-close" bindtap="dismissTip"><view></view></view></view>
+  <view class="viewfinder">
+    <camera wx:if="{{cameraEnabled}}" class="camera" device-position="{{position}}" flash="{{flash}}" binderror="cameraFailed"></camera>
+    <view wx:else class="camera-fallback"><image src="/assets/home-banner-cropped.png" mode="heightFix"></image></view>
+    <view class="grid vertical one"></view><view class="grid vertical two"></view><view class="grid horizontal one"></view><view class="grid horizontal two"></view>
+    <view class="corner tl"></view><view class="corner tr"></view><view class="corner bl"></view><view class="corner br"></view>
+    <view class="frame-note">请将食物置于取景框内</view>
+    <view wx:if="{{cameraError}}" class="permission-card"><text>需要相机权限才能拍摄</text><button bindtap="openSettings">去授权</button></view>
+  </view>
+  <view class="camera-controls"><view class="side-control" bindtap="toggleFlash"><view class="flash-icon"></view><text>闪光灯</text></view><view class="capture-wrap" bindtap="capture"><view class="capture-button"><view class="camera-icon"></view></view><text>拍照</text></view><view class="side-control" bindtap="switchCamera"><view class="switch-icon"><view class="switch-arrow top"></view><view class="switch-arrow bottom"></view></view><text>切换摄像头</text></view></view>
+</view>

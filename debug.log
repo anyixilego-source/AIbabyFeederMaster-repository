@@ -1,0 +1,9 @@
+[40616:28820:0804/124421.129:WARNING:t_skinfilemap.cpp(56)] SGRenderLog:CheckUpdate newMem.OpenMem failed, szNewMem:Local\sgime_skin.v6.filemap.sogouime err:系统错误2: 系统找不到指定的文件。  
+打开Filemap失败: Local\sgime_skin.v6.filemap.sogouime344688518e7
+[40616:28820:0804/124421.129:WARNING:t_skinfilemap.cpp(65)] SGRenderLog:CheckUpdate finish: old version:1
+[40616:28820:0804/124421.129:WARNING:t_skinfilemap.cpp(67)] SGRenderLog:CheckUpdate finish: new version:6
+[40616:28820:0804/124421.195:WARNING:t_skinfilemap.cpp(63)] SGRenderLog:CheckUpdate newMem.OpenMem Suc, szNewMem:Local\sgime_skin.Dpi144.v6.filemap.sogouime
+[40616:28820:0804/124421.195:WARNING:t_skinfilemap.cpp(65)] SGRenderLog:CheckUpdate finish: old version:6
+[40616:28820:0804/124421.195:WARNING:t_skinfilemap.cpp(67)] SGRenderLog:CheckUpdate finish: new version:6
+[40616:28820:0804/124438.997:ERROR:t_layout_border_config.cpp(161)] ParseConfigFile: failed to read file C:\temp\comp_border.cfg
+[40616:28820:0804/124438.997:ERROR:t_layout_border_config.cpp(161)] ParseConfigFile: failed to read file C:\temp\cand_wnd_border.cfg

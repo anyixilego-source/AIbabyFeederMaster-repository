@@ -1,0 +1,17 @@
+<view class="tabbar safe-fixed {{showCamera ? 'five' : 'four'}}">
+  <view class="tab {{active === 'home' ? 'active' : ''}}" bindtap="open" data-key="home" aria-role="button" aria-label="首页">
+    <view class="tab-icon icon-home"><view class="home-door"></view></view><text>首页</text>
+  </view>
+  <view class="tab {{active === 'records' ? 'active' : ''}}" bindtap="open" data-key="records" aria-role="button" aria-label="记录">
+    <view class="tab-icon icon-calendar"><view class="calendar-dot one"></view><view class="calendar-dot two"></view><view class="calendar-line"></view></view><text>记录</text>
+  </view>
+  <view wx:if="{{showCamera}}" class="tab camera-tab" bindtap="open" data-key="camera" aria-role="button" aria-label="拍照">
+    <view class="camera-button"><view class="camera-shape"><view class="camera-lens"></view></view></view><text>拍照</text>
+  </view>
+  <view class="tab {{active === 'report' ? 'active' : ''}}" bindtap="open" data-key="report" aria-role="button" aria-label="报告">
+    <view class="tab-icon icon-report"><view class="report-cut"></view></view><text>报告</text>
+  </view>
+  <view class="tab {{active === 'profile' ? 'active' : ''}}" bindtap="open" data-key="profile" aria-role="button" aria-label="我的">
+    <view class="tab-icon icon-face"><view class="face-eye left"></view><view class="face-eye right"></view><view class="face-smile"></view></view><text>我的</text>
+  </view>
+</view>
