@@ -75,6 +75,27 @@ function rawRequest<T>(path: string, options: RequestOptions): Promise<T> {
   })
 }
 
+function rawUpload<T>(path: string, filePath: string, formData: Record<string, string>): Promise<T> {
+  const auth = getAuth()
+  const header: Record<string, string> = {}
+  if (auth?.accessToken) header.Authorization = `Bearer ${auth.accessToken}`
+  return new Promise<T>((resolve, reject) => {
+    wx.uploadFile({
+      url: `${apiBaseUrl}${path}`, filePath, name: 'image', formData, header,
+      success(response) {
+        let data: unknown = {}
+        try { data = JSON.parse(response.data || '{}') as unknown } catch { data = {} }
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          resolve(data as T)
+          return
+        }
+        reject(new ApiError(responseMessage(data, `上传失败 ${response.statusCode}`), response.statusCode, data))
+      },
+      fail(error) { reject(new ApiError(error.errMsg || '图片上传失败', 0, error)) },
+    })
+  })
+}
+
 function refreshSession(refreshToken: string): Promise<AuthSession> {
   if (refreshPromise && refreshTokenInFlight === refreshToken) return refreshPromise
   refreshTokenInFlight = refreshToken
@@ -100,6 +121,32 @@ export async function request<T>(path: string, options: RequestOptions = {}, ret
         const refreshed = await refreshSession(auth.refreshToken)
         setAuth(refreshed)
         return request<T>(path, options, true)
+      } catch {
+        clearAuth()
+        error.authExpired = true
+      }
+    }
+    throw error
+  }
+}
+
+export async function uploadRecognitionImage<T>(
+  filePath: string,
+  consent: { policyVersion: string; localRetention: string },
+  retried = false,
+): Promise<T> {
+  try {
+    return await rawUpload<T>('/recognition/candidates/image', filePath, {
+      accepted: 'true', policyVersion: consent.policyVersion, localRetention: consent.localRetention,
+    })
+  } catch (caught) {
+    const error = caught instanceof ApiError ? caught : new ApiError('图片上传失败', 0, caught)
+    const auth = getAuth()
+    if (!retried && error.statusCode === 401 && auth?.refreshToken) {
+      try {
+        const refreshed = await refreshSession(auth.refreshToken)
+        setAuth(refreshed)
+        return uploadRecognitionImage<T>(filePath, consent, true)
       } catch {
         clearAuth()
         error.authExpired = true
