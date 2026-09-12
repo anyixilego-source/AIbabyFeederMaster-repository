@@ -1,5 +1,5 @@
 import { ApiError, request } from '../../utils/api'
-import { completeOperation, operationPayload } from '../../utils/operation'
+import { completeOperation, getPendingOperation, operationPayload } from '../../utils/operation'
 import { ensureSessionContext, SessionContext } from '../../utils/session'
 
 interface MealSummary {
@@ -93,7 +93,7 @@ Page({
       const active = await context()
       if (!active.subjectId) throw new Error('请先建立宝宝档案')
       const scope = `create-meal:${active.subjectId}`
-      const payload = operationPayload(scope, { mealType: 'OTHER', occurredAt: new Date().toISOString(), notes: '拍照记录' })
+      const payload = getPendingOperation(scope) || operationPayload(scope, { mealType: 'OTHER', occurredAt: new Date().toISOString(), notes: '拍照记录' })
       const meal = await request<{ mealId: string }>(`/subjects/${active.subjectId}/meals`, { method: 'POST', data: payload })
       completeOperation(scope, payload.operationId)
       wx.setStorageSync('foodmaster.currentMealId', meal.mealId)
