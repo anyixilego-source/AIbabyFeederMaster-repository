@@ -14,6 +14,7 @@ interface AssessmentNutrient {
 }
 interface AssessmentReport {
   reportId: string
+  periodStart: string
   coverageRatio: string
   warnings: string[]
   generatedAt: string
@@ -76,23 +77,27 @@ Page({
     warnings: [] as string[],
   },
 
-  onShow() { void this.loadReport() },
+  onShow() { void this.loadReport(false) },
 
-  async loadReport() {
+  async loadReport(force: boolean) {
     this.setData({ loading: true })
     try {
       const active = await context()
       if (!active.subjectId) throw new Error('请先建立宝宝档案')
       const today = new Date()
       const periodStart = dateOnly(today)
-      const payload = operationPayload(`assessment:${active.subjectId}:${periodStart}`, {
-        periodStart, periodEndExclusive: tomorrow(today), timezoneOffsetMinutes: -today.getTimezoneOffset(),
-      })
-      const [subject, report] = await Promise.all([
+      const [subject, reports] = await Promise.all([
         request<SubjectSummary>(`/subjects/${active.subjectId}`),
-        request<AssessmentReport>(`/subjects/${active.subjectId}/assessment-reports`, { method: 'POST', data: payload }),
+        request<AssessmentReport[]>(`/subjects/${active.subjectId}/assessment-reports`),
       ])
-      completeOperation(`assessment:${active.subjectId}:${periodStart}`, payload.operationId)
+      let report = force ? undefined : reports.find((item) => item.periodStart === periodStart)
+      if (!report) {
+        const payload = operationPayload(`assessment:${active.subjectId}:${periodStart}`, {
+          periodStart, periodEndExclusive: tomorrow(today), timezoneOffsetMinutes: -today.getTimezoneOffset(),
+        })
+        report = await request<AssessmentReport>(`/subjects/${active.subjectId}/assessment-reports`, { method: 'POST', data: payload })
+        completeOperation(`assessment:${active.subjectId}:${periodStart}`, payload.operationId)
+      }
       const assessment = report.result.assessment
       const coverage = Math.round(Number(report.coverageRatio) * 100)
       this.setData({
@@ -121,6 +126,6 @@ Page({
   },
 
   goBack() { wx.redirectTo({ url: '/pages/index/index' }) },
-  share() { wx.showToast({ title: '内部学习版暂不分享个体报告', icon: 'none' }) },
+  refreshReport() { if (!this.data.loading) void this.loadReport(true) },
   openRecords() { wx.redirectTo({ url: '/pages/records/records' }) },
 })

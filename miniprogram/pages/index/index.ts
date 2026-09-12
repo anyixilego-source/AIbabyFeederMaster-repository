@@ -45,7 +45,7 @@ Component({
   data: {
     loading: true, babyName: '宝宝', genderText: '', ageText: '', coverage: 0,
     coverageTip: '仅统计已确认实际摄入', warnings: [] as string[],
-    nutrients: [] as Array<{ name: string; value: number; state: string; color: string }>,
+    nutrients: [] as Array<{ name: string; value: number; state: string; color: string; warn: boolean }>,
     advice: [] as Array<{ tone: string; badge: string; title: string; description: string }>,
   },
   pageLifetimes: { show() { void this.load() } },
@@ -69,6 +69,7 @@ Component({
           value: Math.round(Number(item.coverageRatio) * 100),
           state: statusLabels[item.status] || item.status,
           color: item.status === 'AT_OR_ABOVE_REFERENCE' ? '#73c959' : item.status === 'ABOVE_UPPER_LIMIT' ? '#ef6c64' : '#f6a623',
+          warn: item.status !== 'AT_OR_ABOVE_REFERENCE' && item.status !== 'WITHIN_UPPER_LIMIT',
         }))
         const advice = (coverage > 0 ? nutrients : []).slice(0, 3).map((item) => ({
           tone: item.color === '#73c959' ? 'vegetable' : 'grain', badge: item.name.slice(0, 1),

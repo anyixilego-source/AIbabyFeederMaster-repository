@@ -19,17 +19,31 @@ interface CalculationResult {
 }
 
 const nutrientNames: Record<string, string> = {
-  ENERGY: '能量', PROTEIN: '蛋白质', FAT: '脂肪', CARBOHYDRATE: '碳水', CALCIUM: '钙', IRON: '铁',
-  VITAMIN_A_RAE: '维生素A', VITAMIN_C: '维生素C', DIETARY_FIBER: '膳食纤维',
+  ENERGY: '能量', PROTEIN: '蛋白质', FAT: '脂肪', FAT_TOTAL: '脂肪', CARBOHYDRATE: '碳水', CALCIUM: '钙', IRON: '铁',
+  VITAMIN_A_RAE: '维生素A', VITAMIN_C: '维生素C', DIETARY_FIBER: '膳食纤维', FIBER_DIETARY: '膳食纤维', ZINC: '锌',
 }
 const unitNames: Record<string, string> = { KILOCALORIE: 'kcal', KCAL: 'kcal', GRAM: 'g', MILLIGRAM: 'mg', MICROGRAM: 'μg' }
+const warningNames: Record<string, string> = {
+  NO_NUTRIENT_DATA: '暂无可用于计算的营养数据',
+  ESTIMATED_ZERO_USED: '计算包含估计零值', PARTIAL_VALUE_USED: '计算包含部分已知值',
+  TRACE_VALUE_PRESENT: '计算包含微量值', NUTRIENT_ABSENT_FOR_ITEM: '部分食品缺少该营养素数据',
+}
+function numberText(value: string): string {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed.toString() : value
+}
+function warningText(warning: string): string {
+  const [nutrientCode, code] = warning.split(':')
+  if (code === 'INCOMPLETE') return `${nutrientNames[nutrientCode] || nutrientCode}数据不完整`
+  return warningNames[warning] || warning
+}
 
 Page({
   data: {
     photo: '/assets/camera-food-guide-v5.jpg', samplePhoto: true, busy: false,
     accepted: false, retentionIndex: 0, retentionOptions,
     result: null as RecognitionResult | null,
-    foods: [] as Array<{ badge: string; name: string; amount: string; confidence: string; tone: string; index: number }>,
+    foods: [] as Array<{ badge: string; name: string; details: string; uncertainty: string; tone: string; index: number }>,
     query: '', searchResults: [] as FoodResult[], selectedFood: null as FoodResult | null,
     servedAmount: '', consumedAmount: '',
     nutrition: [] as Array<{ name: string; badge: string; value: string; tone: string }>,
@@ -68,7 +82,8 @@ Page({
         errorMessage: '',
         foods: items.map((item, index) => ({
           badge: item.observedName.slice(0, 1), name: item.observedName,
-          amount: item.amountHint || '待确认', confidence: `${Math.round(item.confidence * 100)}%`, tone: 'vegetable', index,
+          details: [item.form, item.count === null ? null : `${item.count} 份`, item.amountHint || '份量待确认', `置信度 ${Math.round(item.confidence * 100)}%`].filter(Boolean).join(' · '),
+          uncertainty: item.uncertainties.join('；'), tone: 'vegetable', index,
         })),
       })
       if (result.mode === 'MANUAL_SEARCH') wx.showToast({ title: '识别失败，请手工搜索', icon: 'none' })
@@ -116,10 +131,11 @@ Page({
     const nutrients = calculation.nutrients.filter((item) => item.knownValue !== null).slice(0, 6).map((item) => ({
       name: nutrientNames[item.nutrientCode] || item.nutrientCode,
       badge: (nutrientNames[item.nutrientCode] || item.nutrientCode).slice(0, 1),
-      value: `${item.knownValue} ${unitNames[item.unitCode] || item.unitCode}`,
+      value: `${numberText(item.knownValue!)} ${unitNames[item.unitCode] || item.unitCode}`,
       tone: item.nutrientCode === 'ENERGY' ? 'heat' : item.nutrientCode === 'PROTEIN' ? 'protein' : 'mineral',
     }))
-    this.setData({ nutrition: nutrients, coverageText: `${Number(calculation.coverageRatio) * 100}%`, warnings: calculation.warnings })
+    const coverage = Math.round(Number(calculation.coverageRatio) * 1000) / 10
+    this.setData({ nutrition: nutrients, coverageText: `${coverage}%`, warnings: calculation.warnings.map(warningText) })
     return calculation
   },
 
