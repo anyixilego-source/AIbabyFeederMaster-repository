@@ -25,9 +25,16 @@ async function context(): Promise<SessionContext> {
   return value
 }
 
+function todayDate(): string {
+  const today = new Date()
+  return `${today.getFullYear()}-${`${today.getMonth() + 1}`.padStart(2, '0')}-${`${today.getDate()}`.padStart(2, '0')}`
+}
+
 Page({
   data: {
-    loading: true, name: '宝宝', sexText: '未设置', birthDate: '', ageText: '',
+    loading: true, saving: false, editing: false, name: '宝宝', sexText: '未设置', birthDate: '', ageText: '',
+    draftName: '', draftBirthDate: '', draftSexIndex: 2, todayDate: todayDate(),
+    sexOptions: [{ label: '女宝宝', value: 'FEMALE' }, { label: '男宝宝', value: 'MALE' }, { label: '暂不设置', value: 'UNSPECIFIED' }],
     basic: [] as Array<{ tone: string; badge: string; label: string; value: string }>,
     health: [] as Array<{ tone: string; badge: string; label: string; value: string; good?: boolean }>,
   },
@@ -64,7 +71,41 @@ Page({
   },
 
   goBack() { wx.redirectTo({ url: '/pages/index/index' }) },
-  toggleEdit() { wx.showToast({ title: '当前先展示已保存档案', icon: 'none' }) },
-  editItem() { wx.showToast({ title: '档案编辑将在后续工作包接入', icon: 'none' }) },
-  changeAvatar() { wx.showToast({ title: '头像当前仅作本地展示', icon: 'none' }) },
+  toggleEdit() {
+    const draftSexIndex = this.data.sexText === '女宝宝' ? 0 : this.data.sexText === '男宝宝' ? 1 : 2
+    this.setData({ editing: true, draftName: this.data.name, draftBirthDate: this.data.birthDate, draftSexIndex })
+  },
+  editItem(event: WechatMiniprogram.BaseEvent) {
+    const label = event.currentTarget.dataset.label as string | undefined
+    if (label === '性别' || label === '出生日期') this.toggleEdit()
+    else wx.showToast({ title: label === '家庭避免食材（非医学禁忌）' ? '请在菜单设置中维护' : '该资料尚未接入', icon: 'none' })
+  },
+  closeEdit() { if (!this.data.saving) this.setData({ editing: false }) },
+  stopPropagation() {},
+  onNameInput(event: WechatMiniprogram.Input) { this.setData({ draftName: event.detail.value }) },
+  onBirthDateChange(event: WechatMiniprogram.CustomEvent<{ value: string }>) { this.setData({ draftBirthDate: event.detail.value }) },
+  onSexChange(event: WechatMiniprogram.CustomEvent<{ value: string }>) { this.setData({ draftSexIndex: Number(event.detail.value) }) },
+  async saveProfile() {
+    if (this.data.saving) return
+    const displayName = this.data.draftName.trim()
+    if (!displayName) { wx.showToast({ title: '请填写宝宝昵称', icon: 'none' }); return }
+    if (!this.data.draftBirthDate) { wx.showToast({ title: '请选择出生日期', icon: 'none' }); return }
+    this.setData({ saving: true })
+    try {
+      const active = await context()
+      if (!active.subjectId) throw new Error('请先建立宝宝档案')
+      const selected = this.data.sexOptions[this.data.draftSexIndex]
+      await request(`/subjects/${active.subjectId}/profile`, {
+        method: 'PATCH',
+        data: { displayName, birthDate: this.data.draftBirthDate, sex: selected.value, reason: '照护者在小程序更新档案' },
+      })
+      this.setData({ editing: false })
+      wx.showToast({ title: '档案已保存', icon: 'success' })
+      await this.load()
+    } catch (caught) {
+      const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '档案保存失败'
+      wx.showToast({ title: message, icon: 'none' })
+    } finally { this.setData({ saving: false }) }
+  },
+  changeAvatar() { wx.showToast({ title: '头像功能尚未接入', icon: 'none' }) },
 })
