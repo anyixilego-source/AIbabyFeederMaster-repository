@@ -5,7 +5,8 @@
     "pages/result/result",
     "pages/records/records",
     "pages/report/report",
-    "pages/profile/profile"
+    "pages/profile/profile",
+    "pages/menu/menu"
   ],
   "window": {
     "navigationBarTextStyle": "black",

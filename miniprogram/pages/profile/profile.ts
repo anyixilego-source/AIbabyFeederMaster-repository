@@ -71,6 +71,7 @@ Page({
   },
 
   goBack() { wx.redirectTo({ url: '/pages/index/index' }) },
+  openMenu() { wx.navigateTo({ url: '/pages/menu/menu' }) },
   toggleEdit() {
     const draftSexIndex = this.data.sexText === '女宝宝' ? 0 : this.data.sexText === '男宝宝' ? 1 : 2
     this.setData({ editing: true, draftName: this.data.name, draftBirthDate: this.data.birthDate, draftSexIndex })
@@ -78,7 +79,7 @@ Page({
   editItem(event: WechatMiniprogram.BaseEvent) {
     const label = event.currentTarget.dataset.label as string | undefined
     if (label === '性别' || label === '出生日期') this.toggleEdit()
-    else wx.showToast({ title: label === '家庭避免食材（非医学禁忌）' ? '请在菜单设置中维护' : '该资料尚未接入', icon: 'none' })
+    else wx.showToast({ title: label === '家庭避免食材（非医学禁忌）' ? '请在家庭食谱页查看' : '该资料尚未接入', icon: 'none' })
   },
   closeEdit() { if (!this.data.saving) this.setData({ editing: false }) },
   stopPropagation() {},
