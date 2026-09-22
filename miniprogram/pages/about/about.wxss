@@ -1,0 +1,21 @@
+.nav-circle { width: 64rpx; height: 64rpx; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #fff; box-shadow: 0 8rpx 24rpx rgba(113,78,60,.08); }
+.about-scroll { height: 100vh; }
+.about-page { padding-top: 4rpx; }
+.brand-card { min-height: 148rpx; padding: 26rpx; display: flex; align-items: center; gap: 22rpx; }
+.brand-mark { width: 82rpx; height: 82rpx; border-radius: 28rpx; display: flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(135deg,#ff8b86,#ff646b); font-size: 38rpx; font-weight: 700; box-shadow: 0 12rpx 24rpx rgba(255,100,107,.22); }
+.brand-card > view:last-child { display: flex; flex-direction: column; gap: 8rpx; }
+.brand-name { font-size: 32rpx; font-weight: 700; }
+.brand-note { color: var(--color-text-secondary); font-size: 21rpx; }
+.section-card { margin-top: 18rpx; padding: 26rpx; }
+.filing-row { min-height: 112rpx; border-bottom: 1rpx solid #f1e7e1; display: flex; align-items: center; justify-content: space-between; gap: 20rpx; }
+.filing-row:last-child { border-bottom: 0; }
+.filing-row > view { min-width: 0; display: flex; flex: 1; flex-direction: column; gap: 8rpx; }
+.filing-label { font-size: 25rpx; font-weight: 600; }
+.filing-desc { color: var(--color-text-secondary); font-size: 20rpx; }
+.filing-value { max-width: 290rpx; color: #55a945; text-align: right; font-size: 21rpx; word-break: break-all; }
+.filing-value.pending { color: #df8c22; }
+.privacy-item { margin-top: 24rpx; padding-left: 20rpx; border-left: 6rpx solid #ff8b86; display: flex; flex-direction: column; gap: 8rpx; }
+.privacy-title { font-size: 24rpx; font-weight: 600; }
+.privacy-copy { color: var(--color-text-secondary); font-size: 21rpx; line-height: 1.65; }
+.privacy-button { height: 78rpx; margin-top: 30rpx; border: 2rpx solid #ff8585; border-radius: 39rpx; color: var(--color-primary); background: #fff8f6; font-size: 25rpx; line-height: 74rpx; }
+.notice-card { margin-top: 18rpx; padding: 20rpx 24rpx; border-radius: 22rpx; color: #806451; background: #fff5df; font-size: 20rpx; line-height: 1.6; }

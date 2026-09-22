@@ -6,6 +6,7 @@
     "pages/records/records",
     "pages/report/report",
     "pages/profile/profile",
+    "pages/about/about",
     "pages/menu/menu"
   ],
   "window": {

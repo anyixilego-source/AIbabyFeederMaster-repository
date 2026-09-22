@@ -72,6 +72,7 @@ Page({
 
   goBack() { wx.redirectTo({ url: '/pages/index/index' }) },
   openMenu() { wx.navigateTo({ url: '/pages/menu/menu' }) },
+  openAbout() { wx.navigateTo({ url: '/pages/about/about' }) },
   toggleEdit() {
     const draftSexIndex = this.data.sexText === '女宝宝' ? 0 : this.data.sexText === '男宝宝' ? 1 : 2
     this.setData({ editing: true, draftName: this.data.name, draftBirthDate: this.data.birthDate, draftSexIndex })

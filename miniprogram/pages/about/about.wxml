@@ -1,0 +1,19 @@
+<navigation-bar title="关于与备案" back="{{false}}" color="#2d2623" background="transparent"><view slot="left" class="nav-circle" bindtap="goBack"><view class="back-icon"></view></view></navigation-bar>
+<scroll-view class="about-scroll" scroll-y enhanced show-scrollbar="{{false}}"><view class="page-shell no-tabs about-page">
+  <view class="brand-card ui-card"><view class="brand-mark">食</view><view><text class="brand-name">宝宝营养管家</text><text class="brand-note">内部学习版本 · 营养结果仅供参考</text></view></view>
+
+  <view class="section-card ui-card"><text class="section-title">备案信息</text>
+    <view class="filing-row"><view><text class="filing-label">小程序备案</text><text class="filing-desc">已完成</text></view><text class="filing-value {{miniProgramFilingNumber ? '' : 'pending'}}">{{miniProgramFilingNumber || '编号待补充'}}</text></view>
+    <view class="filing-row"><view><text class="filing-label">域名 ICP 备案</text><text class="filing-desc">foodmaster.asia</text></view><text class="filing-value {{icpFilingNumber ? '' : 'pending'}}">{{icpFilingNumber || '管局审核中'}}</text></view>
+    <view class="filing-row"><view><text class="filing-label">公安联网备案</text><text class="filing-desc">正式开通后按要求办理</text></view><text class="filing-value {{publicSecurityFilingNumber ? '' : 'pending'}}">{{publicSecurityFilingNumber || '尚未取得'}}</text></view>
+  </view>
+
+  <view class="section-card ui-card"><text class="section-title">数据与隐私</text>
+    <view class="privacy-item"><text class="privacy-title">图片处理边界</text><text class="privacy-copy">图片发送至 DeepSeek API 生成食物候选；服务端仅在请求期间临时接触且不保存，AI 不直接生成营养事实。</text></view>
+    <view class="privacy-item"><text class="privacy-title">本地保存期限</text><text class="privacy-copy">原图仅保存在用户本地，可选择1个月、半年或1年，到期自动删除。</text></view>
+    <view class="privacy-item"><text class="privacy-title">用户确认</text><text class="privacy-copy">识别候选、食品身份和实际摄入量均需用户确认；拒绝图片授权不影响基础功能。</text></view>
+    <button class="privacy-button" bindtap="openPrivacyContract">查看微信隐私保护指引</button>
+  </view>
+
+  <view class="notice-card"><text>备案编号取得后从项目根目录 .env 集中更新，不需要修改页面代码。</text></view>
+</view></scroll-view>
