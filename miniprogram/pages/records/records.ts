@@ -10,7 +10,11 @@ interface MealSummary {
   notes: string | null
 }
 interface MealDetail extends MealSummary {
-  items: Array<{ observedName: string | null; consumedAmount: string | null; status: string }>
+  items: Array<{ mealItemId: string; observedName: string | null; servedAmount: string | null; consumedAmount: string | null; unit: string; status: string }>
+}
+interface DisplayMeal {
+  mealId: string; type: string; time: string; name: string; ingredients: string; tags: string[]; tone: string; position: string
+  items: Array<{ mealItemId: string; name: string; served: string; consumed: string; status: string }>
 }
 
 const mealLabels: Record<MealSummary['mealType'], string> = {
@@ -40,7 +44,7 @@ Page({
   data: {
     saved: false, loading: false, selectedDate: dateOnly(new Date()), selectedDateLabel: '',
     dates: datesAround(dateOnly(new Date())),
-    meals: [] as Array<{ mealId: string; type: string; time: string; name: string; ingredients: string; tags: string[]; tone: string; position: string }>,
+    meals: [] as DisplayMeal[], selectedMeal: null as DisplayMeal | null,
     confirmedCount: 0, consumedTotal: '0',
   },
 
@@ -70,6 +74,12 @@ Page({
           tags: [meal.status === 'CONFIRMED' ? '已确认' : '草稿'],
           tone: meal.mealType === 'DINNER' ? 'night' : meal.mealType === 'SNACK' ? 'snack' : 'day',
           position: '50% center',
+          items: meal.items.map((item) => ({
+            mealItemId: item.mealItemId, name: item.observedName || '已确认食品',
+            served: item.servedAmount ? `${item.servedAmount} ${item.unit}` : '未填写',
+            consumed: item.consumedAmount ? `${item.consumedAmount} ${item.unit}` : '未填写',
+            status: item.status === 'CONFIRMED' ? '已确认' : item.status,
+          })),
         }
       })
       const selectedDate = new Date(`${this.data.selectedDate}T00:00:00`)
@@ -108,5 +118,11 @@ Page({
     this.setData({ selectedDate, dates: this.data.dates.map((item) => ({ ...item, active: item.date === selectedDate })) })
     void this.loadMeals()
   },
+  openMeal(event: WechatMiniprogram.TouchEvent) {
+    const mealId = String(event.currentTarget.dataset.mealId)
+    this.setData({ selectedMeal: this.data.meals.find((meal) => meal.mealId === mealId) || null })
+  },
+  closeMeal() { this.setData({ selectedMeal: null }) },
+  noop() {},
   closeSaved() { this.setData({ saved: false }); wx.removeStorageSync('mealSaved') },
 })
