@@ -38,7 +38,7 @@ async function login(): Promise<void> {
   setAuth(auth)
 }
 
-export async function ensureSessionContext(): Promise<SessionContext> {
+async function loadSessionContext(): Promise<SessionContext> {
   if (!getAuth()) await login()
   let households: HouseholdSummary[]
   try {
@@ -53,4 +53,22 @@ export async function ensureSessionContext(): Promise<SessionContext> {
     ? await request<SubjectSummary[]>(`/households/${householdId}/subjects`)
     : []
   return { householdId, subjectId: subjects[0]?.subjectId ?? null, households, subjects }
+}
+
+export async function ensureSessionContext(): Promise<SessionContext> {
+  return loadSessionContext()
+}
+
+export function refreshSessionContext(): Promise<SessionContext> {
+  const app = getApp<IAppOption>()
+  const ready = loadSessionContext().then((value) => {
+    app.globalData.householdId = value.householdId || undefined
+    app.globalData.subjectId = value.subjectId || undefined
+    return value
+  }).catch((error: unknown) => {
+    if (app.globalData.ready === ready) app.globalData.ready = undefined
+    throw error
+  })
+  app.globalData.ready = ready
+  return ready
 }

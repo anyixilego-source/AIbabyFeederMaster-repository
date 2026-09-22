@@ -1,5 +1,5 @@
 import { ApiError, request } from '../../utils/api'
-import { ensureSessionContext, SessionContext, SubjectSummary } from '../../utils/session'
+import { ensureSessionContext, refreshSessionContext, SessionContext, SubjectSummary } from '../../utils/session'
 
 interface Avoidance { foodId: string; foodName: string; reason: string | null }
 
@@ -45,7 +45,10 @@ Page({
     this.setData({ loading: true })
     try {
       const active = await context()
-      if (!active.subjectId) throw new Error('请先建立宝宝档案')
+      if (!active.subjectId) {
+        this.setData({ name: '宝宝', sexText: '未设置', birthDate: '', ageText: '', basic: [], health: [] })
+        return
+      }
       const [subject, avoidances] = await Promise.all([
         request<SubjectSummary>(`/subjects/${active.subjectId}`),
         active.householdId ? request<Avoidance[]>(`/households/${active.householdId}/food-avoidances`) : Promise.resolve([]),
@@ -95,12 +98,20 @@ Page({
     this.setData({ saving: true })
     try {
       const active = await context()
-      if (!active.subjectId) throw new Error('请先建立宝宝档案')
       const selected = this.data.sexOptions[this.data.draftSexIndex]
-      await request(`/subjects/${active.subjectId}/profile`, {
-        method: 'PATCH',
-        data: { displayName, birthDate: this.data.draftBirthDate, sex: selected.value, reason: '照护者在小程序更新档案' },
-      })
+      if (active.subjectId) {
+        await request(`/subjects/${active.subjectId}/profile`, {
+          method: 'PATCH',
+          data: { displayName, birthDate: this.data.draftBirthDate, sex: selected.value, reason: '照护者在小程序更新档案' },
+        })
+      } else {
+        if (!active.householdId) throw new Error('当前账号尚未建立家庭')
+        await request(`/households/${active.householdId}/subjects`, {
+          method: 'POST',
+          data: { displayName, birthDate: this.data.draftBirthDate, sex: selected.value, relationshipType: 'PARENT' },
+        })
+        await refreshSessionContext()
+      }
       this.setData({ editing: false })
       wx.showToast({ title: '档案已保存', icon: 'success' })
       await this.load()
