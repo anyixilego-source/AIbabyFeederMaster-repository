@@ -233,10 +233,15 @@ function nutrientView(item: AssessmentNutrient, sources: NutrientSource[]): Nutr
   const hasComparableReference = numericValue !== null && Number.isFinite(numericValue)
     && reference !== null && Number.isFinite(reference) && reference > 0
   const progressRatio = hasComparableReference ? numericValue / reference * 100 : null
+  const progressLabel = progressRatio !== null
+    ? `${item.recommendedValue !== null ? '约占参考值' : '约占上限参考'} ${Math.round(progressRatio)}%`
+    : reference !== null && Number.isFinite(reference) && reference > 0
+      ? '暂无摄入值，暂不能计算参考进度'
+      : '当前月龄暂无适用参考值'
   return {
     nutrientCode: item.nutrientCode, name, badge: name.slice(0, 1), iconPath: nutrientIcon(item.nutrientCode), category: nutrientCategory(item.nutrientCode),
     progressPercent: progressRatio === null ? 0 : Math.max(0, Math.min(100, progressRatio)),
-    progressLabel: progressRatio === null ? '' : `${item.recommendedValue !== null ? '约占参考值' : '约占上限参考'} ${Math.round(progressRatio)}%`,
+    progressLabel,
     progressTone: nutrientProgressTone(item.nutrientCode),
     amountText: item.averageDailyValue === null ? '暂无数值' : formatNumber(item.averageDailyValue),
     numericValue,

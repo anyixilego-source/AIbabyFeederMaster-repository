@@ -113,6 +113,23 @@ async function main() {
       return
     }
 
+    if (command === 'overview') {
+      const overview = await miniProgram.reLaunch('/pages/report-overview/report-overview')
+      await overview.waitFor(2500)
+      const data = await overview.data()
+      const target = screenshotPath('report-overview-current')
+      await miniProgram.screenshot({ path: target })
+      console.log(JSON.stringify({
+        errorMessage: data.errorMessage,
+        trendOptionCount: data.trendOptions.length,
+        selectedTrend: data.selectedTrend,
+        referenceAvailable: data.referenceAvailable,
+        referenceLabel: data.referenceLabel,
+        screenshot: target,
+      }))
+      return
+    }
+
     if (command === 'flow') {
       await miniProgram.callWxMethod('removeStorageSync', 'foodmaster.currentMealId')
 

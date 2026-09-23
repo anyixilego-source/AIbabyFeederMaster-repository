@@ -1,4 +1,5 @@
 import { ApiError } from '../../utils/api'
+import { ageMonths } from '../../utils/age'
 import { dateOnly, formatNumber, latestReportByDate, loadReportBundle, nutrientNames, unitNames } from '../../utils/nutrition-report'
 import type { AssessmentNutrient, ReportBundle } from '../../utils/nutrition-report'
 import { ensureSessionContext } from '../../utils/session'
@@ -34,6 +35,23 @@ async function context(): Promise<SessionContext> {
 function nutrientForCode(nutrients: AssessmentNutrient[], code: string): AssessmentNutrient | undefined {
   if (code === 'ENERGY') return nutrients.find((item) => item.nutrientCode === 'ENERGY' || item.nutrientCode === 'ENERGY_KCAL')
   return nutrients.find((item) => item.nutrientCode === code)
+}
+
+function referenceAgeBand(birthDate: string, date: Date): '6_TO_12' | '12_TO_24' | null {
+  const months = ageMonths(birthDate, date)
+  if (months >= 6 && months < 12) return '6_TO_12'
+  if (months >= 12 && months < 24) return '12_TO_24'
+  return null
+}
+
+function latestReferenceNutrient(bundle: ReportBundle, code: string): AssessmentNutrient | undefined {
+  const currentBand = referenceAgeBand(bundle.subject.birthDate, new Date())
+  if (currentBand === null) return undefined
+  return [...bundle.reports]
+    .sort((left, right) => right.generatedAt.localeCompare(left.generatedAt))
+    .filter((report) => referenceAgeBand(bundle.subject.birthDate, new Date(`${report.periodStart}T12:00:00`)) === currentBand)
+    .map((report) => nutrientForCode(report.result.assessment.nutrients, code))
+    .find((nutrient) => nutrient && (nutrient.recommendedValue !== null || nutrient.upperLimitValue !== null))
 }
 
 function lastSevenDates(): Date[] {
@@ -89,19 +107,18 @@ Page({
       reminders.push('今天可能还有未记录的奶量或其他食物。')
       if (reminders.length < 3) reminders.push('仅统计已记录并确认的食物。')
       const optionMap = new Map<string, TrendOption>()
-      for (const nutrient of currentBundle.nutrients) {
-        const code = nutrient.nutrientCode === 'ENERGY_KCAL' ? 'ENERGY' : nutrient.nutrientCode
-        if (!optionMap.has(code)) optionMap.set(code, { code, label: nutrient.name })
+      for (const report of currentBundle.reports) {
+        for (const nutrient of report.result.assessment.nutrients) {
+          const code = nutrient.nutrientCode === 'ENERGY_KCAL' ? 'ENERGY' : nutrient.nutrientCode
+          if (!optionMap.has(code)) optionMap.set(code, { code, label: nutrientNames[nutrient.nutrientCode] || '其他营养素' })
+        }
       }
       const supportedOptions = [...optionMap.values()]
       let selectedTrend = supportedOptions.some((item) => item.code === this.data.selectedTrend)
         ? this.data.selectedTrend
         : (supportedOptions[0]?.code || 'ENERGY')
-      const withReference = supportedOptions.find((option) => {
-        const nutrient = nutrientForCode(currentBundle!.report.result.assessment.nutrients, option.code)
-        return nutrient?.recommendedValue !== null || nutrient?.upperLimitValue !== null
-      })
-      if (!nutrientForCode(currentBundle.report.result.assessment.nutrients, selectedTrend)?.recommendedValue && withReference) {
+      const withReference = supportedOptions.find((option) => latestReferenceNutrient(currentBundle!, option.code))
+      if (!latestReferenceNutrient(currentBundle, selectedTrend) && withReference) {
         selectedTrend = withReference.code
       }
       this.setData({
@@ -124,7 +141,12 @@ Page({
     if (!currentBundle) return
     const reportsByDate = latestReportByDate(currentBundle.reports)
     const currentNutrient = nutrientForCode(currentBundle.report.result.assessment.nutrients, this.data.selectedTrend)
-    const referenceRaw = currentNutrient?.recommendedValue || currentNutrient?.upperLimitValue
+      || [...currentBundle.reports]
+        .sort((left, right) => right.generatedAt.localeCompare(left.generatedAt))
+        .map((report) => nutrientForCode(report.result.assessment.nutrients, this.data.selectedTrend))
+        .find((nutrient): nutrient is AssessmentNutrient => nutrient !== undefined)
+    const referenceNutrient = latestReferenceNutrient(currentBundle, this.data.selectedTrend)
+    const referenceRaw = referenceNutrient?.recommendedValue || referenceNutrient?.upperLimitValue
     const reference = referenceRaw === null || referenceRaw === undefined ? null : Number(referenceRaw)
     const values = lastSevenDates().map((date) => {
       const report = reportsByDate.get(dateOnly(date))
@@ -155,13 +177,17 @@ Page({
       }
     })
     const unitCode = currentNutrient?.unitCode || ''
+    const currentAgeMonths = ageMonths(currentBundle.subject.birthDate)
+    const noReferenceText = currentAgeMonths < 6 || currentAgeMonths >= 24
+      ? `当前为${currentAgeMonths}个月，现有参考规则适用于6～23个月`
+      : '当前营养素暂无适用参考值'
     this.setData({
       selectedTrendName: nutrientNames[currentNutrient?.nutrientCode || this.data.selectedTrend] || '营养素',
       selectedUnit: unitNames[unitCode] || '',
       trendBars,
       chartTicks,
       referenceAvailable: reference !== null && Number.isFinite(reference),
-      referenceLabel: reference === null ? '当前无适用参考线' : `参考达标线 ${formatNumber(reference)}`,
+      referenceLabel: reference === null ? noReferenceText : `参考达标线 ${formatNumber(reference)}`,
       referencePercent: referencePercent || 0,
     })
   },
