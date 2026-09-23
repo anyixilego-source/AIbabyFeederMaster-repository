@@ -9,52 +9,71 @@ async function context(): Promise<SessionContext> {
 
 Page({
   data: {
-    cameraEnabled: false, cameraError: false, tipVisible: true, preparing: false, preparationError: '',
+    cameraEnabled: false, cameraError: false, tipVisible: true, preparing: false, preparationError: '', pendingPhoto: '',
     flash: 'off' as 'auto'|'on'|'off', position: 'back' as 'back'|'front',
   },
-  onLoad() { void this.prepareMeal() },
-  async prepareMeal() {
-    if (this.data.preparing && !this.data.preparationError) return
+  onLoad() { void this.discardPendingMeal() },
+  onUnload() { void this.discardPendingMeal() },
+  async continueWithPhoto(photoPath: string) {
+    if (this.data.preparing) return
     this.setData({ preparing: true, preparationError: '' })
     try {
       const active = await context()
       if (!active.subjectId) throw new Error('请先建立宝宝档案')
-      const existingMealId = wx.getStorageSync('foodmaster.currentMealId') as string | undefined
+      let mealId = wx.getStorageSync('foodmaster.currentMealId') as string | undefined
+      const existingMealId = mealId
       if (existingMealId) {
         try {
           const meal = await request<{ status: string }>(`/meals/${existingMealId}`)
-          if (meal.status === 'DRAFT') return
-          wx.removeStorageSync('foodmaster.currentMealId')
+          if (meal.status !== 'DRAFT') {
+            wx.removeStorageSync('foodmaster.currentMealId')
+            mealId = undefined
+          }
         } catch (caught) {
           if (!(caught instanceof ApiError) || caught.statusCode === 0) throw caught
           wx.removeStorageSync('foodmaster.currentMealId')
+          mealId = undefined
         }
       }
-      const scope = `create-meal:${active.subjectId}`
-      const payload = getPendingOperation(scope) || operationPayload(scope, {
-        mealType: 'OTHER', occurredAt: new Date().toISOString(), notes: '拍照记录',
-      })
-      const meal = await request<{ mealId: string }>(`/subjects/${active.subjectId}/meals`, { method: 'POST', data: payload })
-      completeOperation(scope, payload.operationId)
-      wx.setStorageSync('foodmaster.currentMealId', meal.mealId)
+      if (!mealId) {
+        const scope = `create-meal:${active.subjectId}`
+        const payload = getPendingOperation(scope) || operationPayload(scope, {
+          mealType: 'OTHER', occurredAt: new Date().toISOString(), notes: '拍照记录',
+        })
+        const meal = await request<{ mealId: string }>(`/subjects/${active.subjectId}/meals`, { method: 'POST', data: payload })
+        completeOperation(scope, payload.operationId)
+        mealId = meal.mealId
+        wx.setStorageSync('foodmaster.currentMealId', mealId)
+      }
+      wx.setStorageSync('mealPhoto', photoPath)
+      this.setData({ pendingPhoto: '' })
+      wx.navigateTo({ url: '/pages/result/result' })
     } catch (caught) {
       const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '餐食记录准备失败'
-      this.setData({ preparationError: message })
+      this.setData({ preparationError: `${message}，请重新选择图片`, pendingPhoto: photoPath })
       wx.showToast({ title: message, icon: 'none' })
     } finally { this.setData({ preparing: false }) }
   },
   readyForPhoto(): boolean {
-    if (this.data.preparing) { wx.showToast({ title: '正在准备餐食记录', icon: 'none' }); return false }
-    if (this.data.preparationError || !wx.getStorageSync('foodmaster.currentMealId')) {
-      wx.showToast({ title: '请先重新准备餐食记录', icon: 'none' }); return false
-    }
+    if (this.data.preparing) { wx.showToast({ title: '正在创建餐食记录', icon: 'none' }); return false }
     return true
   },
-  goBack() { wx.navigateBack({ fail: () => wx.redirectTo({ url: '/pages/index/index' }) }) },
+  async discardPendingMeal() {
+    const mealId = wx.getStorageSync('foodmaster.currentMealId') as string | undefined
+    if (!mealId) return
+    wx.removeStorageSync('foodmaster.currentMealId')
+    try {
+      const meal = await request<{ status: string }>(`/meals/${mealId}`)
+      if (meal.status === 'DRAFT') await request(`/meals/${mealId}`, { method: 'DELETE', data: { reason: '照护者放弃未保存的拍照记录' } })
+    } catch (_caught) {
+      // 放弃清理失败不阻断离开页面；服务端草稿不会进入已确认摄入。
+    }
+  },
+  goBack() { void this.discardPendingMeal(); wx.navigateBack({ fail: () => wx.redirectTo({ url: '/pages/index/index' }) }) },
   dismissTip() { this.setData({ tipVisible: false }) },
   chooseAlbum() {
     if (!this.readyForPhoto()) return
-    wx.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['album'], success: (res) => { wx.setStorageSync('mealPhoto', res.tempFiles[0].tempFilePath); wx.navigateTo({ url: '/pages/result/result' }) } })
+    wx.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['album'], success: (res) => { void this.continueWithPhoto(res.tempFiles[0].tempFilePath) } })
   },
   capture() {
     if (!this.readyForPhoto()) return
@@ -66,7 +85,7 @@ Page({
       })
       return
     }
-    wx.createCameraContext().takePhoto({ quality: 'high', success: (res) => { wx.setStorageSync('mealPhoto', res.tempImagePath); wx.navigateTo({ url: '/pages/result/result' }) }, fail: () => wx.showToast({ title: '拍摄失败，请从相册选择', icon: 'none' }) })
+    wx.createCameraContext().takePhoto({ quality: 'high', success: (res) => { void this.continueWithPhoto(res.tempImagePath) }, fail: () => wx.showToast({ title: '拍摄失败，请从相册选择', icon: 'none' }) })
   },
   toggleFlash() { this.setData({ flash: this.data.flash === 'off' ? 'on' : 'off' }) },
   switchCamera() { this.setData({ position: this.data.position === 'back' ? 'front' : 'back' }) },

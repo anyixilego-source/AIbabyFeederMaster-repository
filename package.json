@@ -3,13 +3,18 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
+    "test:wechat:inspect": "node tests/e2e/wechat-automator.cjs inspect",
+    "test:wechat:capture": "node tests/e2e/wechat-automator.cjs capture",
+    "test:wechat:smoke": "node tests/e2e/wechat-automator.cjs smoke",
+    "test:wechat:flow": "node tests/e2e/wechat-automator.cjs flow",
+    "test:wechat:fixture": "node tests/e2e/wechat-automator.cjs fixture",
+    "test:wechat:candidate": "node tests/e2e/wechat-automator.cjs candidate"
   },
   "keywords": [],
   "author": "",
   "license": "",
-  "dependencies": {
-  },
   "devDependencies": {
-    "miniprogram-api-typings": "^2.8.3-1"
+    "miniprogram-api-typings": "^2.8.3-1",
+    "miniprogram-automator": "0.12.1"
   }
 }

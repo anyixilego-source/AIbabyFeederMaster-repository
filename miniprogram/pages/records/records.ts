@@ -1,5 +1,4 @@
 import { ApiError, request } from '../../utils/api'
-import { completeOperation, getPendingOperation, operationPayload } from '../../utils/operation'
 import { ensureSessionContext, SessionContext } from '../../utils/session'
 
 interface MealSummary {
@@ -42,7 +41,7 @@ async function context(): Promise<SessionContext> {
 
 Page({
   data: {
-    saved: false, loading: false, selectedDate: dateOnly(new Date()), selectedDateLabel: '',
+    saved: false, loading: false, errorMessage: '', selectedDate: dateOnly(new Date()), selectedDateLabel: '', todayDate: dateOnly(new Date()),
     dates: datesAround(dateOnly(new Date())),
     meals: [] as DisplayMeal[], selectedMeal: null as DisplayMeal | null,
     confirmedCount: 0, consumedTotal: '0',
@@ -54,7 +53,7 @@ Page({
   onShow() { void this.loadMeals() },
 
   async loadMeals() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, errorMessage: '' })
     try {
       const active = await context()
       if (!active.subjectId) throw new Error('请先建立宝宝档案')
@@ -90,6 +89,7 @@ Page({
       })
     } catch (caught) {
       const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '记录加载失败'
+      this.setData({ errorMessage: message, meals: [], confirmedCount: 0, consumedTotal: '0' })
       wx.showToast({ title: message, icon: 'none' })
     } finally { this.setData({ loading: false }) }
   },
@@ -102,11 +102,6 @@ Page({
     try {
       const active = await context()
       if (!active.subjectId) throw new Error('请先建立宝宝档案')
-      const scope = `create-meal:${active.subjectId}`
-      const payload = getPendingOperation(scope) || operationPayload(scope, { mealType: 'OTHER', occurredAt: new Date().toISOString(), notes: '拍照记录' })
-      const meal = await request<{ mealId: string }>(`/subjects/${active.subjectId}/meals`, { method: 'POST', data: payload })
-      completeOperation(scope, payload.operationId)
-      wx.setStorageSync('foodmaster.currentMealId', meal.mealId)
       wx.navigateTo({ url: '/pages/camera/camera' })
     } catch (caught) {
       const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '创建餐食失败'
@@ -118,6 +113,12 @@ Page({
     this.setData({ selectedDate, dates: this.data.dates.map((item) => ({ ...item, active: item.date === selectedDate })) })
     void this.loadMeals()
   },
+  changeDate(event: WechatMiniprogram.CustomEvent<{ value: string }>) {
+    const selectedDate = event.detail.value
+    this.setData({ selectedDate, dates: datesAround(selectedDate) })
+    void this.loadMeals()
+  },
+  retryLoad() { void this.loadMeals() },
   openMeal(event: WechatMiniprogram.TouchEvent) {
     const mealId = String(event.currentTarget.dataset.mealId)
     this.setData({ selectedMeal: this.data.meals.find((meal) => meal.mealId === mealId) || null })

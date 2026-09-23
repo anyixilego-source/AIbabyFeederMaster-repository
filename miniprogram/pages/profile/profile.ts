@@ -35,8 +35,8 @@ Page({
     loading: true, saving: false, editing: false, name: '宝宝', sexText: '未设置', birthDate: '', ageText: '',
     draftName: '', draftBirthDate: '', draftSexIndex: 2, todayDate: todayDate(),
     sexOptions: [{ label: '女宝宝', value: 'FEMALE' }, { label: '男宝宝', value: 'MALE' }, { label: '暂不设置', value: 'UNSPECIFIED' }],
-    basic: [] as Array<{ tone: string; badge: string; label: string; value: string }>,
-    health: [] as Array<{ tone: string; badge: string; label: string; value: string; good?: boolean }>,
+    basic: [] as Array<{ tone: string; badge: string; label: string; value: string; editable?: boolean }>,
+    health: [] as Array<{ tone: string; badge: string; label: string; value: string; good?: boolean; editable?: boolean }>,
   },
 
   onShow() { void this.load() },
@@ -58,12 +58,12 @@ Page({
       this.setData({
         name: subject.displayName, sexText: sexLabel(subject.sex), birthDate: subject.birthDate, ageText: age,
         basic: [
-          { tone: 'coral', badge: '性', label: '性别', value: sexLabel(subject.sex) },
-          { tone: 'green', badge: '生', label: '出生日期', value: subject.birthDate },
+          { tone: 'coral', badge: '性', label: '性别', value: sexLabel(subject.sex), editable: true },
+          { tone: 'green', badge: '生', label: '出生日期', value: subject.birthDate, editable: true },
           { tone: 'yellow', badge: '龄', label: '月龄', value: age },
         ],
         health: [
-          { tone: 'orange', badge: '避', label: '家庭避免食材（非医学禁忌）', value: avoidanceText, good: avoidances.length === 0 },
+          { tone: 'orange', badge: '避', label: '家庭避免食材（非医学禁忌）', value: avoidanceText, good: avoidances.length === 0, editable: true },
           { tone: 'green', badge: '注', label: '其他健康档案', value: '暂未接入' },
         ],
       })
@@ -82,8 +82,9 @@ Page({
   },
   editItem(event: WechatMiniprogram.BaseEvent) {
     const label = event.currentTarget.dataset.label as string | undefined
+    if (!event.currentTarget.dataset.editable) return
     if (label === '性别' || label === '出生日期') this.toggleEdit()
-    else wx.showToast({ title: label === '家庭避免食材（非医学禁忌）' ? '请在家庭食谱页查看' : '该资料尚未接入', icon: 'none' })
+    else if (label === '家庭避免食材（非医学禁忌）') this.openMenu()
   },
   closeEdit() { if (!this.data.saving) this.setData({ editing: false }) },
   stopPropagation() {},
@@ -120,5 +121,4 @@ Page({
       wx.showToast({ title: message, icon: 'none' })
     } finally { this.setData({ saving: false }) }
   },
-  changeAvatar() { wx.showToast({ title: '头像功能尚未接入', icon: 'none' }) },
 })

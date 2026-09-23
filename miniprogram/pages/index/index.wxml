@@ -4,21 +4,23 @@
     <view class="profile-row" bindtap="openProfile" aria-role="button" aria-label="查看宝宝档案">
       <image class="avatar" src="/assets/baby-avatar-v2.jpg" mode="aspectFill"></image>
       <view class="profile-copy"><view class="name-row"><text class="baby-name">{{babyName}}</text><text wx:if="{{genderText}}" class="gender-mark">{{genderText}}</text></view><text class="baby-age">{{ageText}}</text></view>
-      <view class="notice" catchtap="showNotice" aria-role="button" aria-label="消息提醒"><view class="bell"><view class="bell-clapper"></view></view><view class="notice-dot"></view></view>
+      <view class="notice" catchtap="showNotice" aria-role="button" aria-label="消息提醒"><view class="bell"><view class="bell-clapper"></view></view><view wx:if="{{warnings.length}}" class="notice-dot"></view></view>
     </view>
     <view class="hero ui-card" bindtap="openCamera" aria-role="button" aria-label="拍照记录饮食">
       <image src="/assets/home-banner-cover-v3.jpg" mode="aspectFill"></image>
       <view class="hero-cta"><view class="camera-icon"></view><text>拍照记录饮食</text><view class="chevron"></view></view>
     </view>
-    <view class="nutrition-card ui-card">
-      <view class="card-heading"><view class="heading-with-info"><text class="section-title">今日营养状况</text><view class="info-icon">i</view></view><view class="detail-link" bindtap="openReport"><text>营养详情</text><view class="chevron"></view></view></view>
-      <view class="nutrition-body">
-        <view class="score-panel"><view class="score-arc" style="background: conic-gradient(#64c954 {{coverage}}%, #dff2d9 0)"><view class="score-number"><text>{{coverage}}</text><text class="score-unit">%</text></view></view><text class="score-label">数据覆盖</text><view class="score-tip"><view class="bulb-icon"></view><text>{{coverageTip}}</text></view></view>
-        <view class="nutrient-panel"><view class="nutrient-item" wx:for="{{nutrients}}" wx:key="name"><text class="nutrient-name">{{item.name}}</text><view class="nutrient-ring" style="background: conic-gradient({{item.color}} {{item.value}}%, #edf3e9 0)"><view class="ring-inner">{{item.value}}%</view></view><text class="status-pill {{item.warn ? 'warn' : ''}}">{{item.state}}</text></view></view>
+    <view class="nutrition-card ui-card" bindtap="openReport" aria-role="button" aria-label="查看今日营养报告">
+      <view class="card-heading"><view class="heading-with-info"><text class="section-title">今日营养报告</text></view><view class="detail-link"><text>查看报告</text><view class="chevron"></view></view></view>
+      <view class="report-summary">
+        <view class="report-summary-icon">报</view>
+        <view class="report-summary-copy"><text class="report-summary-title">{{reportTitle}}</text><text class="report-summary-desc">{{reportDescription}}</text></view>
+        <view class="chevron"></view>
       </view>
+      <view wx:if="{{warnings.length}}" class="report-warning"><view class="bulb-icon"></view><text>{{warnings[0]}}</text></view>
     </view>
     <view class="advice-card ui-card">
-      <view class="advice-title"><view class="spark-icon"></view><text class="section-title">经审核规则解释</text></view>
+      <view class="advice-title"><view class="spark-icon"></view><text class="section-title">今日记录提醒</text></view>
       <view class="advice-content">
         <image class="advice-baby" src="/assets/baby-eating-centered-v3.jpg" mode="aspectFill"></image>
         <view class="advice-list"><view class="advice-row" wx:for="{{advice}}" wx:key="title"><view class="food-badge {{item.tone}}">{{item.badge}}</view><view class="advice-copy"><text class="advice-row-title">{{item.title}}</text><text class="advice-desc">{{item.description}}</text></view><view class="chevron"></view></view></view>

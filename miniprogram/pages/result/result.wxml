@@ -1,18 +1,19 @@
 <navigation-bar title="识别与确认" back="{{false}}" color="#2d2623" background="transparent"><view slot="left" class="nav-circle" bindtap="goBack"><view class="back-icon"></view></view><view slot="right" class="retry-button" bindtap="retry"><view class="retry-icon"></view><text>重拍</text></view></navigation-bar>
-<scroll-view class="result-scroll" scroll-y enhanced show-scrollbar="{{false}}"><view class="page-shell no-tabs result-page">
-  <view class="food-card ui-card"><view class="meal-photo-wrap {{samplePhoto ? 'sample' : ''}}"><image class="meal-photo" src="{{photo}}" mode="{{samplePhoto ? 'heightFix' : 'aspectFill'}}"></image></view><view class="food-list"><text class="food-heading">AI 仅提供候选线索</text><view class="food-row" wx:for="{{foods}}" wx:key="index" bindtap="useCandidate" data-index="{{item.index}}"><view class="food-dot {{item.tone}}">{{item.badge}}</view><view class="food-copy"><text class="food-name">{{item.name}}</text><text class="food-details">{{item.details}}</text><text wx:if="{{item.uncertainty}}" class="food-uncertainty">待确认：{{item.uncertainty}}</text><text wx:if="{{item.mappedName}}" class="food-mapped">已映射：{{item.mappedName}}</text></view></view><view class="reference-note"><view class="info-icon">i</view><text>逐项点击候选，映射并确认实际份量</text></view></view></view>
+<scroll-view class="result-scroll" scroll-y enhanced show-scrollbar="{{false}}" scroll-into-view="{{scrollIntoView}}"><view class="page-shell no-tabs result-page">
+  <view class="food-card ui-card"><view class="meal-photo-wrap {{samplePhoto ? 'sample' : ''}}"><image class="meal-photo" src="{{photo}}" mode="{{samplePhoto ? 'heightFix' : 'aspectFill'}}"></image></view><view class="food-list"><text class="food-heading">AI 仅提供候选线索</text><view wx:if="{{!foods.length}}" class="food-empty"><text>{{busy ? '正在识别图片…' : '等待开始识别'}}</text><text>{{busy ? '识别完成后会在这里显示候选食物' : '同意图片处理后点击“开始识别”'}}</text></view><view class="food-row" wx:for="{{foods}}" wx:key="index" bindtap="useCandidate" data-index="{{item.index}}"><view class="food-dot {{item.tone}}">{{item.badge}}</view><view class="food-copy"><text class="food-name">{{item.name}}</text><text class="food-details">{{item.details}}</text><text wx:if="{{item.uncertainty}}" class="food-uncertainty">待确认：{{item.uncertainty}}</text><text wx:if="{{item.mappedName}}" class="food-mapped">已映射：{{item.mappedName}}</text></view></view><view class="reference-note"><view class="info-icon">i</view><text>逐项点击候选，映射并确认实际份量</text></view></view></view>
 
-  <view class="estimate-card ui-card consent-card">
+  <view wx:if="{{!result || errorMessage}}" class="estimate-card ui-card consent-card">
     <text class="section-title">图片处理授权</text>
     <text class="consent-copy">【宝宝营养管家】为识别食物营养成分，需将你拍摄的食物图片发送至 DeepSeek 模型处理。模型通过 API 调用，不将图片用于训练；原始图片仅保存在你的本地终端，服务端只在请求期间临时接触且不保存。图片中的无关人物由 AI Prompt 忽略。不同意不影响基础功能，可继续手工搜索。</text>
     <picker range="{{retentionOptions}}" range-key="label" value="{{retentionIndex}}" bindchange="onRetentionChange"><view class="picker-value">本地期限：{{retentionOptions[retentionIndex].label}}</view></picker>
     <checkbox-group bindchange="onConsentChange"><label class="consent-check"><checkbox value="accepted" checked="{{accepted}}" color="#ff6f70"></checkbox><text>我已知晓并同意上述图片处理</text></label></checkbox-group>
     <button class="primary-button" loading="{{busy}}" bindtap="recognize">{{busy ? '处理中' : '开始识别'}}</button><text wx:if="{{errorMessage}}" class="consent-copy">{{errorMessage}}，可继续手工搜索。</text>
   </view>
+  <view wx:else class="recognition-status ui-card"><view class="recognition-check"><view class="check-icon"></view></view><view><text>已生成 {{foods.length}} 个候选食物</text><text>图片处理授权已确认，本地保存期限：{{retentionOptions[retentionIndex].label}}</text></view><button bindtap="recognize" loading="{{busy}}">重新识别</button></view>
 
-  <view class="estimate-card ui-card">
+  <view id="confirm-section" class="estimate-card ui-card">
     <view class="estimate-title"><text class="section-title">确认标准食品与实际摄入</text><view class="info-icon">i</view></view>
-    <view class="manual-search"><input value="{{query}}" bindinput="onQueryInput" placeholder="输入食品名称，或点击上方 AI 候选"></input><button bindtap="searchFood">搜索</button></view>
+    <view class="manual-search"><input value="{{query}}" focus="{{manualFocus}}" bindinput="onQueryInput" bindblur="onManualBlur" placeholder="输入食品名称，或点击上方 AI 候选"></input><button bindtap="searchFood">搜索</button></view>
     <text class="mapping-tip">可逐项确认多种食材；每种食材分别填写实际吃下克数。</text>
     <view class="confirmed-list">
       <view class="confirmed-food" wx:for="{{confirmedFoods}}" wx:key="localId">
@@ -25,4 +26,4 @@
   <view wx:if="{{nutrition.length}}" class="estimate-card ui-card"><view class="estimate-title"><text class="section-title">确定性营养参考</text><view class="info-icon">i</view></view><view class="nutrition-grid"><view class="nutrition-cell" wx:for="{{nutrition}}" wx:key="name"><text class="nutrition-name">{{item.name}}</text><view class="nutrition-badge {{item.tone}}">{{item.badge}}</view><text class="nutrition-value">{{item.value}}</text></view></view><view class="estimate-foot"><text>数据覆盖率 {{coverageText}}；缺失值不按零处理</text><text wx:for="{{warnings}}" wx:key="*this">{{item}}</text></view></view>
   <view class="evaluation-card ui-card"><text class="evaluation-heading">使用边界</text><view class="evaluation-panel"><view><text>图片识别只产生候选，不产生营养事实。</text><text>食材、端上桌份量和实际吃下克数均由照护者确认。</text><text>结果仅供内部学习参考，不是医学诊断或喂养处方。</text></view></view></view>
 </view></scroll-view>
-<view class="result-actions safe-fixed"><button class="secondary-button" bindtap="startManualSearch">手工搜索</button><button class="primary-button" loading="{{busy}}" bindtap="save"><view wx:if="{{!busy}}" class="check-circle"><view class="check-icon"></view></view><text>{{busy ? '正在保存' : '确认并保存记录'}}</text></button></view>
+<view class="result-actions safe-fixed"><button class="secondary-button" bindtap="startManualSearch">手工添加食物</button><button class="primary-button" loading="{{busy}}" bindtap="save"><view wx:if="{{!busy}}" class="check-circle"><view class="check-icon"></view></view><text>{{busy ? '正在保存' : '确认并保存记录'}}</text></button></view>

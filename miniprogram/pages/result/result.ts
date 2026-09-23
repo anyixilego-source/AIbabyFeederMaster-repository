@@ -58,7 +58,7 @@ Page({
     confirmedFoods: [] as ConfirmedFoodItem[],
     nutrition: [] as Array<{ name: string; badge: string; value: string; tone: string }>,
     coverageText: '', warnings: [] as string[],
-    errorMessage: '',
+    errorMessage: '', scrollIntoView: '', manualFocus: false,
   },
 
   onLoad() {
@@ -72,6 +72,7 @@ Page({
   onConsentChange(event: WechatMiniprogram.CustomEvent) { this.setData({ accepted: event.detail.value.length > 0 }) },
   onRetentionChange(event: WechatMiniprogram.CustomEvent) { this.setData({ retentionIndex: Number(event.detail.value) }) },
   onQueryInput(event: WechatMiniprogram.Input) { this.setData({ query: event.detail.value }) },
+  onManualBlur() { this.setData({ manualFocus: false }) },
   onServedInput(event: WechatMiniprogram.Input) {
     const index = Number(event.currentTarget.dataset.index)
     const confirmedFoods = this.data.confirmedFoods.map((item, itemIndex) => itemIndex === index ? { ...item, servedAmount: event.detail.value } : item)
@@ -102,7 +103,7 @@ Page({
         foods: items.map((item, index) => ({
           badge: item.observedName.slice(0, 1), name: item.observedName,
           details: [item.form, item.count === null ? null : `${item.count} 份`, item.amountHint || '份量待确认', `置信度 ${Math.round(item.confidence * 100)}%`].filter(Boolean).join(' · '),
-          uncertainty: item.uncertainties.join('；'), tone: 'vegetable', index, mappedName: '',
+          uncertainty: item.uncertainties.filter((value) => !value.includes('实际摄入克数')).join('；'), tone: 'vegetable', index, mappedName: '',
         })),
       })
       if (result.mode === 'MANUAL_SEARCH') wx.showToast({ title: '识别失败，请手工搜索', icon: 'none' })
@@ -120,7 +121,7 @@ Page({
   },
 
   startManualSearch() {
-    this.setData({ pendingCandidateIndex: -1 }, () => { void this.searchFood() })
+    this.setData({ pendingCandidateIndex: -1, scrollIntoView: 'confirm-section', manualFocus: true })
   },
 
   async searchFood(): Promise<void> {
@@ -166,7 +167,7 @@ Page({
       ? this.data.confirmedFoods.map((item, index) => index === currentIndex ? selected : item)
       : [...this.data.confirmedFoods, selected]
     const foods = this.data.foods.map((item) => item.index === candidateIndex ? { ...item, mappedName: food.canonicalNameZh } : item)
-    this.setData({ confirmedFoods, foods, query: '', pendingCandidateIndex: -1 })
+    this.setData({ confirmedFoods, foods, query: '', pendingCandidateIndex: -1, scrollIntoView: 'confirm-section' })
   },
 
   removeFood(event: WechatMiniprogram.TouchEvent) {

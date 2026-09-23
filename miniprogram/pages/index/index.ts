@@ -1,5 +1,4 @@
 import { ApiError, request } from '../../utils/api'
-import { completeOperation, getPendingOperation, operationPayload } from '../../utils/operation'
 import { ensureSessionContext, SessionContext, SubjectSummary } from '../../utils/session'
 
 interface ReportSummary {
@@ -43,8 +42,8 @@ async function context(): Promise<SessionContext> {
 
 Component({
   data: {
-    loading: true, babyName: '宝宝', genderText: '', ageText: '', coverage: 0,
-    coverageTip: '仅统计已确认实际摄入', warnings: [] as string[],
+    loading: true, babyName: '宝宝', genderText: '', ageText: '', warnings: [] as string[],
+    reportTitle: '今天还没有营养报告', reportDescription: '记录并确认实际摄入后生成营养参考',
     nutrients: [] as Array<{ name: string; value: number; state: string; color: string; warn: boolean }>,
     advice: [] as Array<{ tone: string; badge: string; title: string; description: string }>,
   },
@@ -77,14 +76,15 @@ Component({
         }))
         this.setData({
           babyName: subject.displayName, genderText: subject.sex === 'FEMALE' ? '女' : subject.sex === 'MALE' ? '男' : '',
-          ageText: ageLabel(subject.birthDate), coverage,
-          coverageTip: report ? `报告数据覆盖率 ${coverage}%` : '今天尚未生成营养报告',
+          ageText: ageLabel(subject.birthDate),
+          reportTitle: report ? '今日营养报告已生成' : '今天还没有营养报告',
+          reportDescription: report ? '查看已记录摄入、主要来源和参考信息' : '记录并确认实际摄入后生成营养参考',
           warnings: (report?.warnings || []).map(warningLabel), nutrients,
           advice: advice.length ? advice : [{ tone: 'grain', badge: '记', title: '尚无报告结论', description: '先记录并确认实际摄入，再查看营养参考' }],
         })
       } catch (caught) {
         const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '首页加载失败'
-        this.setData({ coverageTip: message, advice: [{ tone: 'grain', badge: '!', title: '数据暂不可用', description: message }] })
+        this.setData({ reportTitle: '今日报告暂不可用', reportDescription: message, advice: [{ tone: 'grain', badge: '!', title: '数据暂不可用', description: message }] })
       } finally { this.setData({ loading: false }) }
     },
     async openCamera() {
@@ -93,11 +93,6 @@ Component({
       try {
         const active = await context()
         if (!active.subjectId) throw new Error('请先建立宝宝档案')
-        const scope = `create-meal:${active.subjectId}`
-        const payload = getPendingOperation(scope) || operationPayload(scope, { mealType: 'OTHER', occurredAt: new Date().toISOString(), notes: '拍照记录' })
-        const meal = await request<{ mealId: string }>(`/subjects/${active.subjectId}/meals`, { method: 'POST', data: payload })
-        completeOperation(scope, payload.operationId)
-        wx.setStorageSync('foodmaster.currentMealId', meal.mealId)
         wx.navigateTo({ url: '/pages/camera/camera' })
       } catch (caught) {
         const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '创建餐食失败'
