@@ -39,7 +39,7 @@
         </view>
       </view>
       <text class="reference-text">{{referenceText}}</text>
-      <view class="ruler-wrap">
+      <view wx:if="{{referenceAvailable}}" class="ruler-wrap">
         <text class="marker-value" style="left: {{markerPercent}}%">{{amountText}} {{unitText}}</text>
         <view class="ruler">
           <view class="ruler-fill"></view>
@@ -60,7 +60,10 @@
     </view>
 
     <view class="about-card" bindtap="toggleAbout">
-      <view class="about-heading"><text>关于{{name}}的说明</text><text>{{aboutExpanded ? '⌃' : '⌄'}}</text></view>
+      <view class="about-heading">
+        <text>关于{{name}}的说明</text>
+        <view class="about-toggle {{aboutExpanded ? 'expanded' : ''}}"><view class="about-arrow"></view></view>
+      </view>
       <view wx:if="{{aboutExpanded}}" class="about-body">
         <text>• 本页数值是已记录食物中可计算的{{name}}合计。</text>
         <text>• 如果仍有未记录的奶量或食物，实际摄入可能不同。</text>

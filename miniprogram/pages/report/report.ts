@@ -23,7 +23,8 @@ Page({
     babyName: '宝宝',
     ageText: '',
     dateLabel: '',
-    encouragement: '今天也在认真记录宝宝的饮食',
+    encouragementTitle: '今天还可以继续加油',
+    encouragementSubtitle: '慢慢记录就很好！',
     mealCount: 0,
     foodCount: 0,
     totalConsumedText: '0',
@@ -52,6 +53,9 @@ Page({
       const selectedCategory = availableCategories.some((category) => category.code === this.data.selectedCategory)
         ? this.data.selectedCategory
         : (availableCategories[0]?.code || 'MACRO')
+      const hasNeedsAttention = bundle.nutrients.some((nutrient) => nutrient.statusTone === 'warn' || nutrient.statusTone === 'danger')
+      const hasPositiveReference = bundle.nutrients.some((nutrient) => nutrient.status === 'AT_OR_ABOVE_REFERENCE')
+      const positiveEncouragement = hasPositiveReference && !hasNeedsAttention
       this.setData({
         babyName: bundle.subject.displayName,
         ageText: bundle.ageText,
@@ -59,6 +63,8 @@ Page({
         mealCount: bundle.mealCount,
         foodCount: bundle.foodCount,
         totalConsumedText: bundle.totalConsumedText,
+        encouragementTitle: positiveEncouragement ? '今天吃得很棒' : '今天还可以继续加油',
+        encouragementSubtitle: positiveEncouragement ? '继续加油呀！' : '慢慢记录就很好！',
         categories: availableCategories,
         selectedCategory,
         allNutrients: bundle.nutrients,

@@ -15,7 +15,8 @@
       <text class="baby-age">{{ageText}}</text>
     </view>
     <view class="encouragement">
-      <text>{{encouragement}}</text>
+      <text>{{encouragementTitle}}</text>
+      <text>{{encouragementSubtitle}}</text>
       <text class="heart">♥</text>
     </view>
     <image class="hero-baby" src="/assets/baby-eating-centered-v3.jpg" mode="aspectFill" />
@@ -29,21 +30,21 @@
   <view class="summary-card" bindtap="openOverview">
     <view class="section-heading">
       <text>今日记录概览</text>
-      <text class="chevron">›</text>
+      <view class="right-arrow"></view>
     </view>
     <view class="summary-grid">
       <view class="summary-item">
-        <view class="summary-icon blue">餐</view>
+        <view class="summary-icon blue"><view class="sprite-icon sprite-meal"></view></view>
         <text class="summary-value">{{mealCount}} 餐</text>
         <text class="summary-label">已记录</text>
       </view>
       <view class="summary-item">
-        <view class="summary-icon coral">食</view>
+        <view class="summary-icon coral"><view class="sprite-icon sprite-food"></view></view>
         <text class="summary-value">{{foodCount}} 种</text>
         <text class="summary-label">食物</text>
       </view>
       <view class="summary-item">
-        <view class="summary-icon green">克</view>
+        <view class="summary-icon green"><view class="sprite-icon sprite-weight"></view></view>
         <text class="summary-value">{{totalConsumedText}} 克</text>
         <text class="summary-label">已确认摄入</text>
       </view>
@@ -59,20 +60,20 @@
         <switch checked="{{sortByImportance}}" color="#ff6d75" bindchange="toggleSort" />
       </label>
     </view>
-    <scroll-view class="category-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+    <view class="category-scroll">
       <view class="category-tabs">
         <button wx:for="{{categories}}" wx:key="code"
           class="category-tab {{selectedCategory === item.code ? 'active' : ''}}"
           data-code="{{item.code}}" bindtap="selectCategory">{{item.label}}</button>
       </view>
-    </scroll-view>
+    </view>
 
     <view wx:if="{{loading}}" class="loading-state">正在整理今天的记录…</view>
     <view wx:elif="{{nutrients.length === 0}}" class="empty-state">当前分类暂无可展示的营养数据</view>
     <view wx:else class="nutrient-list">
       <view wx:for="{{nutrients}}" wx:key="nutrientCode" class="nutrient-row"
         data-code="{{item.nutrientCode}}" bindtap="openNutrient">
-        <view class="nutrient-badge {{item.statusTone}}">{{item.badge}}</view>
+        <view class="nutrient-badge {{item.statusTone}}"><view class="sprite-icon {{item.iconClass}}"></view></view>
         <view class="nutrient-main">
           <view class="nutrient-line">
             <text class="nutrient-name">{{item.name}}</text>

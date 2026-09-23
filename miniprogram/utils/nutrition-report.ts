@@ -61,6 +61,7 @@ export interface NutrientView {
   nutrientCode: string
   name: string
   badge: string
+  iconClass: string
   category: 'MACRO' | 'MINERAL' | 'VITAMIN' | 'OTHER'
   amountText: string
   numericValue: number | null
@@ -231,7 +232,7 @@ function nutrientView(item: AssessmentNutrient, sources: NutrientSource[]): Nutr
   const name = nutrientNames[item.nutrientCode] || '其他营养素'
   const coverage = Number(item.coverageRatio)
   return {
-    nutrientCode: item.nutrientCode, name, badge: name.slice(0, 1), category: nutrientCategory(item.nutrientCode),
+    nutrientCode: item.nutrientCode, name, badge: name.slice(0, 1), iconClass: nutrientIcon(item.nutrientCode), category: nutrientCategory(item.nutrientCode),
     amountText: item.averageDailyValue === null ? '暂无数值' : formatNumber(item.averageDailyValue),
     numericValue: item.averageDailyValue === null ? null : Number(item.averageDailyValue),
     unitText: unitNames[item.unitCode] || '单位待核对', status: item.status,
@@ -240,6 +241,18 @@ function nutrientView(item: AssessmentNutrient, sources: NutrientSource[]): Nutr
     recommendedValue: item.recommendedValue, upperLimitValue: item.upperLimitValue, sources,
     sourceText: sources.length > 0 ? sources.slice(0, 3).map((source) => source.name).join('、') : '暂无可计算来源',
   }
+}
+
+function nutrientIcon(code: string): string {
+  if (code === 'ENERGY' || code === 'ENERGY_KCAL') return 'sprite-energy'
+  if (code === 'PROTEIN') return 'sprite-protein'
+  if (code === 'FAT_TOTAL') return 'sprite-fat'
+  if (code === 'CARBOHYDRATE') return 'sprite-carbohydrate'
+  if (code === 'CALCIUM') return 'sprite-calcium'
+  if (code === 'IRON') return 'sprite-iron'
+  if (code === 'VITAMIN_A_RAE' || code === 'VITAMIN_C') return 'sprite-vitamin'
+  if (code === 'FIBER_DIETARY') return 'sprite-fiber'
+  return 'sprite-calcium'
 }
 
 function nutrientCategory(code: string): NutrientView['category'] {

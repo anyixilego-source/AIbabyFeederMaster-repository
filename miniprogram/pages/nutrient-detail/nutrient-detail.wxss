@@ -49,6 +49,9 @@ page { background: #fffaf7; color: #171722; }
 .explanation-title { font-size: 24rpx; font-weight: 800; }
 .suggestion-title { margin-top: 12rpx; }
 .explanation-item { color: #6f7586; font-size: 22rpx; line-height: 1.55; }
-.about-heading { display: flex; justify-content: space-between; }
+.about-heading { display: flex; justify-content: space-between; align-items: center; }
+.about-toggle { width: 48rpx; height: 48rpx; border: 1rpx solid #d8dce3; border-radius: 24rpx; display: flex; align-items: center; justify-content: center; background: #f1f3f6; box-sizing: border-box; }
+.about-arrow { width: 13rpx; height: 13rpx; margin-top: -7rpx; border-right: 5rpx solid #515866; border-bottom: 5rpx solid #515866; transform: rotate(45deg); }
+.about-toggle.expanded .about-arrow { margin-top: 7rpx; transform: rotate(225deg); }
 .about-body { margin-top: 18rpx; padding: 20rpx; display: flex; flex-direction: column; gap: 12rpx; color: #647086; background: #eff9ff; border-radius: 20rpx; font-size: 22rpx; line-height: 1.55; }
 .bottom-space { height: 70rpx; }

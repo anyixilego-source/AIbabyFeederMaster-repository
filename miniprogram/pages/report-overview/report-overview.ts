@@ -53,6 +53,7 @@ Page({
     referencePercent: 0,
     foodRecords: [] as ReportBundle['foodRecords'],
     scrollTop: 0,
+    showBackToTop: false,
   },
 
   onLoad() { void this.loadOverview() },
@@ -85,6 +86,7 @@ Page({
         foodRecords: currentBundle.foodRecords,
       })
       this.buildTrend()
+      wx.nextTick(() => this.measurePageHeight())
     } catch (caught) {
       const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '报告概览加载失败'
       this.setData({ errorMessage: message })
@@ -129,6 +131,14 @@ Page({
   selectTrend(event: WechatMiniprogram.TouchEvent) {
     this.setData({ selectedTrend: String(event.currentTarget.dataset.code) })
     this.buildTrend()
+  },
+
+  measurePageHeight() {
+    wx.createSelectorQuery().in(this).select('.page-shell').boundingClientRect((rect) => {
+      if (!rect) return
+      const windowHeight = wx.getSystemInfoSync().windowHeight
+      this.setData({ showBackToTop: rect.height > windowHeight * 2 })
+    }).exec()
   },
 
   goBack() { wx.navigateBack() },

@@ -26,7 +26,7 @@ function referencePresentation(nutrient: NutrientView) {
     scaleMax = Math.max(upper, current, 1)
   }
   const markerPercent = Math.max(2, Math.min(98, Math.round(current / scaleMax * 100)))
-  return { referenceText, markerPercent, scaleMaxText: formatNumber(scaleMax) }
+  return { referenceText, markerPercent, scaleMaxText: formatNumber(scaleMax), referenceAvailable: recommended !== null || upper !== null }
 }
 
 Page({
@@ -41,6 +41,7 @@ Page({
     sourceCount: 0,
     sources: [] as NutrientView['sources'],
     referenceText: '',
+    referenceAvailable: false,
     markerPercent: 0,
     scaleMaxText: '',
     conclusion: '',
@@ -77,6 +78,7 @@ Page({
         sourceCount: nutrient.sources.length,
         sources: nutrient.sources.slice(0, 5),
         referenceText: reference.referenceText,
+        referenceAvailable: reference.referenceAvailable,
         markerPercent: reference.markerPercent,
         scaleMaxText: reference.scaleMaxText,
         conclusion: nutrient.statusText,

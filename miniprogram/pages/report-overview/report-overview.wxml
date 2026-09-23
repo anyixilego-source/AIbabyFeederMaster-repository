@@ -9,18 +9,17 @@
         <view class="reminder-list">
           <text wx:for="{{reminders}}" wx:key="*this" class="reminder-item">• {{item}}</text>
         </view>
-        <image class="attention-baby" src="/assets/baby-eating-centered-v3.jpg" mode="aspectFill" />
       </view>
 
       <view class="trend-card">
         <view class="section-heading"><text>近 7 天营养趋势</text></view>
-        <scroll-view class="trend-tabs-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+        <view class="trend-tabs-scroll">
           <view class="trend-tabs">
             <button wx:for="{{trendOptions}}" wx:key="code"
               class="trend-tab {{selectedTrend === item.code ? 'active' : ''}}"
               data-code="{{item.code}}" bindtap="selectTrend">{{item.label}}</button>
           </view>
-        </scroll-view>
+        </view>
         <view class="chart-title">{{selectedTrendName}}（{{selectedUnit}}）</view>
         <view class="chart-area">
           <view wx:if="{{referenceAvailable}}" class="reference-line" style="bottom: {{referencePercent}}%">
@@ -35,7 +34,7 @@
             </view>
           </view>
         </view>
-        <view class="trend-note"><text class="bulb">i</text><text>趋势图用于了解近期已记录的饮食变化，比单日数据更有参考意义；缺少记录的日期显示为“—”。</text></view>
+        <view class="trend-note"><view class="sprite-icon sprite-bulb"></view><text>趋势图用于了解近期已记录的饮食变化，比单日数据更有参考意义；缺少记录的日期显示为“—”。</text></view>
       </view>
 
       <view class="food-card">
@@ -51,7 +50,7 @@
           </view>
         </view>
         <view wx:else class="food-empty">今天还没有已确认的食物记录</view>
-        <button class="top-button" bindtap="backToTop">回到顶部</button>
+        <button wx:if="{{showBackToTop}}" class="top-button" bindtap="backToTop">回到顶部</button>
       </view>
     </block>
     <view class="bottom-space"></view>
