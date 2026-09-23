@@ -36,7 +36,7 @@
             </view>
           </view>
         </view>
-        <view class="trend-note"><view class="sprite-icon"><image class="sprite-sheet sprite-bulb" src="/assets/report-icon-sprite-v2.png" mode="scaleToFill" /></view><text>趋势图用于了解近期已记录的饮食变化，比单日数据更有参考意义；缺少记录的日期显示为“—”。</text></view>
+        <view class="trend-note"><image class="bulb-icon" src="/assets/report-icon-bulb-v1.png" mode="aspectFit" /><text>趋势图用于了解近期已记录的饮食变化，比单日数据更有参考意义；缺少记录的日期显示为“—”。</text></view>
       </view>
 
       <view class="food-card">

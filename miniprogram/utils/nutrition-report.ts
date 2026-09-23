@@ -61,7 +61,10 @@ export interface NutrientView {
   nutrientCode: string
   name: string
   badge: string
-  iconClass: string
+  iconPath: string
+  progressPercent: number
+  progressLabel: string
+  progressTone: string
   category: 'MACRO' | 'MINERAL' | 'VITAMIN' | 'OTHER'
   amountText: string
   numericValue: number | null
@@ -231,10 +234,19 @@ function latestReport(reports: AssessmentReport[], date: string): AssessmentRepo
 function nutrientView(item: AssessmentNutrient, sources: NutrientSource[]): NutrientView {
   const name = nutrientNames[item.nutrientCode] || '其他营养素'
   const coverage = Number(item.coverageRatio)
+  const numericValue = item.averageDailyValue === null ? null : Number(item.averageDailyValue)
+  const referenceRaw = item.recommendedValue ?? item.upperLimitValue
+  const reference = referenceRaw === null ? null : Number(referenceRaw)
+  const hasComparableReference = numericValue !== null && Number.isFinite(numericValue)
+    && reference !== null && Number.isFinite(reference) && reference > 0
+  const progressRatio = hasComparableReference ? numericValue / reference * 100 : null
   return {
-    nutrientCode: item.nutrientCode, name, badge: name.slice(0, 1), iconClass: nutrientIcon(item.nutrientCode), category: nutrientCategory(item.nutrientCode),
+    nutrientCode: item.nutrientCode, name, badge: name.slice(0, 1), iconPath: nutrientIcon(item.nutrientCode), category: nutrientCategory(item.nutrientCode),
+    progressPercent: progressRatio === null ? 0 : Math.max(0, Math.min(100, progressRatio)),
+    progressLabel: progressRatio === null ? '' : `${item.recommendedValue !== null ? '约占参考值' : '约占上限参考'} ${Math.round(progressRatio)}%`,
+    progressTone: nutrientProgressTone(item.nutrientCode),
     amountText: item.averageDailyValue === null ? '暂无数值' : formatNumber(item.averageDailyValue),
-    numericValue: item.averageDailyValue === null ? null : Number(item.averageDailyValue),
+    numericValue,
     unitText: unitNames[item.unitCode] || '单位待核对', status: item.status,
     statusText: statusLabels[item.status] || '暂无法比较', statusTone: statusTone(item.status),
     dataNote: coverage < 1 ? `部分食物缺少${name}数据` : '',
@@ -243,16 +255,25 @@ function nutrientView(item: AssessmentNutrient, sources: NutrientSource[]): Nutr
   }
 }
 
+function nutrientProgressTone(code: string): string {
+  if (code === 'ENERGY' || code === 'ENERGY_KCAL') return 'blue'
+  if (code === 'PROTEIN') return 'green'
+  if (code === 'FAT_TOTAL') return 'yellow'
+  if (code === 'CARBOHYDRATE') return 'purple'
+  return 'cyan'
+}
+
 function nutrientIcon(code: string): string {
-  if (code === 'ENERGY' || code === 'ENERGY_KCAL') return 'sprite-energy'
-  if (code === 'PROTEIN') return 'sprite-protein'
-  if (code === 'FAT_TOTAL') return 'sprite-fat'
-  if (code === 'CARBOHYDRATE') return 'sprite-carbohydrate'
-  if (code === 'CALCIUM') return 'sprite-calcium'
-  if (code === 'IRON') return 'sprite-iron'
-  if (code === 'VITAMIN_A_RAE' || code === 'VITAMIN_C') return 'sprite-vitamin'
-  if (code === 'FIBER_DIETARY') return 'sprite-fiber'
-  return 'sprite-calcium'
+  if (code === 'ENERGY' || code === 'ENERGY_KCAL') return '/assets/report-icon-energy-v1.png'
+  if (code === 'PROTEIN') return '/assets/report-icon-protein-v1.png'
+  if (code === 'FAT_TOTAL') return '/assets/report-icon-fat-v1.png'
+  if (code === 'CARBOHYDRATE') return '/assets/report-icon-carbohydrate-v1.png'
+  if (code === 'CALCIUM') return '/assets/report-icon-calcium-v1.png'
+  if (code === 'IRON') return '/assets/report-icon-iron-v1.png'
+  if (code === 'ZINC' || code === 'SODIUM') return '/assets/report-icon-mineral-v1.png'
+  if (code === 'VITAMIN_A_RAE' || code === 'VITAMIN_C') return '/assets/report-icon-vitamin-v1.png'
+  if (code === 'FIBER_DIETARY') return '/assets/report-icon-fiber-v1.png'
+  return '/assets/report-icon-mineral-v1.png'
 }
 
 function nutrientCategory(code: string): NutrientView['category'] {

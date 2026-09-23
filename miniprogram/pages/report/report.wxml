@@ -29,22 +29,22 @@
     </view>
     <view class="summary-grid">
       <view class="summary-item">
-        <view class="summary-icon blue"><view class="sprite-icon"><image class="sprite-sheet sprite-meal" src="/assets/report-icon-sprite-v2.png" mode="scaleToFill" /></view></view>
+        <view class="summary-icon blue"><image class="report-icon" src="/assets/report-icon-meal-v1.png" mode="aspectFit" /></view>
         <text class="summary-value">{{mealCount}} 餐</text>
         <text class="summary-label">已记录</text>
       </view>
       <view class="summary-item">
-        <view class="summary-icon coral"><view class="sprite-icon"><image class="sprite-sheet sprite-food" src="/assets/report-icon-sprite-v2.png" mode="scaleToFill" /></view></view>
+        <view class="summary-icon coral"><image class="report-icon" src="/assets/report-icon-food-v1.png" mode="aspectFit" /></view>
         <text class="summary-value">{{foodCount}} 种</text>
         <text class="summary-label">食物</text>
       </view>
       <view class="summary-item">
-        <view class="summary-icon green"><view class="sprite-icon"><image class="sprite-sheet sprite-weight" src="/assets/report-icon-sprite-v2.png" mode="scaleToFill" /></view></view>
+        <view class="summary-icon green"><image class="report-icon" src="/assets/report-icon-weight-v1.png" mode="aspectFit" /></view>
         <text class="summary-value">{{totalConsumedText}} 克</text>
         <text class="summary-label">已确认摄入</text>
       </view>
     </view>
-    <view class="summary-note">仅统计已经记录并确认的食物，可能还有未记录的奶量或其他食物。</view>
+    <view class="summary-note"><view class="summary-alert">!</view><text>仅统计已记录并确认的食物，未记录内容不计入。</text></view>
   </view>
 
   <view class="nutrient-card">
@@ -68,7 +68,7 @@
     <view wx:else class="nutrient-list">
       <view wx:for="{{nutrients}}" wx:key="nutrientCode" class="nutrient-row"
         data-code="{{item.nutrientCode}}" bindtap="openNutrient">
-        <view class="nutrient-badge {{item.statusTone}}"><view class="sprite-icon"><image class="sprite-sheet {{item.iconClass}}" src="/assets/report-icon-sprite-v2.png" mode="scaleToFill" /></view></view>
+        <view class="nutrient-badge {{item.statusTone}}"><image class="report-icon" src="{{item.iconPath}}" mode="aspectFit" /></view>
         <view class="nutrient-main">
           <view class="nutrient-line">
             <text class="nutrient-name">{{item.name}}</text>
@@ -76,6 +76,10 @@
               <text class="amount-value">{{item.amountText}}</text>
               <text class="amount-unit">{{item.unitText}}</text>
             </view>
+          </view>
+          <view wx:if="{{item.progressLabel}}" class="nutrient-progress">
+            <view class="nutrient-progress-track"><view class="nutrient-progress-fill {{item.progressTone}}" style="width: {{item.progressPercent}}%"></view></view>
+            <text>{{item.progressLabel}}</text>
           </view>
           <text class="source-text">主要来源：{{item.sourceText}}</text>
           <view wx:if="{{item.dataNote}}" class="data-note">! {{item.dataNote}}</view>
