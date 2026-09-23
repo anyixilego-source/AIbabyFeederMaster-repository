@@ -6,6 +6,7 @@ import type { SessionContext } from '../../utils/session'
 
 interface TrendOption { code: string; label: string }
 interface TrendBar { date: string; label: string; valueText: string; heightPercent: number; current: boolean; missing: boolean }
+interface ChartTick { valueText: string; topPercent: number }
 
 const defaultTrendOptions: TrendOption[] = [
   { code: 'ENERGY', label: '能量' },
@@ -38,6 +39,14 @@ function lastSevenDates(): Date[] {
   return result
 }
 
+function niceStep(value: number): number {
+  const exponent = Math.floor(Math.log10(Math.max(value, 0.0001)))
+  const base = 10 ** exponent
+  const fraction = value / base
+  const multiplier = fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10
+  return multiplier * base
+}
+
 Page({
   data: {
     loading: true,
@@ -48,6 +57,7 @@ Page({
     selectedTrendName: '能量',
     selectedUnit: '',
     trendBars: [] as TrendBar[],
+    chartTicks: [] as ChartTick[],
     referenceAvailable: false,
     referenceLabel: '',
     referencePercent: 0,
@@ -66,10 +76,10 @@ Page({
       currentBundle = await loadReportBundle(active.subjectId)
       const reminders: string[] = []
       if (currentBundle.warnings.length > 0 || currentBundle.nutrients.some((item) => item.dataNote)) {
-        reminders.push('部分营养数据不完整,当前数值仅代表已知部分.')
+        reminders.push('部分营养数据不完整，当前数值仅代表已知部分。')
       }
-      reminders.push('今天可能还有未记录的奶量或其他食物.')
-      if (reminders.length < 3) reminders.push('仅统计已记录并确认的食物.')
+      reminders.push('今天可能还有未记录的奶量或其他食物。')
+      if (reminders.length < 3) reminders.push('仅统计已记录并确认的食物。')
       const optionMap = new Map<string, TrendOption>()
       for (const nutrient of currentBundle.nutrients) {
         const code = nutrient.nutrientCode === 'ENERGY_KCAL' ? 'ENERGY' : nutrient.nutrientCode
@@ -115,7 +125,13 @@ Page({
       return { date, value: value !== null && Number.isFinite(value) ? value : null }
     })
     const availableValues = values.map((item) => item.value).filter((value): value is number => value !== null)
-    const scaleMax = Math.max(reference || 0, ...availableValues, 1) * 1.18
+    const maximumValue = Math.max(reference || 0, ...availableValues, 1)
+    const tickStep = niceStep(maximumValue / 4)
+    const scaleMax = tickStep * 4
+    const chartTicks: ChartTick[] = Array.from({ length: 5 }, (_, index) => ({
+      valueText: formatNumber(scaleMax - tickStep * index),
+      topPercent: index * 25,
+    }))
     const trendBars: TrendBar[] = values.map((item, index) => ({
       date: dateOnly(item.date),
       label: `${item.date.getMonth() + 1}/${item.date.getDate()}`,
@@ -129,6 +145,7 @@ Page({
       selectedTrendName: nutrientNames[currentNutrient?.nutrientCode || this.data.selectedTrend] || '营养素',
       selectedUnit: unitNames[unitCode] || '',
       trendBars,
+      chartTicks,
       referenceAvailable: reference !== null && Number.isFinite(reference),
       referenceLabel: reference === null ? '当前无适用参考线' : `参考达标线 ${formatNumber(reference)}`,
       referencePercent: reference === null ? 0 : Math.round(reference / scaleMax * 100),

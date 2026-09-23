@@ -26,6 +26,7 @@ Page({
     mealCount: 0,
     foodCount: 0,
     totalConsumedText: '0',
+    encouragementImage: '/assets/report-encouragement-continue-v1.png',
     categories: [
       { code: 'MACRO', label: categoryLabels.MACRO },
       { code: 'MINERAL', label: categoryLabels.MINERAL },
@@ -55,6 +56,8 @@ Page({
       const selectedCategory = allCategories.some((category) => category.code === this.data.selectedCategory)
         ? this.data.selectedCategory
         : 'MACRO'
+      const hasNeedsAttention = bundle.nutrients.some((nutrient) => nutrient.statusTone === 'warn' || nutrient.statusTone === 'danger')
+      const hasPositiveReference = bundle.nutrients.some((nutrient) => nutrient.status === 'AT_OR_ABOVE_REFERENCE')
       this.setData({
         babyName: bundle.subject.displayName,
         ageText: bundle.ageText,
@@ -62,6 +65,9 @@ Page({
         mealCount: bundle.mealCount,
         foodCount: bundle.foodCount,
         totalConsumedText: bundle.totalConsumedText,
+        encouragementImage: hasPositiveReference && !hasNeedsAttention
+          ? '/assets/report-encouragement-positive-v1.png'
+          : '/assets/report-encouragement-continue-v1.png',
         categories: allCategories,
         selectedCategory,
         allNutrients: bundle.nutrients,

@@ -22,6 +22,8 @@
         </scroll-view>
         <view class="chart-title">{{selectedTrendName}}（{{selectedUnit}}）</view>
         <view class="chart-area">
+          <view class="y-axis"><text wx:for="{{chartTicks}}" wx:key="topPercent" class="y-axis-label" style="top: {{item.topPercent}}%">{{item.valueText}}</text></view>
+          <view class="plot-grid"></view>
           <view wx:if="{{referenceAvailable}}" class="reference-line" style="bottom: {{referencePercent}}%">
             <text>{{referenceLabel}}</text>
           </view>
@@ -34,7 +36,7 @@
             </view>
           </view>
         </view>
-        <view class="trend-note"><view class="sprite-icon"><image class="sprite-sheet sprite-bulb" src="/assets/report-icon-sprite-v1.webp" mode="scaleToFill" /></view><text>趋势图用于了解近期已记录的饮食变化，比单日数据更有参考意义；缺少记录的日期显示为“—”。</text></view>
+        <view class="trend-note"><view class="sprite-icon"><image class="sprite-sheet sprite-bulb" src="/assets/report-icon-sprite-v2.png" mode="scaleToFill" /></view><text>趋势图用于了解近期已记录的饮食变化，比单日数据更有参考意义；缺少记录的日期显示为“—”。</text></view>
       </view>
 
       <view class="food-card">

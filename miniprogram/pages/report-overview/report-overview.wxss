@@ -19,11 +19,14 @@ page { background: #fffaf7; color: #171722; }
 .trend-tab { flex: 0 0 112rpx; margin: 0; padding: 0 5rpx; height: 58rpx; line-height: 58rpx; border-radius: 29rpx; color: #697083; background: transparent; font-size: 20rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .trend-tab.active { color: #fff; background: linear-gradient(135deg,#3cb8f2,#3296ef); }
 .chart-title { margin-top: 18rpx; color: #6f7585; font-size: 21rpx; }
-.chart-area { height: 380rpx; margin-top: 12rpx; position: relative; border-bottom: 1rpx solid #dfe4e9; background-image: linear-gradient(to top, rgba(224,229,234,.7) 1rpx, transparent 1rpx); background-size: 100% 25%; }
-.reference-line { position: absolute; left: 0; right: 0; z-index: 3; border-top: 2rpx dashed #ff7e26; }
+.chart-area { height: 380rpx; margin-top: 12rpx; position: relative; }
+.plot-grid { position: absolute; left: 58rpx; right: 0; top: 0; bottom: 0; border-bottom: 1rpx solid #dfe4e9; background-image: linear-gradient(to top, rgba(224,229,234,.7) 1rpx, transparent 1rpx); background-size: 100% 25%; }
+.y-axis { position: absolute; left: 0; top: 0; bottom: 0; width: 52rpx; z-index: 4; }
+.y-axis-label { position: absolute; right: 8rpx; color: #687085; font-size: 19rpx; transform: translateY(-50%); }
+.reference-line { position: absolute; left: 58rpx; right: 0; z-index: 3; border-top: 2rpx dashed #ff7e26; }
 .reference-line text { position: absolute; right: 0; bottom: 8rpx; padding-left: 9rpx; color: #ff7420; background: rgba(255,255,255,.92); font-size: 20rpx; }
 .no-reference { position: absolute; right: 0; top: 8rpx; color: #9297a3; font-size: 20rpx; }
-.bars { position: absolute; left: 0; right: 0; top: 38rpx; bottom: 0; display: flex; align-items: flex-end; justify-content: space-around; }
+.bars { position: absolute; left: 58rpx; right: 0; top: 38rpx; bottom: 0; display: flex; align-items: flex-end; justify-content: space-around; }
 .bar-column { height: 100%; width: 12%; position: relative; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
 .bar { width: 46rpx; min-height: 0; border-radius: 10rpx 10rpx 0 0; background: linear-gradient(180deg,#a7ddf8,#d5effc); }
 .bar.current { background: linear-gradient(180deg,#2ca8f2,#188ee6); }

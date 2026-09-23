@@ -11,8 +11,7 @@ page { background: #fffaf7; color: #171722; }
 .baby-copy { margin-left: 18rpx; display: flex; flex-direction: column; gap: 8rpx; z-index: 2; }
 .baby-name { font-size: 34rpx; font-weight: 800; }
 .baby-age { color: #7b8192; font-size: 25rpx; }
-.encouragement-image { margin-left: 22rpx; width: 255rpx; height: 102rpx; z-index: 2; }
-.hero-baby { position: absolute; right: -18rpx; bottom: -12rpx; width: 160rpx; height: 160rpx; border-radius: 80rpx; opacity: .95; }
+.encouragement-image { position: absolute; right: -8rpx; bottom: -2rpx; width: 480rpx; height: 190rpx; z-index: 1; }
 .summary-card, .nutrient-card, .error-card { margin-top: 22rpx; background: rgba(255, 255, 255, .96); border: 1rpx solid #f2e9e4; border-radius: 30rpx; box-shadow: 0 12rpx 30rpx rgba(90, 65, 51, .05); }
 .error-card { padding: 28rpx; display: flex; flex-direction: column; gap: 8rpx; background: #fff4f2; }
 .error-title { color: #be3d44; font-weight: 700; }
