@@ -22,28 +22,51 @@ interface AssessmentReport {
 }
 
 const nutrientNames: Record<string, string> = {
-  ENERGY: '能量', PROTEIN: '蛋白质', FAT_TOTAL: '脂肪', CARBOHYDRATE: '碳水', CALCIUM: '钙', IRON: '铁',
-  VITAMIN_A_RAE: '维生素A', VITAMIN_C: '维生素C', FIBER_DIETARY: '膳食纤维', ZINC: '锌',
+  ENERGY: '能量', ENERGY_KCAL: '能量', PROTEIN: '蛋白质', FAT_TOTAL: '脂肪', CARBOHYDRATE: '碳水化合物',
+  CALCIUM: '钙', IRON: '铁', SODIUM: '钠', VITAMIN_A_RAE: '维生素A', VITAMIN_C: '维生素C',
+  FIBER_DIETARY: '膳食纤维', ZINC: '锌',
 }
-const unitNames: Record<string, string> = { KILOCALORIE: 'kcal', KCAL: 'kcal', GRAM: 'g', MILLIGRAM: 'mg', MICROGRAM: 'μg' }
+const unitNames: Record<string, string> = {
+  KILOCALORIE: '千卡', KCAL: '千卡', GRAM: '克', MILLIGRAM: '毫克', MICROGRAM: '微克', MICROGRAM_RAE: '微克 RAE',
+}
 const statusLabels: Record<string, string> = {
-  AT_OR_ABOVE_REFERENCE: '达到参考值', BELOW_REFERENCE: '低于参考值（非诊断）',
-  ABOVE_UPPER_LIMIT: '高于上限参考', WITHIN_UPPER_LIMIT: '未超过上限',
-  NO_INTAKE_DATA: '无摄入数据', INSUFFICIENT_COVERAGE: '数据覆盖不足',
-  NO_REFERENCE_VALUE: '无适用参考值', UNIT_MISMATCH: '单位不匹配',
+  AT_OR_ABOVE_REFERENCE: '达到参考值', BELOW_REFERENCE: '低于参考值',
+  ABOVE_UPPER_LIMIT: '超过上限参考', WITHIN_UPPER_LIMIT: '未超过上限',
+  NO_INTAKE_DATA: '暂无摄入数据', INSUFFICIENT_COVERAGE: '数据不足，暂不比较',
+  NO_REFERENCE_VALUE: '当前规则无参考值', UNIT_MISMATCH: '单位不同，暂不比较',
 }
 const warningLabels: Record<string, string> = {
   NO_CONFIRMED_INTAKE: '本时段没有已确认的实际摄入记录',
   NO_NUTRIENT_DATA: '本时段暂无可用于计算的营养数据',
-  NO_INTAKE_DATA: '没有已确认的摄入数据',
-  INSUFFICIENT_COVERAGE: '数据覆盖不足，暂不作参考值比较',
+  NO_INTAKE_DATA: '没有已确认的摄入数据，无法进行参考值比较',
+  INSUFFICIENT_COVERAGE: '可计算数据不足，暂不进行参考值比较',
+  INSUFFICIENT_COVERAGE_NO_COMPARISON: '可计算数据不足，暂不进行参考值比较',
   NO_REFERENCE_VALUE: '当前规则没有提供适用参考值',
-  UNIT_MISMATCH: '摄入数据与参考规则单位不一致',
+  UNIT_MISMATCH: '摄入数据与参考规则单位不同，暂不比较',
+  UNIT_MISMATCH_NO_COMPARISON: '摄入数据与参考规则单位不同，暂不比较',
+  BELOW_REFERENCE_NOT_DIAGNOSIS: '本次已确认摄入低于参考值，仅供记录参考，不代表营养诊断',
+  REFERENCE_UPPER_LIMIT_EXCEEDED: '本次已确认摄入超过上限参考值，请结合完整饮食记录理解',
+  INCOMPLETE: '部分已确认食物缺少该营养素数值，当前合计可能不完整',
+  NUTRIENT_ABSENT_FOR_ITEM: '部分已确认食物没有该营养素数据',
+  INCONSISTENT_OR_MISSING_UNIT: '数据单位缺失或不一致，暂不进行参考值比较',
+  ESTIMATED_ZERO_USED: '计算中使用了来源标注的估计零值',
+  PARTIAL_VALUE_USED: '计算中使用了部分已知值',
+  TRACE_VALUE_PRESENT: '部分食物仅标注为微量，未按确定数值计入',
+  NO_APPLICABLE_RULE: '当前月龄或条件没有匹配的参考规则',
 }
 function warningLabel(warning: string): string {
-  const [nutrientCode, code] = warning.split(':')
-  if (code) return `${nutrientNames[nutrientCode] || nutrientCode}：${warningLabels[code] || code}`
-  return warningLabels[warning] || warning
+  const [prefix, code] = warning.split(':')
+  if (code && nutrientNames[prefix]) return `${nutrientNames[prefix]}：${warningLabels[code] || '存在尚未归类的数据说明'}`
+  if (prefix === 'RULES_UNAVAILABLE') return `参考规则暂不可用：${warningLabels[code] || '当前条件没有匹配规则'}`
+  if (prefix === 'AMBIGUOUS_RULE') return `${nutrientNames[code] || '部分营养素'}存在多条适用规则，暂不比较`
+  return warningLabels[warning] || '存在尚未归类的数据说明，请稍后更新报告'
+}
+
+function statusTone(status: string): string {
+  if (status === 'AT_OR_ABOVE_REFERENCE' || status === 'WITHIN_UPPER_LIMIT') return 'good'
+  if (status === 'ABOVE_UPPER_LIMIT') return 'danger'
+  if (status === 'BELOW_REFERENCE') return 'warn'
+  return 'neutral'
 }
 
 function dateOnly(date: Date): string {
@@ -73,7 +96,7 @@ Page({
   data: {
     loading: true, babyName: '宝宝', ageText: '', dateLabel: '', reportStatus: '加载中',
     coverage: 0, coverageText: '0%',
-    nutrients: [] as Array<{ name: string; badge: string; value: number; amount: string; status: string; color: string; warn: boolean }>,
+    nutrients: [] as Array<{ nutrientCode: string; name: string; badge: string; value: number; amount: string; status: string; ringColor: string; statusTone: string }>,
     warnings: [] as string[],
   },
 
@@ -107,14 +130,14 @@ Page({
         coverage, coverageText: `${coverage}%`, warnings: report.warnings.map(warningLabel),
         nutrients: assessment.nutrients.map((item) => {
           const value = Math.round(Number(item.coverageRatio) * 100)
-          const label = statusLabels[item.status] || item.status
+          const label = statusLabels[item.status] || '暂无法比较'
+          const name = nutrientNames[item.nutrientCode] || '其他营养素'
           return {
-            name: nutrientNames[item.nutrientCode] || item.nutrientCode,
-            badge: (nutrientNames[item.nutrientCode] || item.nutrientCode).slice(0, 1), value,
-            amount: item.averageDailyValue === null ? '暂无数值' : `${item.averageDailyValue} ${unitNames[item.unitCode] || item.unitCode}`,
+            nutrientCode: item.nutrientCode, name, badge: name.slice(0, 1), value,
+            amount: item.averageDailyValue === null ? '暂无可计算数值' : `${item.averageDailyValue} ${unitNames[item.unitCode] || '（单位待核对）'}`,
             status: label,
-            color: item.status === 'ABOVE_UPPER_LIMIT' ? '#ef6c64' : item.status === 'AT_OR_ABOVE_REFERENCE' ? '#73c959' : '#f6a623',
-            warn: item.status !== 'AT_OR_ABOVE_REFERENCE' && item.status !== 'WITHIN_UPPER_LIMIT',
+            ringColor: value === 100 ? '#42b7ca' : '#f6a623',
+            statusTone: statusTone(item.status),
           }
         }),
       })
