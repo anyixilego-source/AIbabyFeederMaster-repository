@@ -14,11 +14,7 @@
       <text class="baby-name">{{babyName}}</text>
       <text class="baby-age">{{ageText}}</text>
     </view>
-    <view class="encouragement">
-      <text>{{encouragementTitle}}</text>
-      <text>{{encouragementSubtitle}}</text>
-      <text class="heart">♥</text>
-    </view>
+    <image class="encouragement-image" src="/assets/report-encouragement-v1.webp" mode="aspectFit" />
     <image class="hero-baby" src="/assets/baby-eating-centered-v3.jpg" mode="aspectFill" />
   </view>
 
@@ -34,17 +30,17 @@
     </view>
     <view class="summary-grid">
       <view class="summary-item">
-        <view class="summary-icon blue"><view class="sprite-icon sprite-meal"></view></view>
+        <view class="summary-icon blue"><view class="sprite-icon"><image class="sprite-sheet sprite-meal" src="/assets/report-icon-sprite-v1.webp" mode="scaleToFill" /></view></view>
         <text class="summary-value">{{mealCount}} 餐</text>
         <text class="summary-label">已记录</text>
       </view>
       <view class="summary-item">
-        <view class="summary-icon coral"><view class="sprite-icon sprite-food"></view></view>
+        <view class="summary-icon coral"><view class="sprite-icon"><image class="sprite-sheet sprite-food" src="/assets/report-icon-sprite-v1.webp" mode="scaleToFill" /></view></view>
         <text class="summary-value">{{foodCount}} 种</text>
         <text class="summary-label">食物</text>
       </view>
       <view class="summary-item">
-        <view class="summary-icon green"><view class="sprite-icon sprite-weight"></view></view>
+        <view class="summary-icon green"><view class="sprite-icon"><image class="sprite-sheet sprite-weight" src="/assets/report-icon-sprite-v1.webp" mode="scaleToFill" /></view></view>
         <text class="summary-value">{{totalConsumedText}} 克</text>
         <text class="summary-label">已确认摄入</text>
       </view>
@@ -73,7 +69,7 @@
     <view wx:else class="nutrient-list">
       <view wx:for="{{nutrients}}" wx:key="nutrientCode" class="nutrient-row"
         data-code="{{item.nutrientCode}}" bindtap="openNutrient">
-        <view class="nutrient-badge {{item.statusTone}}"><view class="sprite-icon {{item.iconClass}}"></view></view>
+        <view class="nutrient-badge {{item.statusTone}}"><view class="sprite-icon"><image class="sprite-sheet {{item.iconClass}}" src="/assets/report-icon-sprite-v1.webp" mode="scaleToFill" /></view></view>
         <view class="nutrient-main">
           <view class="nutrient-line">
             <text class="nutrient-name">{{item.name}}</text>

@@ -11,8 +11,7 @@ page { background: #fffaf7; color: #171722; }
 .baby-copy { margin-left: 18rpx; display: flex; flex-direction: column; gap: 8rpx; z-index: 2; }
 .baby-name { font-size: 34rpx; font-weight: 800; }
 .baby-age { color: #7b8192; font-size: 25rpx; }
-.encouragement { margin-left: 28rpx; width: 245rpx; min-height: 90rpx; padding: 15rpx 24rpx; border-radius: 48rpx; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; background: linear-gradient(135deg, #fff7ef, #ffeadf); font-size: 23rpx; line-height: 1.55; z-index: 2; }
-.heart { margin-left: 12rpx; color: #ff6b74; }
+.encouragement-image { margin-left: 22rpx; width: 255rpx; height: 102rpx; z-index: 2; }
 .hero-baby { position: absolute; right: -18rpx; bottom: -12rpx; width: 160rpx; height: 160rpx; border-radius: 80rpx; opacity: .95; }
 .summary-card, .nutrient-card, .error-card { margin-top: 22rpx; background: rgba(255, 255, 255, .96); border: 1rpx solid #f2e9e4; border-radius: 30rpx; box-shadow: 0 12rpx 30rpx rgba(90, 65, 51, .05); }
 .error-card { padding: 28rpx; display: flex; flex-direction: column; gap: 8rpx; background: #fff4f2; }
@@ -56,18 +55,19 @@ page { background: #fffaf7; color: #171722; }
 .source-text { display: block; margin-top: 8rpx; color: #7d8292; font-size: 22rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .data-note { display: inline-flex; margin-top: 9rpx; padding: 5rpx 12rpx; color: #ef7a22; background: #fff1df; border-radius: 14rpx; font-size: 20rpx; }
 .row-chevron { margin-left: 8rpx; }
-.sprite-icon { width: 72rpx; height: 64rpx; background-image: url('/assets/report-icon-sprite-v1.png'); background-repeat: no-repeat; background-size: 400% 300%; }
+.sprite-icon { position: relative; width: 72rpx; height: 64rpx; overflow: hidden; }
+.sprite-sheet { position: absolute; width: 400%; height: 300%; }
 .summary-icon .sprite-icon { width: 82rpx; height: 72rpx; }
-.sprite-meal { background-position: 0 0; }
-.sprite-food { background-position: 33.333% 0; }
-.sprite-weight { background-position: 66.667% 0; }
-.sprite-bulb { background-position: 100% 0; }
-.sprite-energy { background-position: 0 50%; }
-.sprite-protein { background-position: 33.333% 50%; }
-.sprite-fat { background-position: 66.667% 50%; }
-.sprite-carbohydrate { background-position: 100% 50%; }
-.sprite-calcium { background-position: 0 100%; }
-.sprite-iron { background-position: 33.333% 100%; }
-.sprite-vitamin { background-position: 66.667% 100%; }
-.sprite-fiber { background-position: 100% 100%; }
+.sprite-meal { left: 0; top: 0; }
+.sprite-food { left: -100%; top: 0; }
+.sprite-weight { left: -200%; top: 0; }
+.sprite-bulb { left: -300%; top: 0; }
+.sprite-energy { left: 0; top: -100%; }
+.sprite-protein { left: -100%; top: -100%; }
+.sprite-fat { left: -200%; top: -100%; }
+.sprite-carbohydrate { left: -300%; top: -100%; }
+.sprite-calcium { left: 0; top: -200%; }
+.sprite-iron { left: -100%; top: -200%; }
+.sprite-vitamin { left: -200%; top: -200%; }
+.sprite-fiber { left: -300%; top: -200%; }
 .bottom-spacer { height: 158rpx; }

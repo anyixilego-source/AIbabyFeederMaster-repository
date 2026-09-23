@@ -49,7 +49,7 @@
       </view>
       <view class="conclusion {{conclusionTone}}" bindtap="toggleConclusion">
         <view class="conclusion-left"><text class="alert-icon">!</text><text>{{conclusion}}</text></view>
-        <text class="expand-icon">{{conclusionExpanded ? '⌃' : '›'}}</text>
+        <view class="expand-arrow {{conclusionExpanded ? 'expanded' : ''}}"></view>
       </view>
       <view wx:if="{{conclusionExpanded}}" class="explanation">
         <text class="explanation-title">可能原因</text>
@@ -62,7 +62,7 @@
     <view class="about-card" bindtap="toggleAbout">
       <view class="about-heading">
         <text>关于{{name}}的说明</text>
-        <view class="about-toggle {{aboutExpanded ? 'expanded' : ''}}"><view class="about-arrow"></view></view>
+        <view class="expand-arrow {{aboutExpanded ? 'expanded' : ''}}"></view>
       </view>
       <view wx:if="{{aboutExpanded}}" class="about-body">
         <text>• 本页数值是已记录食物中可计算的{{name}}合计。</text>

@@ -7,7 +7,7 @@ import type { SessionContext } from '../../utils/session'
 interface TrendOption { code: string; label: string }
 interface TrendBar { date: string; label: string; valueText: string; heightPercent: number; current: boolean; missing: boolean }
 
-const trendOptions: TrendOption[] = [
+const defaultTrendOptions: TrendOption[] = [
   { code: 'ENERGY', label: '能量' },
   { code: 'PROTEIN', label: '蛋白质' },
   { code: 'CALCIUM', label: '钙' },
@@ -43,7 +43,7 @@ Page({
     loading: true,
     errorMessage: '',
     reminders: [] as string[],
-    trendOptions,
+    trendOptions: defaultTrendOptions,
     selectedTrend: 'ENERGY',
     selectedTrendName: '能量',
     selectedUnit: '',
@@ -64,11 +64,18 @@ Page({
       const active = await context()
       if (!active.subjectId) throw new Error('请先建立宝宝档案')
       currentBundle = await loadReportBundle(active.subjectId)
-      const reminders = [...currentBundle.warnings]
-      if (!reminders.some((item) => item.includes('未记录'))) reminders.push('今天可能还有未记录的奶量或其他食物。')
-      if (reminders.length < 2) reminders.push('报告仅统计已经记录并确认的食物。')
-      const supportedOptions = trendOptions.filter((option) => currentBundle!.nutrients.some((item) =>
-        option.code === 'ENERGY' ? ['ENERGY', 'ENERGY_KCAL'].includes(item.nutrientCode) : item.nutrientCode === option.code))
+      const reminders: string[] = []
+      if (currentBundle.warnings.length > 0 || currentBundle.nutrients.some((item) => item.dataNote)) {
+        reminders.push('部分营养数据不完整,当前数值仅代表已知部分.')
+      }
+      reminders.push('今天可能还有未记录的奶量或其他食物.')
+      if (reminders.length < 3) reminders.push('仅统计已记录并确认的食物.')
+      const optionMap = new Map<string, TrendOption>()
+      for (const nutrient of currentBundle.nutrients) {
+        const code = nutrient.nutrientCode === 'ENERGY_KCAL' ? 'ENERGY' : nutrient.nutrientCode
+        if (!optionMap.has(code)) optionMap.set(code, { code, label: nutrient.name })
+      }
+      const supportedOptions = [...optionMap.values()]
       let selectedTrend = supportedOptions.some((item) => item.code === this.data.selectedTrend)
         ? this.data.selectedTrend
         : (supportedOptions[0]?.code || 'ENERGY')
