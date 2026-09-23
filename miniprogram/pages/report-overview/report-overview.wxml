@@ -1,0 +1,59 @@
+<navigation-bar title="营养报告" back="{{true}}" color="#171722" background="transparent"></navigation-bar>
+<scroll-view class="page-scroll" scroll-y enhanced scroll-top="{{scrollTop}}">
+  <view class="page-shell">
+    <view wx:if="{{errorMessage}}" class="error-card">{{errorMessage}}</view>
+    <view wx:elif="{{loading}}" class="loading-card">正在整理报告概览…</view>
+    <block wx:else>
+      <view class="attention-card">
+        <view class="attention-title"><text class="attention-icon">!</text><text>需要留意</text></view>
+        <view class="reminder-list">
+          <text wx:for="{{reminders}}" wx:key="*this" class="reminder-item">• {{item}}</text>
+        </view>
+        <image class="attention-baby" src="/assets/baby-eating-centered-v3.jpg" mode="aspectFill" />
+      </view>
+
+      <view class="trend-card">
+        <view class="section-heading"><text>近 7 天营养趋势</text></view>
+        <scroll-view class="trend-tabs-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+          <view class="trend-tabs">
+            <button wx:for="{{trendOptions}}" wx:key="code"
+              class="trend-tab {{selectedTrend === item.code ? 'active' : ''}}"
+              data-code="{{item.code}}" bindtap="selectTrend">{{item.label}}</button>
+          </view>
+        </scroll-view>
+        <view class="chart-title">{{selectedTrendName}}（{{selectedUnit}}）</view>
+        <view class="chart-area">
+          <view wx:if="{{referenceAvailable}}" class="reference-line" style="bottom: {{referencePercent}}%">
+            <text>{{referenceLabel}}</text>
+          </view>
+          <view wx:if="{{!referenceAvailable}}" class="no-reference">{{referenceLabel}}</view>
+          <view class="bars">
+            <view wx:for="{{trendBars}}" wx:key="date" class="bar-column">
+              <text class="bar-value {{item.missing ? 'missing' : ''}}" style="bottom: {{item.heightPercent}}%">{{item.valueText}}</text>
+              <view class="bar {{item.current ? 'current' : ''}} {{item.missing ? 'empty' : ''}}" style="height: {{item.heightPercent}}%"></view>
+              <text class="bar-label">{{item.label}}</text>
+            </view>
+          </view>
+        </view>
+        <view class="trend-note"><text class="bulb">i</text><text>趋势图用于了解近期已记录的饮食变化，比单日数据更有参考意义；缺少记录的日期显示为“—”。</text></view>
+      </view>
+
+      <view class="food-card">
+        <view class="section-heading">
+          <text>今日食物记录</text>
+          <text class="view-all" bindtap="openRecords">查看全部 ›</text>
+        </view>
+        <view wx:if="{{foodRecords.length}}" class="food-grid">
+          <view wx:for="{{foodRecords}}" wx:key="key" class="food-item">
+            <view class="food-picture {{item.tone}}">{{item.badge}}</view>
+            <text class="food-name">{{item.name}}</text>
+            <text class="food-amount">{{item.amountText}}</text>
+          </view>
+        </view>
+        <view wx:else class="food-empty">今天还没有已确认的食物记录</view>
+        <button class="top-button" bindtap="backToTop">回到顶部</button>
+      </view>
+    </block>
+    <view class="bottom-space"></view>
+  </view>
+</scroll-view>

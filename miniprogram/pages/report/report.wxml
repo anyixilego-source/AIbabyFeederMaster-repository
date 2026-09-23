@@ -1,10 +1,94 @@
-<navigation-bar title="每日营养报告" back="{{false}}" color="#2d2623" background="transparent"><view slot="left" class="nav-circle" bindtap="goBack"><view class="back-icon"></view></view><view slot="right" class="share-button" bindtap="refreshReport"><text>更新</text></view></navigation-bar>
-<scroll-view class="report-scroll" scroll-y enhanced show-scrollbar="{{false}}"><view class="page-shell report-page">
-  <view class="report-meta"><image src="/assets/baby-avatar-v2.jpg" mode="aspectFill"></image><view><text class="meta-name">{{babyName}}</text><text>{{ageText}}</text></view><view class="date-pill"><text>{{dateLabel}}</text><view class="calendar-small"></view></view></view>
-  <view class="overview-card ui-card"><view class="overview-score"><text>整体数据完整度</text><view><text class="big-score">{{coverage}}</text><text>%</text></view><text class="overview-caption">各营养素完整度的平均值</text><text class="praise-pill">{{reportStatus}}</text></view><image src="/assets/baby-eating-focus-v3.jpg" mode="aspectFill"></image><view class="radar-panel"><view class="radar-title">报告边界 <view class="info-icon">i</view></view><text>仅比较经审核的人群参考规则</text><text>不构成医学诊断或喂养处方</text><text>缺失值不会按零计算</text></view></view>
-  <view class="reading-guide ui-card"><text class="guide-title">怎么看这份报告</text><view><text>数据完整度</text><text>表示已确认食物中，有多少份量具备可计算的营养数值。顶部数值是本页各营养素完整度的算术平均值。</text></view><view><text>参考值比较</text><text>本报告不使用容易误解的“达标率”。是否达到参考值，请看每种营养素下方的绿色、橙色或红色结论标签。</text></view></view>
-  <view class="intake-card ui-card"><view class="intake-heading"><text class="section-title">营养摄入与参考值比较</text><view class="legend"><view><view class="dot good"></view><text>达到参考</text></view><view><view class="dot warn"></view><text>低于参考或暂不比较</text></view><view><view class="dot danger"></view><text>超过上限</text></view></view></view><view class="intake-grid"><view class="intake-item" wx:for="{{nutrients}}" wx:key="nutrientCode"><view class="nutrient-heading"><view class="nutrient-title"><view class="nutrient-symbol">{{item.badge}}</view><text class="intake-name">{{item.name}}</text></view><text class="status-pill {{item.statusTone}}">{{item.status}}</text></view><view class="nutrient-body"><view class="intake-ring" style="background: conic-gradient({{item.ringColor}} {{item.value}}%, #f2e9e4 0)"><view><text>{{item.value}}%</text><text>数据完整度</text></view></view><view class="amount-block"><text>已确认摄入</text><text>{{item.amount}}</text></view></view></view></view><view class="intake-tip"><view class="bulb"></view><text>摄入数值来自已确认食物与实际吃下克数；数据不完整时只展示已知部分，不把缺失值当作零。</text></view></view>
-  <view class="insight-card ui-card"><view class="insight-title"><text>数据说明</text><view class="info-badge">i</view></view><view class="highlight-row" wx:for="{{warnings}}" wx:key="*this"><view class="warning-dot"></view><text>{{item}}</text></view><view wx:if="{{!warnings.length}}" class="highlight-row"><view class="ok-dot"><view class="check-icon"></view></view><text>当前报告没有额外数据说明</text></view></view>
-  <view class="streak-card"><image src="/assets/baby-avatar-v2.jpg" mode="aspectFill"></image><view><text>坚持记录是形成可靠参考的第一步</text><text>食材和实际吃下的份量仍需照护者逐项确认</text></view><button bindtap="openRecords">查看记录</button></view>
-</view></scroll-view>
+<navigation-bar back="{{false}}" color="#171722" background="transparent">
+  <view slot="left" class="nav-back" bindtap="goBack">‹</view>
+  <view slot="center" class="nav-title-wrap">
+    <text class="nav-title">每日营养报告</text>
+    <text class="nav-date">{{dateLabel}}</text>
+  </view>
+  <view slot="right" class="nav-action" bindtap="refreshReport">更新</view>
+</navigation-bar>
+<view class="page-shell">
+
+  <view class="hero-card">
+    <image class="baby-avatar" src="/assets/baby-avatar-v2.jpg" mode="aspectFill" />
+    <view class="baby-copy">
+      <text class="baby-name">{{babyName}}</text>
+      <text class="baby-age">{{ageText}}</text>
+    </view>
+    <view class="encouragement">
+      <text>{{encouragement}}</text>
+      <text class="heart">♥</text>
+    </view>
+    <image class="hero-baby" src="/assets/baby-eating-centered-v3.jpg" mode="aspectFill" />
+  </view>
+
+  <view wx:if="{{errorMessage}}" class="error-card">
+    <text class="error-title">报告暂不可用</text>
+    <text class="error-message">{{errorMessage}}</text>
+  </view>
+
+  <view class="summary-card" bindtap="openOverview">
+    <view class="section-heading">
+      <text>今日记录概览</text>
+      <text class="chevron">›</text>
+    </view>
+    <view class="summary-grid">
+      <view class="summary-item">
+        <view class="summary-icon blue">餐</view>
+        <text class="summary-value">{{mealCount}} 餐</text>
+        <text class="summary-label">已记录</text>
+      </view>
+      <view class="summary-item">
+        <view class="summary-icon coral">食</view>
+        <text class="summary-value">{{foodCount}} 种</text>
+        <text class="summary-label">食物</text>
+      </view>
+      <view class="summary-item">
+        <view class="summary-icon green">克</view>
+        <text class="summary-value">{{totalConsumedText}} 克</text>
+        <text class="summary-label">已确认摄入</text>
+      </view>
+    </view>
+    <view class="summary-note">仅统计已经记录并确认的食物，可能还有未记录的奶量或其他食物。</view>
+  </view>
+
+  <view class="nutrient-card">
+    <view class="section-heading nutrient-heading">
+      <text>营养摄入</text>
+      <label class="sort-control">
+        <text>需要留意优先</text>
+        <switch checked="{{sortByImportance}}" color="#ff6d75" bindchange="toggleSort" />
+      </label>
+    </view>
+    <scroll-view class="category-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="category-tabs">
+        <button wx:for="{{categories}}" wx:key="code"
+          class="category-tab {{selectedCategory === item.code ? 'active' : ''}}"
+          data-code="{{item.code}}" bindtap="selectCategory">{{item.label}}</button>
+      </view>
+    </scroll-view>
+
+    <view wx:if="{{loading}}" class="loading-state">正在整理今天的记录…</view>
+    <view wx:elif="{{nutrients.length === 0}}" class="empty-state">当前分类暂无可展示的营养数据</view>
+    <view wx:else class="nutrient-list">
+      <view wx:for="{{nutrients}}" wx:key="nutrientCode" class="nutrient-row"
+        data-code="{{item.nutrientCode}}" bindtap="openNutrient">
+        <view class="nutrient-badge {{item.statusTone}}">{{item.badge}}</view>
+        <view class="nutrient-main">
+          <view class="nutrient-line">
+            <text class="nutrient-name">{{item.name}}</text>
+            <view class="nutrient-amount">
+              <text class="amount-value">{{item.amountText}}</text>
+              <text class="amount-unit">{{item.unitText}}</text>
+            </view>
+          </view>
+          <text class="source-text">主要来源：{{item.sourceText}}</text>
+          <view wx:if="{{item.dataNote}}" class="data-note">! {{item.dataNote}}</view>
+        </view>
+        <text class="row-chevron">›</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="bottom-spacer"></view>
+</view>
 <app-tabbar active="report" showCamera="{{true}}"></app-tabbar>

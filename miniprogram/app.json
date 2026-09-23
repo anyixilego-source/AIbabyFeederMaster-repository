@@ -5,6 +5,8 @@
     "pages/result/result",
     "pages/records/records",
     "pages/report/report",
+    "pages/nutrient-detail/nutrient-detail",
+    "pages/report-overview/report-overview",
     "pages/profile/profile",
     "pages/about/about",
     "pages/menu/menu"
