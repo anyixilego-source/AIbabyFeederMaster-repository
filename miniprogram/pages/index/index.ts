@@ -1,4 +1,5 @@
 import { ApiError, request } from '../../utils/api'
+import { ageDisplay } from '../../utils/age'
 import { ensureSessionContext, SessionContext, SubjectSummary } from '../../utils/session'
 
 interface ReportSummary {
@@ -8,8 +9,9 @@ interface ReportSummary {
   result: { assessment: { status: string; nutrients: Array<{ nutrientCode: string; status: string; coverageRatio: string }> } }
 }
 const nutrientNames: Record<string, string> = {
-  PROTEIN: '蛋白质', CALCIUM: '钙', IRON: '铁', VITAMIN_A_RAE: '维生素A',
-  VITAMIN_C: '维生素C', CARBOHYDRATE: '碳水', FIBER_DIETARY: '膳食纤维', ZINC: '锌',
+  ENERGY: '能量', ENERGY_KCAL: '能量', PROTEIN: '蛋白质', FAT_TOTAL: '脂肪', CALCIUM: '钙', IRON: '铁',
+  VITAMIN_A_RAE: '维生素A', VITAMIN_C: '维生素C', CARBOHYDRATE: '碳水',
+  FIBER_DIETARY: '膳食纤维', ZINC: '锌', SODIUM: '钠',
 }
 const statusLabels: Record<string, string> = {
   AT_OR_ABOVE_REFERENCE: '达到参考值', BELOW_REFERENCE: '低于参考值（非诊断）', ABOVE_UPPER_LIMIT: '高于上限参考',
@@ -20,20 +22,15 @@ const warningLabels: Record<string, string> = {
   NO_NUTRIENT_DATA: '本时段暂无可用于计算的营养数据',
   NO_INTAKE_DATA: '没有已确认的摄入数据',
   INSUFFICIENT_COVERAGE: '数据覆盖不足，暂不作参考值比较',
+  INSUFFICIENT_COVERAGE_NO_COMPARISON: '部分营养数据不完整，当前数值仅代表已知部分',
   NO_REFERENCE_VALUE: '当前规则没有提供适用参考值',
   UNIT_MISMATCH: '摄入数据与参考规则单位不一致',
+  INCOMPLETE: '部分食物缺少该营养素数据',
 }
 function warningLabel(warning: string): string {
   const [nutrientCode, code] = warning.split(':')
-  if (code) return `${nutrientNames[nutrientCode] || nutrientCode}：${warningLabels[code] || code}`
-  return warningLabels[warning] || warning
-}
-function ageLabel(birthDate: string): string {
-  const birth = new Date(`${birthDate}T00:00:00`)
-  const today = new Date()
-  let months = (today.getFullYear() - birth.getFullYear()) * 12 + today.getMonth() - birth.getMonth()
-  if (today.getDate() < birth.getDate()) months -= 1
-  return `${Math.max(0, months)}个月`
+  if (code) return `${nutrientNames[nutrientCode] || '部分营养素'}：${warningLabels[code] || '存在尚未归类的数据说明'}`
+  return warningLabels[warning] || '存在尚未归类的数据说明'
 }
 async function context(): Promise<SessionContext> {
   const app = getApp<IAppOption>()
@@ -61,6 +58,7 @@ Component({
         const today = new Date()
         const todayKey = `${today.getFullYear()}-${`${today.getMonth() + 1}`.padStart(2, '0')}-${`${today.getDate()}`.padStart(2, '0')}`
         const report = reports.find((item) => item.periodStart === todayKey)
+        const reportNeedsRefresh = Boolean(wx.getStorageSync('foodmaster.reportNeedsRefresh'))
         const assessment = report?.result.assessment
         const coverage = report ? Math.round(Number(report.coverageRatio) * 100) : 0
         const nutrients = (assessment?.nutrients || []).filter((item) => nutrientNames[item.nutrientCode]).slice(0, 4).map((item) => ({
@@ -70,17 +68,22 @@ Component({
           color: item.status === 'AT_OR_ABOVE_REFERENCE' ? '#73c959' : item.status === 'ABOVE_UPPER_LIMIT' ? '#ef6c64' : '#f6a623',
           warn: item.status !== 'AT_OR_ABOVE_REFERENCE' && item.status !== 'WITHIN_UPPER_LIMIT',
         }))
-        const advice = (coverage > 0 ? nutrients : []).slice(0, 3).map((item) => ({
+        const advice = (!reportNeedsRefresh && coverage > 0 ? nutrients : []).slice(0, 3).map((item) => ({
           tone: item.color === '#73c959' ? 'vegetable' : 'grain', badge: item.name.slice(0, 1),
           title: item.name, description: item.state,
         }))
         this.setData({
           babyName: subject.displayName, genderText: subject.sex === 'FEMALE' ? '女' : subject.sex === 'MALE' ? '男' : '',
-          ageText: ageLabel(subject.birthDate),
-          reportTitle: report ? '今日营养报告已生成' : '今天还没有营养报告',
-          reportDescription: report ? '查看已记录摄入、主要来源和参考信息' : '记录并确认实际摄入后生成营养参考',
-          warnings: (report?.warnings || []).map(warningLabel), nutrients,
-          advice: advice.length ? advice : [{ tone: 'grain', badge: '记', title: '尚无报告结论', description: '先记录并确认实际摄入，再查看营养参考' }],
+          ageText: ageDisplay(subject.birthDate),
+          reportTitle: reportNeedsRefresh ? '今日营养报告待更新' : report ? '今日营养报告已生成' : '今天还没有营养报告',
+          reportDescription: reportNeedsRefresh ? '新记录已保存，打开报告生成最新营养参考' : report ? '查看已记录摄入、主要来源和参考信息' : '记录并确认实际摄入后生成营养参考',
+          warnings: reportNeedsRefresh ? [] : (report?.warnings || []).map(warningLabel),
+          nutrients: reportNeedsRefresh ? [] : nutrients,
+          advice: advice.length ? advice : [{
+            tone: 'grain', badge: '记',
+            title: reportNeedsRefresh ? '报告等待更新' : '尚无报告结论',
+            description: reportNeedsRefresh ? '打开今日营养报告即可生成最新结果' : '先记录并确认实际摄入，再查看营养参考',
+          }],
         })
       } catch (caught) {
         const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '首页加载失败'

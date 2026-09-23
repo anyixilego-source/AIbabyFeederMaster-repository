@@ -39,7 +39,7 @@ Page({
     nutrients: [] as NutrientView[],
   },
 
-  onShow() { void this.loadReport(false) },
+  onShow() { void this.loadReport(Boolean(wx.getStorageSync('foodmaster.reportNeedsRefresh'))) },
 
   async loadReport(force: boolean) {
     this.setData({ loading: true, errorMessage: '' })
@@ -71,8 +71,8 @@ Page({
         categories: allCategories,
         selectedCategory,
         allNutrients: bundle.nutrients,
-      })
-      this.applyFilter()
+      }, () => this.applyFilter())
+      if (force) wx.removeStorageSync('foodmaster.reportNeedsRefresh')
     } catch (caught) {
       const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '报告加载失败'
       this.setData({ errorMessage: message, nutrients: [] })

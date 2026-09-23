@@ -1,4 +1,5 @@
 import { request } from './api'
+import { ageDisplay } from './age'
 import { completeOperation, operationPayload } from './operation'
 import type { SubjectSummary } from './session'
 
@@ -154,14 +155,6 @@ export function tomorrow(date: Date): string {
   return dateOnly(next)
 }
 
-export function ageMonths(birthDate: string): number {
-  const birth = new Date(`${birthDate}T00:00:00`)
-  const today = new Date()
-  let months = (today.getFullYear() - birth.getFullYear()) * 12 + today.getMonth() - birth.getMonth()
-  if (today.getDate() < birth.getDate()) months -= 1
-  return Math.max(0, months)
-}
-
 export function formatNumber(value: string | number): string {
   const parsed = Number(value)
   if (!Number.isFinite(parsed)) return String(value)
@@ -221,7 +214,7 @@ async function createReportBundle(subjectId: string, force: boolean): Promise<Re
   return {
     subject, report, reports, date: today,
     dateLabel: `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 周${'日一二三四五六'[now.getDay()]}`,
-    ageText: `${ageMonths(subject.birthDate)}个月`, mealCount: todaySummaries.length,
+    ageText: ageDisplay(subject.birthDate), mealCount: todaySummaries.length,
     foodCount: foodRecords.length, totalConsumedText: formatNumber(totalConsumed), nutrients, warnings, foodRecords,
   }
 }

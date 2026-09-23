@@ -1,4 +1,5 @@
 import { ApiError, request } from '../../utils/api'
+import { ageDisplay } from '../../utils/age'
 import { ensureSessionContext, refreshSessionContext, SessionContext, SubjectSummary } from '../../utils/session'
 
 interface Avoidance { foodId: string; foodName: string; reason: string | null }
@@ -7,14 +8,6 @@ function sexLabel(sex: SubjectSummary['sex']): string {
   if (sex === 'FEMALE') return '女宝宝'
   if (sex === 'MALE') return '男宝宝'
   return '未设置'
-}
-
-function ageLabel(birthDate: string): string {
-  const birth = new Date(`${birthDate}T00:00:00`)
-  const today = new Date()
-  let months = (today.getFullYear() - birth.getFullYear()) * 12 + today.getMonth() - birth.getMonth()
-  if (today.getDate() < birth.getDate()) months -= 1
-  return `${Math.max(0, months)}个月`
 }
 
 async function context(): Promise<SessionContext> {
@@ -53,7 +46,7 @@ Page({
         request<SubjectSummary>(`/subjects/${active.subjectId}`),
         active.householdId ? request<Avoidance[]>(`/households/${active.householdId}/food-avoidances`) : Promise.resolve([]),
       ])
-      const age = ageLabel(subject.birthDate)
+      const age = ageDisplay(subject.birthDate)
       const avoidanceText = avoidances.length ? avoidances.map((item) => item.foodName).join('、') : '暂无'
       this.setData({
         name: subject.displayName, sexText: sexLabel(subject.sex), birthDate: subject.birthDate, ageText: age,

@@ -20,8 +20,10 @@ interface ConfirmedFoodItem {
   canonicalNameZh: string
   servedAmount: string
   consumedAmount: string
+  ratioPercent: number
   source: 'AI_CANDIDATE' | 'SEARCH'
 }
+type AmountMode = 'MANUAL' | 'SLIDER' | 'RATIO'
 interface CalculationResult {
   coverageRatio: string
   warnings: string[]
@@ -47,6 +49,35 @@ function warningText(warning: string): string {
   if (code === 'INCOMPLETE') return `${nutrientNames[nutrientCode] || nutrientCode}数据不完整`
   return warningNames[warning] || warning
 }
+function gramText(value: number): string {
+  return (Math.round(value * 10) / 10).toString()
+}
+function ratioTotal(items: ConfirmedFoodItem[]): number {
+  return items.reduce((sum, item) => sum + Number(item.ratioPercent || 0), 0)
+}
+function initialRatios(items: ConfirmedFoodItem[]): ConfirmedFoodItem[] {
+  if (!items.length) return items
+  if (ratioTotal(items) === 100) return items
+  const knownTotal = items.reduce((sum, item) => sum + Number(item.consumedAmount || 0), 0)
+  let assigned = 0
+  return items.map((item, index) => {
+    const ratio = index === items.length - 1
+      ? 100 - assigned
+      : knownTotal > 0
+        ? Math.round(Number(item.consumedAmount || 0) / knownTotal * 100)
+        : Math.floor(100 / items.length)
+    assigned += ratio
+    return { ...item, ratioPercent: ratio }
+  })
+}
+function applyRatioAmounts(items: ConfirmedFoodItem[], totalText: string): ConfirmedFoodItem[] {
+  const total = Number(totalText)
+  if (!Number.isFinite(total) || total <= 0) return items.map((item) => ({ ...item, consumedAmount: '' }))
+  return items.map((item) => ({
+    ...item,
+    consumedAmount: gramText(total * Number(item.ratioPercent || 0) / 100),
+  }))
+}
 
 Page({
   data: {
@@ -56,6 +87,13 @@ Page({
     foods: [] as Array<{ badge: string; name: string; details: string; uncertainty: string; tone: string; index: number; mappedName: string }>,
     query: '', searchResults: [] as FoodResult[], pendingCandidateIndex: -1,
     confirmedFoods: [] as ConfirmedFoodItem[],
+    amountMode: 'MANUAL' as AmountMode,
+    amountModes: [
+      { value: 'MANUAL', label: '手动填写' },
+      { value: 'SLIDER', label: '克数滑条' },
+      { value: 'RATIO', label: '总量与占比' },
+    ],
+    mealTotalAmount: '', ratioTotal: 0,
     nutrition: [] as Array<{ name: string; badge: string; value: string; tone: string }>,
     coverageText: '', warnings: [] as string[],
     errorMessage: '', scrollIntoView: '', manualFocus: false,
@@ -82,6 +120,38 @@ Page({
     const index = Number(event.currentTarget.dataset.index)
     const confirmedFoods = this.data.confirmedFoods.map((item, itemIndex) => itemIndex === index ? { ...item, consumedAmount: event.detail.value } : item)
     this.setData({ confirmedFoods })
+  },
+  selectAmountMode(event: WechatMiniprogram.TouchEvent) {
+    const amountMode = String(event.currentTarget.dataset.mode) as AmountMode
+    if (!['MANUAL', 'SLIDER', 'RATIO'].includes(amountMode)) return
+    if (amountMode !== 'RATIO') {
+      this.setData({ amountMode })
+      return
+    }
+    let confirmedFoods = initialRatios(this.data.confirmedFoods).map((item) => ({ ...item, servedAmount: '' }))
+    const currentTotal = confirmedFoods.reduce((sum, item) => sum + Number(item.consumedAmount || 0), 0)
+    const mealTotalAmount = this.data.mealTotalAmount || (currentTotal > 0 ? gramText(currentTotal) : '')
+    confirmedFoods = applyRatioAmounts(confirmedFoods, mealTotalAmount)
+    this.setData({ amountMode, mealTotalAmount, confirmedFoods, ratioTotal: ratioTotal(confirmedFoods) })
+  },
+  onConsumedSliderChange(event: WechatMiniprogram.SliderChange) {
+    const index = Number(event.currentTarget.dataset.index)
+    const confirmedFoods = this.data.confirmedFoods.map((item, itemIndex) => itemIndex === index
+      ? { ...item, consumedAmount: String(event.detail.value) }
+      : item)
+    this.setData({ confirmedFoods })
+  },
+  onMealTotalInput(event: WechatMiniprogram.Input) {
+    const mealTotalAmount = event.detail.value
+    const confirmedFoods = applyRatioAmounts(this.data.confirmedFoods, mealTotalAmount)
+    this.setData({ mealTotalAmount, confirmedFoods })
+  },
+  onRatioSliderChange(event: WechatMiniprogram.SliderChange) {
+    const index = Number(event.currentTarget.dataset.index)
+    const confirmedFoods = applyRatioAmounts(this.data.confirmedFoods.map((item, itemIndex) => itemIndex === index
+      ? { ...item, ratioPercent: Number(event.detail.value) }
+      : item), this.data.mealTotalAmount)
+    this.setData({ confirmedFoods, ratioTotal: ratioTotal(confirmedFoods) })
   },
 
   async recognize(): Promise<void> {
@@ -161,22 +231,33 @@ Page({
       canonicalNameZh: food.canonicalNameZh,
       servedAmount: current?.servedAmount || '',
       consumedAmount: current?.consumedAmount || '',
+      ratioPercent: current?.ratioPercent || 0,
       source: candidate ? 'AI_CANDIDATE' : 'SEARCH',
     }
-    const confirmedFoods = currentIndex >= 0
+    let confirmedFoods = currentIndex >= 0
       ? this.data.confirmedFoods.map((item, index) => index === currentIndex ? selected : item)
       : [...this.data.confirmedFoods, selected]
+    if (this.data.amountMode === 'RATIO') {
+      const ratioBase = currentIndex >= 0 ? confirmedFoods : confirmedFoods.map((item) => ({ ...item, ratioPercent: 0 }))
+      confirmedFoods = applyRatioAmounts(initialRatios(ratioBase), this.data.mealTotalAmount)
+    }
     const foods = this.data.foods.map((item) => item.index === candidateIndex ? { ...item, mappedName: food.canonicalNameZh } : item)
-    this.setData({ confirmedFoods, foods, query: '', pendingCandidateIndex: -1, scrollIntoView: 'confirm-section' })
+    this.setData({
+      confirmedFoods, foods, query: '', pendingCandidateIndex: -1, scrollIntoView: 'confirm-section',
+      ratioTotal: ratioTotal(confirmedFoods),
+    })
   },
 
   removeFood(event: WechatMiniprogram.TouchEvent) {
     const index = Number(event.currentTarget.dataset.index)
     const removed = this.data.confirmedFoods[index]
     if (!removed) return
-    const confirmedFoods = this.data.confirmedFoods.filter((_item, itemIndex) => itemIndex !== index)
+    let confirmedFoods = this.data.confirmedFoods.filter((_item, itemIndex) => itemIndex !== index)
+    if (this.data.amountMode === 'RATIO') {
+      confirmedFoods = applyRatioAmounts(initialRatios(confirmedFoods.map((item) => ({ ...item, ratioPercent: 0 }))), this.data.mealTotalAmount)
+    }
     const foods = this.data.foods.map((item) => item.index === removed.candidateIndex ? { ...item, mappedName: '' } : item)
-    this.setData({ confirmedFoods, foods, nutrition: [], coverageText: '', warnings: [] })
+    this.setData({ confirmedFoods, foods, nutrition: [], coverageText: '', warnings: [], ratioTotal: ratioTotal(confirmedFoods) })
   },
 
   async calculate(): Promise<CalculationResult | null> {
@@ -202,6 +283,14 @@ Page({
     const foods = this.data.confirmedFoods
     if (!mealId) { wx.showToast({ title: '请从新增记录进入拍照', icon: 'none' }); return }
     if (!foods.length) { wx.showToast({ title: '请至少确认一种标准食品', icon: 'none' }); return }
+    if (this.data.amountMode === 'RATIO') {
+      if (!/^\d+(?:\.\d{1,6})?$/.test(this.data.mealTotalAmount) || Number(this.data.mealTotalAmount) <= 0) {
+        wx.showToast({ title: '请填写本餐实际摄入总克数', icon: 'none' }); return
+      }
+      if (this.data.ratioTotal !== 100) {
+        wx.showToast({ title: `食材占比合计需为100%，当前${this.data.ratioTotal}%`, icon: 'none' }); return
+      }
+    }
     for (const food of foods) {
       const consumedAmount = food.consumedAmount.trim()
       const servedAmount = food.servedAmount.trim()
@@ -230,6 +319,7 @@ Page({
       await request(`/meals/${mealId}/confirm`, { method: 'POST' })
       operations.forEach((operation) => completeOperation(operation.scope, operation.operationId))
       wx.setStorageSync('mealSaved', true)
+      wx.setStorageSync('foodmaster.reportNeedsRefresh', true)
       wx.removeStorageSync('foodmaster.currentMealId')
       wx.redirectTo({ url: '/pages/records/records?saved=1' })
     } catch (caught) {

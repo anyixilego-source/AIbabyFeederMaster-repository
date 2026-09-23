@@ -91,6 +91,28 @@ async function main() {
       return
     }
 
+    if (command === 'report') {
+      const report = await miniProgram.reLaunch('/pages/report/report')
+      await report.waitFor(2500)
+      if (process.argv[3] === 'force') {
+        await report.callMethod('loadReport', true)
+        await report.waitFor(2500)
+      }
+      const data = await report.data()
+      const target = screenshotPath('report-current')
+      await miniProgram.screenshot({ path: target })
+      console.log(JSON.stringify({
+        errorMessage: data.errorMessage,
+        mealCount: data.mealCount,
+        foodCount: data.foodCount,
+        allNutrientCount: data.allNutrients.length,
+        visibleNutrientCount: data.nutrients.length,
+        selectedCategory: data.selectedCategory,
+        screenshot: target,
+      }))
+      return
+    }
+
     if (command === 'flow') {
       await miniProgram.callWxMethod('removeStorageSync', 'foodmaster.currentMealId')
 
@@ -176,8 +198,11 @@ async function main() {
       const retakeCamera = await miniProgram.currentPage()
       assert.equal(retakeCamera.path, 'pages/camera/camera', '重拍应返回拍照页')
       await retakeCamera.callMethod('continueWithPhoto', photoPath)
-      await delay(1200)
-      const retakeResult = await miniProgram.currentPage()
+      let retakeResult = await miniProgram.currentPage()
+      for (let attempt = 0; attempt < 10 && retakeResult.path !== 'pages/result/result'; attempt += 1) {
+        await delay(500)
+        retakeResult = await miniProgram.currentPage()
+      }
       assert.equal(retakeResult.path, 'pages/result/result', '重拍重新选图后应回到识别结果页')
       const secondMealId = await miniProgram.callWxMethod('getStorageSync', 'foodmaster.currentMealId')
       assert.equal(secondMealId, firstMealId, '同一次重拍应复用当前餐食草稿')
@@ -220,7 +245,25 @@ async function main() {
       data = await result.data()
       assert.equal(data.confirmedFoods.length, 1, '候选应能映射为一个标准食品')
       assert.equal(data.scrollIntoView, 'confirm-section', '映射成功后应定位到份量确认区')
-      const target = screenshotPath('result-mapped')
+      assert.equal(data.amountMode, 'MANUAL', '份量录入默认应为手动填写')
+      await result.callMethod('selectAmountMode', { currentTarget: { dataset: { mode: 'SLIDER' } } })
+      await result.callMethod('onConsumedSliderChange', { currentTarget: { dataset: { index: 0 } }, detail: { value: 80 } })
+      data = await result.data()
+      assert.equal(data.confirmedFoods[0].consumedAmount, '80', '克数滑条应更新实际摄入量')
+      await result.setData({
+        confirmedFoods: [data.confirmedFoods[0], {
+          ...data.confirmedFoods[0], localId: `${data.confirmedFoods[0].localId}-2`, canonicalNameZh: '豆腐',
+          observedName: '豆腐', consumedAmount: '', servedAmount: '', ratioPercent: 0,
+        }],
+      })
+      await result.callMethod('selectAmountMode', { currentTarget: { dataset: { mode: 'RATIO' } } })
+      await result.callMethod('onMealTotalInput', { detail: { value: '500' } })
+      await result.callMethod('onRatioSliderChange', { currentTarget: { dataset: { index: 0 } }, detail: { value: 60 } })
+      await result.callMethod('onRatioSliderChange', { currentTarget: { dataset: { index: 1 } }, detail: { value: 40 } })
+      data = await result.data()
+      assert.equal(data.ratioTotal, 100, '总量占比模式的食材占比应可调整到100%')
+      assert.deepEqual(data.confirmedFoods.map((item) => item.consumedAmount), ['300', '200'], '总量500克按60%/40%应换算为300克和200克')
+      const target = screenshotPath('result-amount-modes')
       await miniProgram.screenshot({ path: target })
       await miniProgram.restoreWxMethod('showActionSheet')
       await miniProgram.reLaunch('/pages/index/index')
@@ -228,6 +271,7 @@ async function main() {
       console.log(JSON.stringify({
         confirmedFoodCount: data.confirmedFoods.length,
         scrollIntoView: data.scrollIntoView,
+        amountModesWork: true,
         draftCleaned: !(await miniProgram.callWxMethod('getStorageSync', 'foodmaster.currentMealId')),
         screenshot: target,
       }))

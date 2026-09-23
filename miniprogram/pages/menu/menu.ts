@@ -1,4 +1,5 @@
 import { ApiError, request } from '../../utils/api'
+import { ageDisplayFromMonths, ageMonths } from '../../utils/age'
 import { ensureSessionContext, SessionContext, SubjectSummary } from '../../utils/session'
 
 interface RecipeSummary {
@@ -28,13 +29,6 @@ interface CandidateResponse {
 }
 interface Avoidance { foodId: string; foodName: string; reason: string | null }
 
-function ageMonths(birthDate: string): number {
-  const birth = new Date(`${birthDate}T00:00:00`)
-  const today = new Date()
-  let months = (today.getFullYear() - birth.getFullYear()) * 12 + today.getMonth() - birth.getMonth()
-  if (today.getDate() < birth.getDate()) months -= 1
-  return Math.max(0, months)
-}
 async function context(): Promise<SessionContext> {
   const app = getApp<IAppOption>()
   return app.globalData.ready || ensureSessionContext()
@@ -68,7 +62,7 @@ Page({
         request<Avoidance[]>(`/households/${active.householdId}/food-avoidances`),
       ])
       this.setData({
-        babyName: subject.displayName, ageText: `${months}个月`, notice: result.notice,
+        babyName: subject.displayName, ageText: ageDisplayFromMonths(months), notice: result.notice,
         caregiverNotice: result.caregiverNotice, excludedCount: result.excludedRecipeIds.length, avoidances,
         candidates: result.candidates.map((item) => ({
           ...item, ingredientCount: item.foodIds.length,
