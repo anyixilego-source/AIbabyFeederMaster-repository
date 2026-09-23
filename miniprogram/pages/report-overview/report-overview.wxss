@@ -31,8 +31,10 @@ page { background: #fff9f3; color: #2f1f1d; }
 .bar { width: 46rpx; min-height: 0; border-radius: 10rpx 10rpx 0 0; background: linear-gradient(180deg,#ffc7b8,#ffe0d5); }
 .bar.current { background: linear-gradient(180deg,#ff737a,#ff5666); }
 .bar.empty { height: 2rpx !important; background: #eadfda; }
-.bar-value { position: absolute; margin-bottom: 44rpx; color: #1d2330; font-size: 18rpx; font-weight: 700; }
+.bar-value { position: absolute; z-index: 4; margin-bottom: 44rpx; color: #1d2330; font-size: 18rpx; font-weight: 700; line-height: 24rpx; white-space: nowrap; }
 .bar-value.missing { color: #aaa09d; }
+.bar-value.inside { margin-bottom: -31rpx; padding: 0 5rpx; border-radius: 7rpx; color: #674944; background: rgba(255,255,255,.78); font-size: 16rpx; }
+.bar-value.inside.current { color: #fff; background: rgba(174,55,65,.48); text-shadow: 0 1rpx 2rpx rgba(112,32,38,.24); }
 .bar-label { height: 42rpx; padding-top: 9rpx; color: #675653; font-size: 19rpx; }
 .trend-note { margin-top: 26rpx; padding: 18rpx; display: flex; gap: 15rpx; align-items: center; color: #5f453d; background: #fff6e2; border-radius: 20rpx; font-size: 21rpx; line-height: 1.5; }
 .trend-note > text { flex: 1; }

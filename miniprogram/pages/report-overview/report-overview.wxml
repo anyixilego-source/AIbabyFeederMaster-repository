@@ -30,7 +30,7 @@
           <view wx:if="{{!referenceAvailable}}" class="no-reference">{{referenceLabel}}</view>
           <view class="bars">
             <view wx:for="{{trendBars}}" wx:key="date" class="bar-column">
-              <text class="bar-value {{item.missing ? 'missing' : ''}}" style="bottom: {{item.heightPercent}}%">{{item.valueText}}</text>
+              <text class="bar-value {{item.missing ? 'missing' : ''}} {{item.labelInside ? 'inside' : ''}} {{item.current ? 'current' : ''}}" style="bottom: {{item.heightPercent}}%">{{item.valueText}}</text>
               <view class="bar {{item.current ? 'current' : ''}} {{item.missing ? 'empty' : ''}}" style="height: {{item.heightPercent}}%"></view>
               <text class="bar-label">{{item.label}}</text>
             </view>

@@ -5,7 +5,15 @@ import { ensureSessionContext } from '../../utils/session'
 import type { SessionContext } from '../../utils/session'
 
 interface TrendOption { code: string; label: string }
-interface TrendBar { date: string; label: string; valueText: string; heightPercent: number; current: boolean; missing: boolean }
+interface TrendBar {
+  date: string
+  label: string
+  valueText: string
+  heightPercent: number
+  current: boolean
+  missing: boolean
+  labelInside: boolean
+}
 interface ChartTick { valueText: string; topPercent: number }
 
 const defaultTrendOptions: TrendOption[] = [
@@ -132,14 +140,20 @@ Page({
       valueText: formatNumber(scaleMax - tickStep * index),
       topPercent: index * 25,
     }))
-    const trendBars: TrendBar[] = values.map((item, index) => ({
-      date: dateOnly(item.date),
-      label: `${item.date.getMonth() + 1}/${item.date.getDate()}`,
-      valueText: item.value === null ? '—' : formatNumber(item.value),
-      heightPercent: item.value === null ? 0 : Math.max(4, Math.round(item.value / scaleMax * 100)),
-      current: index === values.length - 1,
-      missing: item.value === null,
-    }))
+    const referencePercent = reference === null ? null : Math.round(reference / scaleMax * 100)
+    const trendBars: TrendBar[] = values.map((item, index) => {
+      const heightPercent = item.value === null ? 0 : Math.max(4, Math.round(item.value / scaleMax * 100))
+      return {
+        date: dateOnly(item.date),
+        label: `${item.date.getMonth() + 1}/${item.date.getDate()}`,
+        valueText: item.value === null ? '—' : formatNumber(item.value),
+        heightPercent,
+        current: index === values.length - 1,
+        missing: item.value === null,
+        labelInside: item.value !== null && referencePercent !== null
+          && heightPercent >= 14 && Math.abs(heightPercent - referencePercent) <= 10,
+      }
+    })
     const unitCode = currentNutrient?.unitCode || ''
     this.setData({
       selectedTrendName: nutrientNames[currentNutrient?.nutrientCode || this.data.selectedTrend] || '营养素',
@@ -148,7 +162,7 @@ Page({
       chartTicks,
       referenceAvailable: reference !== null && Number.isFinite(reference),
       referenceLabel: reference === null ? '当前无适用参考线' : `参考达标线 ${formatNumber(reference)}`,
-      referencePercent: reference === null ? 0 : Math.round(reference / scaleMax * 100),
+      referencePercent: referencePercent || 0,
     })
   },
 
