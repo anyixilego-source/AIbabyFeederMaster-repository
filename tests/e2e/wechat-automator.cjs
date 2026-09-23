@@ -106,6 +106,30 @@ async function main() {
       await editButton.tap()
       await profile.waitFor(300)
       assert.ok(await profile.$('.edit-sheet'), '点击编辑后应打开档案编辑面板')
+      await profile.callMethod('closeEdit')
+      await delay(300)
+
+      const menuEntry = await profile.$('.menu-entry')
+      assert.ok(menuEntry, '档案页应提供家庭食谱入口')
+      await miniProgram.navigateTo('/pages/menu/menu')
+      await delay(800)
+      const menu = await miniProgram.currentPage()
+      assert.equal(menu.path, 'pages/menu/menu', '家庭食谱入口应打开菜单页')
+      await menu.callMethod('goBack')
+      await delay(1200)
+      const returnedProfile = await miniProgram.currentPage()
+      assert.equal(returnedProfile.path, 'pages/profile/profile', '菜单页返回后应回到档案页')
+      const profileForAbout = await miniProgram.reLaunch('/pages/profile/profile')
+      await profileForAbout.waitFor(1200)
+      const aboutEntry = await profileForAbout.$('.about-entry')
+      assert.ok(aboutEntry, '档案页应提供关于与合规入口')
+      await miniProgram.navigateTo('/pages/about/about')
+      await delay(800)
+      const about = await miniProgram.currentPage()
+      assert.equal(about.path, 'pages/about/about', '关于与合规入口应打开备案页')
+      await about.callMethod('goBack')
+      await delay(400)
+      assert.equal((await miniProgram.currentPage()).path, 'pages/profile/profile', '备案页返回后应回到档案页')
 
       const result = await miniProgram.reLaunch('/pages/result/result')
       await result.waitFor(800)
@@ -121,6 +145,7 @@ async function main() {
       console.log(JSON.stringify({
         cameraEntryCreatesDraft: false,
         profileEditorOpens: true,
+        profileSecondaryNavigationWorks: true,
         manualSearchFocuses: true,
       }))
       return

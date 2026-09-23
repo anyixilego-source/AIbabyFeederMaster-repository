@@ -85,6 +85,6 @@ Page({
       wx.showToast({ title: message, icon: 'none' })
     } finally { this.setData({ loading: false }) }
   },
-  goBack() { wx.navigateBack() },
+  goBack() { wx.navigateBack({ fail: () => wx.redirectTo({ url: '/pages/profile/profile' }) }) },
   explainCandidate() { wx.showToast({ title: '候选不会自动记为实际摄入', icon: 'none' }) },
 })

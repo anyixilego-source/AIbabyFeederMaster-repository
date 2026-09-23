@@ -15,5 +15,5 @@
     <button class="privacy-button" bindtap="openPrivacyContract">查看微信隐私保护指引</button>
   </view>
 
-  <view class="notice-card"><text>备案编号取得后从项目根目录 .env 集中更新，不需要修改页面代码。</text></view>
+  <view class="notice-card"><text>备案信息如有更新，将在后续版本中同步展示。</text></view>
 </view></scroll-view>

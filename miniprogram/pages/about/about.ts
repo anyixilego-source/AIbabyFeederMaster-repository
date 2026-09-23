@@ -13,7 +13,7 @@ Page({
     publicSecurityFilingNumber: complianceInfo.publicSecurityFilingNumber,
   },
 
-  goBack() { wx.navigateBack() },
+  goBack() { wx.navigateBack({ fail: () => wx.redirectTo({ url: '/pages/profile/profile' }) }) },
 
   openPrivacyContract() {
     const privacyApi = wx as unknown as PrivacyContractApi
