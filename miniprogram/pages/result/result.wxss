@@ -65,3 +65,27 @@
 .leaf-icon::after { content: ''; position: absolute; left: 17rpx; top: 17rpx; width: 2rpx; height: 10rpx; background: #fff; transform: rotate(32deg); transform-origin: top; }
 .ratio-check { width: 34rpx; height: 34rpx; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; background: #31a34b; font-size: 22rpx; }
 @media (max-width: 360px) { .confirmed-heading .confirmed-thumb { width: 76rpx; height: 76rpx; min-width: 76rpx; }.portion-card .slider-summary { padding-left: 94rpx; }.meal-total-copy text:last-child { font-size: 16rpx; }.portion-card .meal-total-input { width: 140rpx; } }
+
+/* 简化图片授权：摘要常显，完整说明按需弹出 */
+.consent-card { padding: 24rpx; }
+.consent-heading { display: flex; align-items: center; gap: 14rpx; }
+.consent-heading > view:last-child { min-width: 0; display: flex; flex-direction: column; gap: 5rpx; }
+.consent-heading > view:last-child > text:last-child { color: #958982; font-size: 18rpx; }
+.consent-shield { width: 46rpx; height: 46rpx; border-radius: 14rpx; display: flex; flex-shrink: 0; align-items: center; justify-content: center; color: #fff; background: linear-gradient(135deg,#ff8e70,#ff666e); font-size: 24rpx; font-weight: 700; }
+.consent-summary { display: block; margin: 18rpx 0 14rpx; padding: 16rpx 18rpx; border-radius: 18rpx; color: #756a64; background: #fff8f2; font-size: 19rpx; line-height: 1.55; }
+.picker-value.compact-picker { min-height: 64rpx; margin: 0; padding: 0 18rpx; display: flex; align-items: center; justify-content: space-between; color: #766b65; background: #f8f5f2; font-size: 19rpx; }
+.compact-picker text:last-child { color: #e96869; font-weight: 700; }
+.consent-agree-row { min-height: 68rpx; display: flex; align-items: center; flex-wrap: wrap; gap: 4rpx; }
+.consent-agree-row checkbox-group { display: flex; }
+.consent-check { margin: 0; gap: 8rpx; color: #635a55; font-size: 19rpx; }
+.consent-check checkbox { transform: scale(1.16); transform-origin: left center; margin-right: 4rpx; }
+.consent-link { padding: 12rpx 6rpx; color: #ff665f; font-size: 19rpx; }
+.consent-primary { width: 100%; height: 72rpx; margin-top: 4rpx; }
+.consent-error { display: block; margin-top: 12rpx; color: #c35d55; font-size: 18rpx; line-height: 1.5; }
+
+/* 增粗占比轨道，原生 slider 只负责触摸，视觉层提供白色描边滑块 */
+.ratio-slider-control { position: relative; height: 52rpx; margin-top: 4rpx; }
+.ratio-slider-track { position: absolute; z-index: 0; left: 0; right: 0; top: 19rpx; height: 14rpx; overflow: hidden; border-radius: 7rpx; background: #e9e5e2; }
+.ratio-slider-fill { height: 100%; border-radius: 7rpx; background: linear-gradient(90deg,#ffd36f,#ff9562); }
+.ratio-slider-thumb { position: absolute; z-index: 1; top: 6rpx; width: 38rpx; height: 38rpx; border: 5rpx solid #fff; border-radius: 50%; background: #ff9d62; box-shadow: 0 3rpx 10rpx rgba(210,113,65,.28); transform: translateX(-50%); pointer-events: none; }
+.portion-card .ratio-slider-native { position: absolute; z-index: 2; left: -18rpx; right: -18rpx; top: 0; height: 52rpx; margin: 0; opacity: .01; }

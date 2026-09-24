@@ -148,6 +148,22 @@ Page({
   goBack() { wx.navigateBack({ fail: () => wx.redirectTo({ url: '/pages/camera/camera' }) }) },
   retry() { wx.navigateBack({ delta: 1, fail: () => wx.redirectTo({ url: '/pages/camera/camera' }) }) },
   onConsentChange(event: WechatMiniprogram.CustomEvent) { this.setData({ accepted: event.detail.value.length > 0 }) },
+  openConsentDetails() {
+    wx.showModal({
+      title: '图片处理授权说明',
+      content: '为识别食物营养成分，需要将所选食物图片发送至 DeepSeek 模型。API 调用场景下图片不用于训练；服务端仅在请求期间临时接触且不保存；原始图片只保存在本地终端，并按你选择的期限自动删除；图片中的无关人物由 AI Prompt 忽略。不同意不影响手工搜索等基础功能。',
+      showCancel: false,
+      confirmText: '我知道了',
+    })
+  },
+  onConsentPrimaryAction() {
+    if (this.data.busy) return
+    if (!this.data.accepted) {
+      this.setData({ accepted: true })
+      return
+    }
+    void this.recognize()
+  },
   onRetentionChange(event: WechatMiniprogram.CustomEvent) { this.setData({ retentionIndex: Number(event.detail.value) }) },
   onQueryInput(event: WechatMiniprogram.Input) { this.setData({ query: event.detail.value }) },
   onManualBlur() { this.setData({ manualFocus: false }) },
