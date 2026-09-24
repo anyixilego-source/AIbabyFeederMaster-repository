@@ -270,16 +270,31 @@ async function main() {
       await result.setData({
         confirmedFoods: [data.confirmedFoods[0], {
           ...data.confirmedFoods[0], localId: `${data.confirmedFoods[0].localId}-2`, canonicalNameZh: '豆腐',
-          observedName: '豆腐', consumedAmount: '', servedAmount: '', ratioPercent: 0,
+          observedName: '豆腐', consumedAmount: '', servedAmount: '', ratioPercent: 0, ratioMax: 100, ratioLocked: false,
         }],
       })
       await result.callMethod('selectAmountMode', { currentTarget: { dataset: { mode: 'RATIO' } } })
-      await result.callMethod('onMealTotalInput', { detail: { value: '500' } })
+      data = await result.data()
+      assert.equal(data.mealTotalAmount, '200', '总量占比模式默认本餐总量应为200克')
+      assert.deepEqual(data.confirmedFoods.map((item) => item.ratioPercent), [50, 50], '两种食材默认应均分为50%/50%')
       await result.callMethod('onRatioSliderChange', { currentTarget: { dataset: { index: 0 } }, detail: { value: 60 } })
-      await result.callMethod('onRatioSliderChange', { currentTarget: { dataset: { index: 1 } }, detail: { value: 40 } })
       data = await result.data()
       assert.equal(data.ratioTotal, 100, '总量占比模式的食材占比应可调整到100%')
-      assert.deepEqual(data.confirmedFoods.map((item) => item.consumedAmount), ['300', '200'], '总量500克按60%/40%应换算为300克和200克')
+      assert.deepEqual(data.confirmedFoods.map((item) => item.ratioPercent), [60, 40], '第一种调整为60%时第二种应联动为40%')
+      assert.deepEqual(data.confirmedFoods.map((item) => item.consumedAmount), ['120', '80'], '总量200克按60%/40%应换算为120克和80克')
+      await result.callMethod('onRatioSliderChange', { currentTarget: { dataset: { index: 1 } }, detail: { value: 80 } })
+      data = await result.data()
+      assert.deepEqual(data.confirmedFoods.map((item) => item.ratioPercent), [60, 40], '最后一项不得单独破坏100%联动关系')
+      const fiveFoods = ['米饭', '豆腐', '鸡蛋', '青菜', '胡萝卜'].map((name, index) => ({
+        ...data.confirmedFoods[0], localId: `linked-${index}`, canonicalNameZh: name, observedName: name,
+        ratioPercent: 20, ratioMax: 40, ratioLocked: index === 4, consumedAmount: '40',
+      }))
+      await result.setData({ confirmedFoods: fiveFoods, mealTotalAmount: '200', ratioTotal: 100 })
+      await result.callMethod('selectAmountMode', { currentTarget: { dataset: { mode: 'RATIO' } } })
+      await result.callMethod('onRatioSliderChange', { currentTarget: { dataset: { index: 2 } }, detail: { value: 30 } })
+      data = await result.data()
+      assert.deepEqual(data.confirmedFoods.map((item) => item.ratioPercent), [20, 20, 30, 10, 20], '调整第三项时应只联动第四项')
+      assert.deepEqual(data.confirmedFoods.map((item) => item.consumedAmount), ['40', '40', '60', '20', '40'], '五种食材克数应随联动占比即时换算')
       const target = screenshotPath('result-amount-modes')
       await miniProgram.screenshot({ path: target })
       await miniProgram.restoreWxMethod('showActionSheet')

@@ -21,6 +21,8 @@ interface ConfirmedFoodItem {
   servedAmount: string
   consumedAmount: string
   ratioPercent: number
+  ratioMax: number
+  ratioLocked: boolean
   source: 'AI_CANDIDATE' | 'SEARCH'
 }
 type AmountMode = 'MANUAL' | 'SLIDER' | 'RATIO'
@@ -55,28 +57,52 @@ function gramText(value: number): string {
 function ratioTotal(items: ConfirmedFoodItem[]): number {
   return items.reduce((sum, item) => sum + Number(item.ratioPercent || 0), 0)
 }
+function withRatioConstraints(items: ConfirmedFoodItem[]): ConfirmedFoodItem[] {
+  return items.map((item, index) => ({
+    ...item,
+    ratioMax: index < items.length - 1
+      ? Number(item.ratioPercent || 0) + Number(items[index + 1]?.ratioPercent || 0)
+      : Number(item.ratioPercent || 0),
+    ratioLocked: index === items.length - 1,
+  }))
+}
 function initialRatios(items: ConfirmedFoodItem[]): ConfirmedFoodItem[] {
   if (!items.length) return items
-  if (ratioTotal(items) === 100) return items
-  const knownTotal = items.reduce((sum, item) => sum + Number(item.consumedAmount || 0), 0)
+  if (ratioTotal(items) === 100) return withRatioConstraints(items)
   let assigned = 0
-  return items.map((item, index) => {
+  return withRatioConstraints(items.map((item, index) => {
     const ratio = index === items.length - 1
       ? 100 - assigned
-      : knownTotal > 0
-        ? Math.round(Number(item.consumedAmount || 0) / knownTotal * 100)
-        : Math.floor(100 / items.length)
+      : Math.floor(100 / items.length)
     assigned += ratio
     return { ...item, ratioPercent: ratio }
-  })
+  }))
 }
 function applyRatioAmounts(items: ConfirmedFoodItem[], totalText: string): ConfirmedFoodItem[] {
   const total = Number(totalText)
-  if (!Number.isFinite(total) || total <= 0) return items.map((item) => ({ ...item, consumedAmount: '' }))
-  return items.map((item) => ({
+  if (!Number.isFinite(total) || total <= 0) return withRatioConstraints(items.map((item) => ({ ...item, consumedAmount: '' })))
+  return withRatioConstraints(items.map((item) => ({
     ...item,
     consumedAmount: gramText(total * Number(item.ratioPercent || 0) / 100),
-  }))
+  })))
+}
+function linkedRatioChange(items: ConfirmedFoodItem[], index: number, requestedValue: number): {
+  items: ConfirmedFoodItem[]
+  limited: boolean
+} {
+  if (index < 0 || index >= items.length) return { items: withRatioConstraints(items), limited: true }
+  if (index === items.length - 1) return { items: withRatioConstraints(items), limited: true }
+  const current = Number(items[index]?.ratioPercent || 0)
+  const next = Number(items[index + 1]?.ratioPercent || 0)
+  const maximum = current + next
+  const requested = Math.round(Number.isFinite(requestedValue) ? requestedValue : current)
+  const value = Math.max(0, Math.min(maximum, requested))
+  const changed = items.map((item, itemIndex) => {
+    if (itemIndex === index) return { ...item, ratioPercent: value }
+    if (itemIndex === index + 1) return { ...item, ratioPercent: maximum - value }
+    return item
+  })
+  return { items: withRatioConstraints(changed), limited: value !== requested }
 }
 
 Page({
@@ -128,9 +154,12 @@ Page({
       this.setData({ amountMode })
       return
     }
+    if (!this.data.confirmedFoods.length) {
+      wx.showToast({ title: '请先确认需要计入本餐的食材', icon: 'none' })
+      return
+    }
     let confirmedFoods = initialRatios(this.data.confirmedFoods).map((item) => ({ ...item, servedAmount: '' }))
-    const currentTotal = confirmedFoods.reduce((sum, item) => sum + Number(item.consumedAmount || 0), 0)
-    const mealTotalAmount = this.data.mealTotalAmount || (currentTotal > 0 ? gramText(currentTotal) : '')
+    const mealTotalAmount = this.data.mealTotalAmount || '200'
     confirmedFoods = applyRatioAmounts(confirmedFoods, mealTotalAmount)
     this.setData({ amountMode, mealTotalAmount, confirmedFoods, ratioTotal: ratioTotal(confirmedFoods) })
   },
@@ -146,12 +175,20 @@ Page({
     const confirmedFoods = applyRatioAmounts(this.data.confirmedFoods, mealTotalAmount)
     this.setData({ mealTotalAmount, confirmedFoods })
   },
-  onRatioSliderChange(event: WechatMiniprogram.SliderChange) {
+  updateLinkedRatio(event: WechatMiniprogram.SliderChange, showFeedback: boolean) {
     const index = Number(event.currentTarget.dataset.index)
-    const confirmedFoods = applyRatioAmounts(this.data.confirmedFoods.map((item, itemIndex) => itemIndex === index
-      ? { ...item, ratioPercent: Number(event.detail.value) }
-      : item), this.data.mealTotalAmount)
+    const linked = linkedRatioChange(this.data.confirmedFoods, index, Number(event.detail.value))
+    const confirmedFoods = applyRatioAmounts(linked.items, this.data.mealTotalAmount)
     this.setData({ confirmedFoods, ratioTotal: ratioTotal(confirmedFoods) })
+    if (showFeedback && (linked.limited || index === confirmedFoods.length - 1)) {
+      wx.showToast({ title: '最后一项由剩余占比自动补足，请调整前面的食材', icon: 'none' })
+    }
+  },
+  onRatioSliderChanging(event: WechatMiniprogram.SliderChange) {
+    this.updateLinkedRatio(event, false)
+  },
+  onRatioSliderChange(event: WechatMiniprogram.SliderChange) {
+    this.updateLinkedRatio(event, true)
   },
 
   async recognize(): Promise<void> {
@@ -232,6 +269,8 @@ Page({
       servedAmount: current?.servedAmount || '',
       consumedAmount: current?.consumedAmount || '',
       ratioPercent: current?.ratioPercent || 0,
+      ratioMax: current?.ratioMax || 100,
+      ratioLocked: current?.ratioLocked || false,
       source: candidate ? 'AI_CANDIDATE' : 'SEARCH',
     }
     let confirmedFoods = currentIndex >= 0
