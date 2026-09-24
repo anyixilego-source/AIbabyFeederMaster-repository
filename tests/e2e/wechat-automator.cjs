@@ -254,21 +254,39 @@ async function main() {
           badge: '米', name: '米饭', details: '煮 · 1份 · 份量待确认 · 置信度 90%',
           uncertainty: '', tone: 'vegetable', index: 0, mappedName: '',
         }],
+        confirmedFoods: [],
+        mealTotalAmount: '200',
+        ratioTotal: 0,
+        ratioAdjustmentSequence: 0,
         errorMessage: '',
       })
+      await result.callMethod('autoMapCandidates', [candidate])
+      let data
+      for (let attempt = 0; attempt < 12; attempt += 1) {
+        data = await result.data()
+        if (data.confirmedFoods.length && data.foods[0].mappedName) break
+        await delay(500)
+      }
+      data = await result.data()
+      assert.equal(data.confirmedFoods.length, 1, '可查到的候选应自动映射首个标准食品')
+      assert.ok(data.foods[0].mappedName, '候选区域应标明默认映射结果')
+      assert.equal(data.confirmedFoods[0].canonicalNameZh, data.foods[0].mappedName, '默认映射名称应与已确认食材一致')
+      assert.equal(data.scrollIntoView, 'confirm-section', '自动映射后应定位到份量确认区')
+      assert.deepEqual(data.confirmedFoods.map((item) => item.ratioPercent), [100], '自动映射单一食材时应固定占比100%')
+      assert.equal(data.confirmedFoods[0].consumedAmount, '200', '自动映射单一食材应换算为全部摄入量')
       await miniProgram.mockWxMethod('showActionSheet', { tapIndex: 0 })
       const row = await result.$('.food-row')
       assert.ok(row, '候选食物应可点击')
       await row.tap()
-      let data
+      await delay(1200)
       for (let attempt = 0; attempt < 12; attempt += 1) {
         data = await result.data()
-        if (!data.busy && data.confirmedFoods.length) break
+        if (!data.busy && data.pendingCandidateIndex === -1 && data.confirmedFoods.length) break
         await delay(500)
       }
       data = await result.data()
-      assert.equal(data.confirmedFoods.length, 1, '候选应能映射为一个标准食品')
-      assert.equal(data.scrollIntoView, 'confirm-section', '映射成功后应定位到份量确认区')
+      assert.equal(data.confirmedFoods.length, 1, '点击已映射候选应替换选择而不是重复新增')
+      assert.equal(data.confirmedFoods[0].candidateIndex, 0, '手动改选后仍应关联原识别候选')
       assert.equal(data.amountModes, undefined, '页面不应再保留手动填写或克数滑条模式')
       assert.equal(data.mealTotalAmount, '200', '唯一的总量占比模式默认本餐总量应为200克')
       assert.deepEqual(data.confirmedFoods.map((item) => item.ratioPercent), [100], '只有一种食材时应固定占比100%')
@@ -309,6 +327,8 @@ async function main() {
       console.log(JSON.stringify({
         confirmedFoodCount: data.confirmedFoods.length,
         scrollIntoView: data.scrollIntoView,
+        autoMappingWorks: true,
+        manualRemappingWorks: true,
         ratioOnlyModeWorks: true,
         draftCleaned: !(await miniProgram.callWxMethod('getStorageSync', 'foodmaster.currentMealId')),
         screenshot: target,

@@ -124,6 +124,26 @@ function linkedRatioChange(items: ConfirmedFoodItem[], index: number, requestedV
     ? { items, limited: true }
     : { items: changed, limited: value !== requested }
 }
+function confirmedFoodSelection(
+  food: FoodResult,
+  candidate: RecognitionItem | undefined,
+  candidateIndex: number,
+  current?: ConfirmedFoodItem,
+): ConfirmedFoodItem {
+  return {
+    localId: current?.localId || `${Date.now().toString(36)}-${candidateIndex}-${food.foodId}`,
+    candidateIndex,
+    observedName: candidate?.observedName || food.canonicalNameZh,
+    foodId: food.foodId,
+    canonicalNameZh: food.canonicalNameZh,
+    badge: food.canonicalNameZh.slice(0, 1),
+    servedAmount: current?.servedAmount || '',
+    consumedAmount: current?.consumedAmount || '',
+    ratioPercent: current?.ratioPercent || 0,
+    ratioAdjustedOrder: current?.ratioAdjustedOrder || 0,
+    source: candidate ? 'AI_CANDIDATE' : 'SEARCH',
+  }
+}
 
 Page({
   data: {
@@ -212,7 +232,11 @@ Page({
           uncertainty: item.uncertainties.filter((value) => !value.includes('实际摄入克数')).join('；'), tone: 'vegetable', index, mappedName: '',
         })),
       })
-      if (result.mode === 'MANUAL_SEARCH') wx.showToast({ title: '识别失败，请手工搜索', icon: 'none' })
+      if (result.mode === 'MANUAL_SEARCH') {
+        wx.showToast({ title: '识别失败，请手工搜索', icon: 'none' })
+      } else if (items.length) {
+        await this.autoMapCandidates(items)
+      }
     } catch (caught) {
       const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '识别失败，请手工搜索'
       this.setData({ errorMessage: message })
@@ -252,33 +276,45 @@ Page({
     } finally { this.setData({ busy: false }) }
   },
 
-  selectFood(food: FoodResult) {
-    const candidateIndex = this.data.pendingCandidateIndex
+  async autoMapCandidates(items: RecognitionItem[]): Promise<void> {
+    const matches = await Promise.all(items.map(async (candidate) => {
+      try {
+        const response = await request<{ items: FoodResult[] }>(`/foods/search?q=${encodeURIComponent(candidate.observedName)}&limit=1`)
+        return response.items?.[0] || null
+      } catch (_) {
+        return null
+      }
+    }))
+    let foods = this.data.foods
+    let confirmedFoods = matches.flatMap((food, candidateIndex) => {
+      if (!food) return []
+      foods = foods.map((item) => item.index === candidateIndex ? { ...item, mappedName: food.canonicalNameZh } : item)
+      return [confirmedFoodSelection(food, items[candidateIndex], candidateIndex)]
+    })
+    if (!confirmedFoods.length) return
+    confirmedFoods = applyRatioAmounts(initialRatios(confirmedFoods), this.data.mealTotalAmount || '200')
+    this.setData({
+      confirmedFoods, foods, pendingCandidateIndex: -1, scrollIntoView: 'confirm-section',
+      ratioTotal: ratioTotal(confirmedFoods),
+    })
+  },
+
+  selectFood(food: FoodResult, candidateIndexOverride?: number, shouldScroll = true) {
+    const candidateIndex = candidateIndexOverride === undefined ? this.data.pendingCandidateIndex : candidateIndexOverride
     const candidate = candidateIndex >= 0 ? this.data.result?.items?.[candidateIndex] : undefined
     const currentIndex = candidateIndex >= 0
       ? this.data.confirmedFoods.findIndex((item) => item.candidateIndex === candidateIndex)
       : -1
     const current = currentIndex >= 0 ? this.data.confirmedFoods[currentIndex] : undefined
-    const selected: ConfirmedFoodItem = {
-      localId: current?.localId || `${Date.now().toString(36)}-${food.foodId}`,
-      candidateIndex,
-      observedName: candidate?.observedName || food.canonicalNameZh,
-      foodId: food.foodId,
-      canonicalNameZh: food.canonicalNameZh,
-      badge: food.canonicalNameZh.slice(0, 1),
-      servedAmount: current?.servedAmount || '',
-      consumedAmount: current?.consumedAmount || '',
-      ratioPercent: current?.ratioPercent || 0,
-      ratioAdjustedOrder: current?.ratioAdjustedOrder || 0,
-      source: candidate ? 'AI_CANDIDATE' : 'SEARCH',
-    }
+    const selected = confirmedFoodSelection(food, candidate, candidateIndex, current)
     let confirmedFoods = currentIndex >= 0
       ? this.data.confirmedFoods.map((item, index) => index === currentIndex ? selected : item)
       : [...this.data.confirmedFoods, selected]
     confirmedFoods = applyRatioAmounts(initialRatios(confirmedFoods), this.data.mealTotalAmount || '200')
     const foods = this.data.foods.map((item) => item.index === candidateIndex ? { ...item, mappedName: food.canonicalNameZh } : item)
     this.setData({
-      confirmedFoods, foods, query: '', pendingCandidateIndex: -1, scrollIntoView: 'confirm-section',
+      confirmedFoods, foods, query: '', pendingCandidateIndex: -1,
+      scrollIntoView: shouldScroll ? 'confirm-section' : this.data.scrollIntoView,
       ratioTotal: ratioTotal(confirmedFoods),
     })
   },
