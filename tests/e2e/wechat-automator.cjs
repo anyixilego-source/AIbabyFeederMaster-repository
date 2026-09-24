@@ -270,7 +270,7 @@ async function main() {
       await result.setData({
         confirmedFoods: [data.confirmedFoods[0], {
           ...data.confirmedFoods[0], localId: `${data.confirmedFoods[0].localId}-2`, canonicalNameZh: '豆腐',
-          observedName: '豆腐', consumedAmount: '', servedAmount: '', ratioPercent: 0, ratioMax: 100, ratioLocked: false,
+          observedName: '豆腐', consumedAmount: '', servedAmount: '', ratioPercent: 0, ratioAdjustedOrder: 0,
         }],
       })
       await result.callMethod('selectAmountMode', { currentTarget: { dataset: { mode: 'RATIO' } } })
@@ -284,17 +284,21 @@ async function main() {
       assert.deepEqual(data.confirmedFoods.map((item) => item.consumedAmount), ['120', '80'], '总量200克按60%/40%应换算为120克和80克')
       await result.callMethod('onRatioSliderChange', { currentTarget: { dataset: { index: 1 } }, detail: { value: 80 } })
       data = await result.data()
-      assert.deepEqual(data.confirmedFoods.map((item) => item.ratioPercent), [60, 40], '最后一项不得单独破坏100%联动关系')
+      assert.deepEqual(data.confirmedFoods.map((item) => item.ratioPercent), [20, 80], '最后一项也应可调整，必要时回退联动已调整食材')
       const fiveFoods = ['米饭', '豆腐', '鸡蛋', '青菜', '胡萝卜'].map((name, index) => ({
         ...data.confirmedFoods[0], localId: `linked-${index}`, canonicalNameZh: name, observedName: name,
-        ratioPercent: 20, ratioMax: 40, ratioLocked: index === 4, consumedAmount: '40',
+        ratioPercent: 20, ratioAdjustedOrder: 0, consumedAmount: '40',
       }))
-      await result.setData({ confirmedFoods: fiveFoods, mealTotalAmount: '200', ratioTotal: 100 })
+      await result.setData({ confirmedFoods: fiveFoods, mealTotalAmount: '200', ratioTotal: 100, ratioAdjustmentSequence: 0 })
       await result.callMethod('selectAmountMode', { currentTarget: { dataset: { mode: 'RATIO' } } })
       await result.callMethod('onRatioSliderChange', { currentTarget: { dataset: { index: 2 } }, detail: { value: 30 } })
       data = await result.data()
-      assert.deepEqual(data.confirmedFoods.map((item) => item.ratioPercent), [20, 20, 30, 10, 20], '调整第三项时应只联动第四项')
+      assert.deepEqual(data.confirmedFoods.map((item) => item.ratioPercent), [20, 20, 30, 10, 20], '调整第三项时应优先联动后方未调整食材')
       assert.deepEqual(data.confirmedFoods.map((item) => item.consumedAmount), ['40', '40', '60', '20', '40'], '五种食材克数应随联动占比即时换算')
+      await result.callMethod('onRatioSliderChange', { currentTarget: { dataset: { index: 0 } }, detail: { value: 30 } })
+      data = await result.data()
+      assert.deepEqual(data.confirmedFoods.map((item) => item.ratioPercent), [30, 10, 30, 10, 20], '再调整第一项时应优先改动未调整项，保留第三项的手动结果')
+      assert.equal(data.ratioTotal, 100, '多次任意调整后总占比仍应保持100%')
       const target = screenshotPath('result-amount-modes')
       await miniProgram.screenshot({ path: target })
       await miniProgram.restoreWxMethod('showActionSheet')

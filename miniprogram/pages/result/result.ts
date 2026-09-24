@@ -21,8 +21,7 @@ interface ConfirmedFoodItem {
   servedAmount: string
   consumedAmount: string
   ratioPercent: number
-  ratioMax: number
-  ratioLocked: boolean
+  ratioAdjustedOrder: number
   source: 'AI_CANDIDATE' | 'SEARCH'
 }
 type AmountMode = 'MANUAL' | 'SLIDER' | 'RATIO'
@@ -57,52 +56,73 @@ function gramText(value: number): string {
 function ratioTotal(items: ConfirmedFoodItem[]): number {
   return items.reduce((sum, item) => sum + Number(item.ratioPercent || 0), 0)
 }
-function withRatioConstraints(items: ConfirmedFoodItem[]): ConfirmedFoodItem[] {
-  return items.map((item, index) => ({
-    ...item,
-    ratioMax: index < items.length - 1
-      ? Number(item.ratioPercent || 0) + Number(items[index + 1]?.ratioPercent || 0)
-      : Number(item.ratioPercent || 0),
-    ratioLocked: index === items.length - 1,
-  }))
-}
 function initialRatios(items: ConfirmedFoodItem[]): ConfirmedFoodItem[] {
   if (!items.length) return items
-  if (ratioTotal(items) === 100) return withRatioConstraints(items)
-  let assigned = 0
-  return withRatioConstraints(items.map((item, index) => {
-    const ratio = index === items.length - 1
-      ? 100 - assigned
-      : Math.floor(100 / items.length)
-    assigned += ratio
-    return { ...item, ratioPercent: ratio }
-  }))
+  if (ratioTotal(items) === 100 && items.every((item) => item.ratioPercent >= 1)) return items
+  const adjustedTotal = items.reduce((sum, item) => sum + (item.ratioAdjustedOrder > 0 ? Number(item.ratioPercent || 0) : 0), 0)
+  let automatic = items.filter((item) => item.ratioAdjustedOrder === 0)
+  if (!automatic.length || adjustedTotal > 100 - automatic.length) automatic = items
+  const automaticIds = new Set(automatic.map((item) => item.localId))
+  const fixedTotal = automatic.length === items.length ? 0 : adjustedTotal
+  const remaining = 100 - fixedTotal
+  const base = Math.floor(remaining / automatic.length)
+  let extra = remaining - base * automatic.length
+  return items.map((item) => {
+    if (!automaticIds.has(item.localId)) return item
+    const ratioPercent = base + (extra > 0 ? 1 : 0)
+    if (extra > 0) extra -= 1
+    return { ...item, ratioPercent, ratioAdjustedOrder: automatic.length === items.length ? 0 : item.ratioAdjustedOrder }
+  })
 }
 function applyRatioAmounts(items: ConfirmedFoodItem[], totalText: string): ConfirmedFoodItem[] {
   const total = Number(totalText)
-  if (!Number.isFinite(total) || total <= 0) return withRatioConstraints(items.map((item) => ({ ...item, consumedAmount: '' })))
-  return withRatioConstraints(items.map((item) => ({
+  if (!Number.isFinite(total) || total <= 0) return items.map((item) => ({ ...item, consumedAmount: '' }))
+  return items.map((item) => ({
     ...item,
     consumedAmount: gramText(total * Number(item.ratioPercent || 0) / 100),
-  })))
+  }))
 }
-function linkedRatioChange(items: ConfirmedFoodItem[], index: number, requestedValue: number): {
+function linkedRatioChange(items: ConfirmedFoodItem[], index: number, requestedValue: number, adjustedOrder: number): {
   items: ConfirmedFoodItem[]
   limited: boolean
 } {
-  if (index < 0 || index >= items.length) return { items: withRatioConstraints(items), limited: true }
-  if (index === items.length - 1) return { items: withRatioConstraints(items), limited: true }
+  if (index < 0 || index >= items.length) return { items, limited: true }
+  if (items.length === 1) return { items: [{ ...items[0]!, ratioPercent: 100, ratioAdjustedOrder: adjustedOrder }], limited: true }
+  const minimum = 1
+  const maximum = 100 - (items.length - 1) * minimum
   const current = Number(items[index]?.ratioPercent || 0)
-  const next = Number(items[index + 1]?.ratioPercent || 0)
-  const maximum = current + next
   const requested = Math.round(Number.isFinite(requestedValue) ? requestedValue : current)
-  const value = Math.max(0, Math.min(maximum, requested))
-  const changed = items.map((item, itemIndex) => {
-    if (itemIndex === index) return { ...item, ratioPercent: value }
-    if (itemIndex === index + 1) return { ...item, ratioPercent: maximum - value }
-    return item
-  })
-  return { items: withRatioConstraints(changed), limited: value !== requested }
+  const value = Math.max(minimum, Math.min(maximum, requested))
+  let remaining = Math.abs(value - current)
+  const direction = value > current ? -1 : 1
+  const circularDistance = (candidateIndex: number) => (candidateIndex - index + items.length) % items.length
+  const candidates = items.map((item, itemIndex) => ({ item, itemIndex }))
+    .filter(({ itemIndex }) => itemIndex !== index)
+    .sort((left, right) => {
+      const leftTouched = left.item.ratioAdjustedOrder === 0 ? 0 : 1
+      const rightTouched = right.item.ratioAdjustedOrder === 0 ? 0 : 1
+      if (leftTouched !== rightTouched) return leftTouched - rightTouched
+      if (leftTouched === 1 && left.item.ratioAdjustedOrder !== right.item.ratioAdjustedOrder) {
+        return left.item.ratioAdjustedOrder - right.item.ratioAdjustedOrder
+      }
+      return circularDistance(left.itemIndex) - circularDistance(right.itemIndex)
+    })
+  const changed = items.map((item, itemIndex) => itemIndex === index
+    ? { ...item, ratioPercent: value, ratioAdjustedOrder: adjustedOrder }
+    : { ...item })
+  for (const candidate of candidates) {
+    if (remaining <= 0) break
+    const candidateItem = changed[candidate.itemIndex]!
+    const capacity = direction < 0
+      ? Math.max(0, candidateItem.ratioPercent - minimum)
+      : maximum - candidateItem.ratioPercent
+    const amount = Math.min(remaining, capacity)
+    candidateItem.ratioPercent += direction * amount
+    remaining -= amount
+  }
+  return remaining > 0
+    ? { items, limited: true }
+    : { items: changed, limited: value !== requested }
 }
 
 Page({
@@ -119,7 +139,7 @@ Page({
       { value: 'SLIDER', label: '克数滑条' },
       { value: 'RATIO', label: '总量与占比' },
     ],
-    mealTotalAmount: '', ratioTotal: 0,
+    mealTotalAmount: '', ratioTotal: 0, ratioAdjustmentSequence: 0,
     nutrition: [] as Array<{ name: string; badge: string; value: string; tone: string }>,
     coverageText: '', warnings: [] as string[],
     errorMessage: '', scrollIntoView: '', manualFocus: false,
@@ -177,11 +197,12 @@ Page({
   },
   updateLinkedRatio(event: WechatMiniprogram.SliderChange, showFeedback: boolean) {
     const index = Number(event.currentTarget.dataset.index)
-    const linked = linkedRatioChange(this.data.confirmedFoods, index, Number(event.detail.value))
+    const ratioAdjustmentSequence = this.data.ratioAdjustmentSequence + 1
+    const linked = linkedRatioChange(this.data.confirmedFoods, index, Number(event.detail.value), ratioAdjustmentSequence)
     const confirmedFoods = applyRatioAmounts(linked.items, this.data.mealTotalAmount)
-    this.setData({ confirmedFoods, ratioTotal: ratioTotal(confirmedFoods) })
-    if (showFeedback && (linked.limited || index === confirmedFoods.length - 1)) {
-      wx.showToast({ title: '最后一项由剩余占比自动补足，请调整前面的食材', icon: 'none' })
+    this.setData({ confirmedFoods, ratioTotal: ratioTotal(confirmedFoods), ratioAdjustmentSequence })
+    if (showFeedback && linked.limited) {
+      wx.showToast({ title: '已达到当前食材可调整范围', icon: 'none' })
     }
   },
   onRatioSliderChanging(event: WechatMiniprogram.SliderChange) {
@@ -207,6 +228,7 @@ Page({
         result,
         errorMessage: '',
         confirmedFoods: [], nutrition: [], coverageText: '', warnings: [],
+        mealTotalAmount: '', ratioTotal: 0, ratioAdjustmentSequence: 0,
         foods: items.map((item, index) => ({
           badge: item.observedName.slice(0, 1), name: item.observedName,
           details: [item.form, item.count === null ? null : `${item.count} 份`, item.amountHint || '份量待确认', `置信度 ${Math.round(item.confidence * 100)}%`].filter(Boolean).join(' · '),
@@ -269,16 +291,14 @@ Page({
       servedAmount: current?.servedAmount || '',
       consumedAmount: current?.consumedAmount || '',
       ratioPercent: current?.ratioPercent || 0,
-      ratioMax: current?.ratioMax || 100,
-      ratioLocked: current?.ratioLocked || false,
+      ratioAdjustedOrder: current?.ratioAdjustedOrder || 0,
       source: candidate ? 'AI_CANDIDATE' : 'SEARCH',
     }
     let confirmedFoods = currentIndex >= 0
       ? this.data.confirmedFoods.map((item, index) => index === currentIndex ? selected : item)
       : [...this.data.confirmedFoods, selected]
     if (this.data.amountMode === 'RATIO') {
-      const ratioBase = currentIndex >= 0 ? confirmedFoods : confirmedFoods.map((item) => ({ ...item, ratioPercent: 0 }))
-      confirmedFoods = applyRatioAmounts(initialRatios(ratioBase), this.data.mealTotalAmount)
+      confirmedFoods = applyRatioAmounts(initialRatios(confirmedFoods), this.data.mealTotalAmount)
     }
     const foods = this.data.foods.map((item) => item.index === candidateIndex ? { ...item, mappedName: food.canonicalNameZh } : item)
     this.setData({
@@ -293,7 +313,7 @@ Page({
     if (!removed) return
     let confirmedFoods = this.data.confirmedFoods.filter((_item, itemIndex) => itemIndex !== index)
     if (this.data.amountMode === 'RATIO') {
-      confirmedFoods = applyRatioAmounts(initialRatios(confirmedFoods.map((item) => ({ ...item, ratioPercent: 0 }))), this.data.mealTotalAmount)
+      confirmedFoods = applyRatioAmounts(initialRatios(confirmedFoods), this.data.mealTotalAmount)
     }
     const foods = this.data.foods.map((item) => item.index === removed.candidateIndex ? { ...item, mappedName: '' } : item)
     this.setData({ confirmedFoods, foods, nutrition: [], coverageText: '', warnings: [], ratioTotal: ratioTotal(confirmedFoods) })
