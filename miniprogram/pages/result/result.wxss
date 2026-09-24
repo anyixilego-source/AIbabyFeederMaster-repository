@@ -19,3 +19,49 @@
 .confirmed-food .amount-row { margin-top: 14rpx; }
 .amount-mode-tabs { margin: 18rpx 0 6rpx; padding: 6rpx; border-radius: 18rpx; display: grid; grid-template-columns: repeat(3,1fr); gap: 6rpx; background: #f7f2ee; }.amount-mode-tab { height: 58rpx; border-radius: 14rpx; display: flex; align-items: center; justify-content: center; color: #877a73; font-size: 20rpx; }.amount-mode-tab.active { color: #fff; background: linear-gradient(135deg,#ff7a76,#ff626b); box-shadow: 0 7rpx 16rpx rgba(235,91,96,.18); font-weight: 700; }.meal-total-row { margin: 16rpx 0; padding: 18rpx; border-radius: 18rpx; display: flex; align-items: center; gap: 16rpx; background: #fff7eb; }.meal-total-row > view:first-child { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 5rpx; }.meal-total-row > view:first-child text:first-child { color: #4a3d36; font-size: 22rpx; font-weight: 700; }.meal-total-row > view:first-child text:last-child { color: #96867d; font-size: 17rpx; }.meal-total-input { width: 180rpx; height: 64rpx; padding: 0 14rpx; border-radius: 14rpx; display: flex; align-items: center; background: #fff; }.meal-total-input input { min-width: 0; flex: 1; font-size: 23rpx; text-align: right; }.meal-total-input text { margin-left: 7rpx; color: #8c7b70; font-size: 19rpx; }.slider-editor { margin-top: 14rpx; }.slider-summary { display: flex; align-items: center; justify-content: space-between; color: #81736d; font-size: 20rpx; }.slider-summary text:last-child { color: #332a26; font-weight: 700; }.slider-editor slider { margin: 8rpx 0 4rpx; }.served-inline { min-height: 58rpx; padding: 0 14rpx; border-radius: 14rpx; display: flex; align-items: center; color: #8c7f78; background: #fff; font-size: 18rpx; }.served-inline input { min-width: 0; margin-left: auto; flex: 1; text-align: right; font-size: 20rpx; }.served-inline text:last-child { margin-left: 6rpx; }.ratio-total { margin: 0 0 22rpx; padding: 14rpx 18rpx; border-radius: 15rpx; display: flex; align-items: center; justify-content: space-between; color: #b36c35; background: #fff1e5; font-size: 19rpx; }.ratio-total.valid { color: #4c9542; background: #eff8ea; }
 .ratio-link-note { display: block; margin-top: 2rpx; color: #9a877b; font-size: 17rpx; line-height: 1.4; }
+
+/* 唯一份量录入：本餐总量 + 食材占比 */
+.portion-card { padding: 26rpx 22rpx 24rpx; border: 1rpx solid #f6e5d9; background: linear-gradient(180deg,#fffdfa 0%,#fff9f3 100%); }
+.portion-card .estimate-title { align-items: flex-start; }
+.portion-card .estimate-title > view:first-child { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 6rpx; }
+.portion-card .section-title { color: #332725; font-size: 30rpx; }
+.portion-subtitle { color: #988b83; font-size: 19rpx; line-height: 1.45; }
+.portion-card .manual-search { margin-top: 22rpx; }
+.portion-card .mapping-tip { margin: 12rpx 2rpx 18rpx; }
+.portion-card .meal-total-row { min-height: 112rpx; margin: 0; padding: 18rpx 20rpx; border: 1rpx solid #f8e9dc; border-radius: 24rpx; gap: 16rpx; background: linear-gradient(105deg,#fff8ed,#fffdf9); box-shadow: 0 10rpx 28rpx rgba(170,111,72,.07); }
+.portion-card .meal-total-row > .total-meal-icon { width: 70rpx; height: 70rpx; min-width: 70rpx; border-radius: 50%; display: flex; flex: 0 0 70rpx; align-items: center; justify-content: center; background: #fff0dc; }
+.bowl-icon { position: relative; width: 40rpx; height: 23rpx; border-radius: 4rpx 4rpx 22rpx 22rpx; background: linear-gradient(180deg,#ff9a68,#ff746f); }
+.bowl-icon::before { content: ''; position: absolute; left: -3rpx; top: -5rpx; width: 46rpx; height: 9rpx; border-radius: 50%; background: #ffc66f; }
+.bowl-icon::after { content: ''; position: absolute; left: 13rpx; bottom: -7rpx; width: 15rpx; height: 7rpx; border-radius: 0 0 6rpx 6rpx; background: #e96f64; }
+.meal-total-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 7rpx; }
+.meal-total-copy text:first-child { color: #342925; font-size: 23rpx; font-weight: 700; }
+.meal-total-copy text:last-child { color: #968a83; font-size: 17rpx; line-height: 1.4; }
+.portion-card .meal-total-input { width: 154rpx; height: 68rpx; border: 1rpx solid #eadfd8; border-radius: 18rpx; box-shadow: inset 0 2rpx 4rpx rgba(94,65,51,.03); }
+.portion-card .meal-total-input input { color: #2d2521; font-size: 28rpx; font-weight: 700; }
+.ratio-guide { margin: 18rpx 0; padding: 15rpx 18rpx; border: 1rpx solid #f2dfbf; border-radius: 20rpx; display: flex; align-items: center; gap: 12rpx; color: #76665b; background: linear-gradient(90deg,#fff8e9,#fffdf7); font-size: 18rpx; line-height: 1.45; }
+.guide-icon { width: 32rpx; height: 32rpx; border-radius: 50%; display: flex; flex-shrink: 0; align-items: center; justify-content: center; color: #fff; background: #dda756; font-size: 19rpx; font-weight: 700; }
+.portion-card .confirmed-list { gap: 18rpx; padding-bottom: 18rpx; }
+.portion-card .confirmed-food { padding: 20rpx; border: 1rpx solid #f4e7de; border-radius: 24rpx; background: rgba(255,255,255,.96); box-shadow: 0 10rpx 28rpx rgba(137,89,62,.07); }
+.portion-card .confirmed-heading { align-items: center; }
+.confirmed-heading .confirmed-thumb { width: 86rpx; height: 86rpx; min-width: 86rpx; overflow: hidden; border: 5rpx solid #fff4e9; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #d88754; background: linear-gradient(135deg,#fff0dc,#ffe2c5); box-shadow: 0 5rpx 14rpx rgba(150,91,49,.10); font-size: 30rpx; font-weight: 700; }
+.confirmed-thumb image { width: 100%; height: 100%; border-radius: 50%; }
+.confirmed-heading .confirmed-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 7rpx; }
+.portion-card .confirmed-name { color: #2e2622; font-size: 25rpx; }
+.portion-card .observed-name { overflow: hidden; color: #958a84; font-size: 18rpx; text-overflow: ellipsis; white-space: nowrap; }
+.confirmed-heading .remove-food { padding: 8rpx 0 8rpx 10rpx; display: flex; flex-direction: row; align-items: center; gap: 8rpx; color: #ff6f70; }
+.trash-icon { position: relative; width: 22rpx; height: 24rpx; border: 3rpx solid currentColor; border-top: 0; border-radius: 0 0 4rpx 4rpx; }
+.trash-icon::before { content: ''; position: absolute; left: -5rpx; top: -7rpx; width: 26rpx; height: 3rpx; border-radius: 2rpx; background: currentColor; }
+.trash-icon::after { content: ''; position: absolute; left: 5rpx; top: -12rpx; width: 8rpx; height: 5rpx; border: 3rpx solid currentColor; border-bottom: 0; border-radius: 4rpx 4rpx 0 0; }
+.portion-card .slider-editor { margin-top: 14rpx; }
+.portion-card .slider-summary { padding-left: 104rpx; color: #94877f; font-size: 18rpx; }
+.portion-card .slider-summary text:last-child { color: #2e2723; font-size: 23rpx; }
+.portion-card .slider-editor slider { margin: 9rpx -8rpx 0; }
+.portion-card .ratio-total { min-height: 72rpx; margin: 0; padding: 14rpx 18rpx; border: 1rpx solid #dcefd5; border-radius: 22rpx; color: #338e3e; background: linear-gradient(90deg,#effae9,#e8f8e5); font-size: 19rpx; }
+.ratio-total-title,.ratio-total-value { display: flex; align-items: center; gap: 11rpx; }
+.ratio-total-title { color: #364c36; font-weight: 700; }
+.ratio-total-value { font-weight: 700; }
+.leaf-icon { position: relative; width: 36rpx; height: 36rpx; border-radius: 50%; background: #65bf62; }
+.leaf-icon::before { content: ''; position: absolute; left: 10rpx; top: 8rpx; width: 15rpx; height: 11rpx; border-radius: 100% 0 100% 0; background: #fff; transform: rotate(-18deg); }
+.leaf-icon::after { content: ''; position: absolute; left: 17rpx; top: 17rpx; width: 2rpx; height: 10rpx; background: #fff; transform: rotate(32deg); transform-origin: top; }
+.ratio-check { width: 34rpx; height: 34rpx; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; background: #31a34b; font-size: 22rpx; }
+@media (max-width: 360px) { .confirmed-heading .confirmed-thumb { width: 76rpx; height: 76rpx; min-width: 76rpx; }.portion-card .slider-summary { padding-left: 94rpx; }.meal-total-copy text:last-child { font-size: 16rpx; }.portion-card .meal-total-input { width: 140rpx; } }

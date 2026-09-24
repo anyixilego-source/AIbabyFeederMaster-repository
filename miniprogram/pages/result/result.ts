@@ -18,13 +18,13 @@ interface ConfirmedFoodItem {
   observedName: string
   foodId: string
   canonicalNameZh: string
+  badge: string
   servedAmount: string
   consumedAmount: string
   ratioPercent: number
   ratioAdjustedOrder: number
   source: 'AI_CANDIDATE' | 'SEARCH'
 }
-type AmountMode = 'MANUAL' | 'SLIDER' | 'RATIO'
 interface CalculationResult {
   coverageRatio: string
   warnings: string[]
@@ -133,13 +133,7 @@ Page({
     foods: [] as Array<{ badge: string; name: string; details: string; uncertainty: string; tone: string; index: number; mappedName: string }>,
     query: '', searchResults: [] as FoodResult[], pendingCandidateIndex: -1,
     confirmedFoods: [] as ConfirmedFoodItem[],
-    amountMode: 'MANUAL' as AmountMode,
-    amountModes: [
-      { value: 'MANUAL', label: '手动填写' },
-      { value: 'SLIDER', label: '克数滑条' },
-      { value: 'RATIO', label: '总量与占比' },
-    ],
-    mealTotalAmount: '', ratioTotal: 0, ratioAdjustmentSequence: 0,
+    mealTotalAmount: '200', ratioTotal: 0, ratioAdjustmentSequence: 0,
     nutrition: [] as Array<{ name: string; badge: string; value: string; tone: string }>,
     coverageText: '', warnings: [] as string[],
     errorMessage: '', scrollIntoView: '', manualFocus: false,
@@ -157,39 +151,6 @@ Page({
   onRetentionChange(event: WechatMiniprogram.CustomEvent) { this.setData({ retentionIndex: Number(event.detail.value) }) },
   onQueryInput(event: WechatMiniprogram.Input) { this.setData({ query: event.detail.value }) },
   onManualBlur() { this.setData({ manualFocus: false }) },
-  onServedInput(event: WechatMiniprogram.Input) {
-    const index = Number(event.currentTarget.dataset.index)
-    const confirmedFoods = this.data.confirmedFoods.map((item, itemIndex) => itemIndex === index ? { ...item, servedAmount: event.detail.value } : item)
-    this.setData({ confirmedFoods })
-  },
-  onConsumedInput(event: WechatMiniprogram.Input) {
-    const index = Number(event.currentTarget.dataset.index)
-    const confirmedFoods = this.data.confirmedFoods.map((item, itemIndex) => itemIndex === index ? { ...item, consumedAmount: event.detail.value } : item)
-    this.setData({ confirmedFoods })
-  },
-  selectAmountMode(event: WechatMiniprogram.TouchEvent) {
-    const amountMode = String(event.currentTarget.dataset.mode) as AmountMode
-    if (!['MANUAL', 'SLIDER', 'RATIO'].includes(amountMode)) return
-    if (amountMode !== 'RATIO') {
-      this.setData({ amountMode })
-      return
-    }
-    if (!this.data.confirmedFoods.length) {
-      wx.showToast({ title: '请先确认需要计入本餐的食材', icon: 'none' })
-      return
-    }
-    let confirmedFoods = initialRatios(this.data.confirmedFoods).map((item) => ({ ...item, servedAmount: '' }))
-    const mealTotalAmount = this.data.mealTotalAmount || '200'
-    confirmedFoods = applyRatioAmounts(confirmedFoods, mealTotalAmount)
-    this.setData({ amountMode, mealTotalAmount, confirmedFoods, ratioTotal: ratioTotal(confirmedFoods) })
-  },
-  onConsumedSliderChange(event: WechatMiniprogram.SliderChange) {
-    const index = Number(event.currentTarget.dataset.index)
-    const confirmedFoods = this.data.confirmedFoods.map((item, itemIndex) => itemIndex === index
-      ? { ...item, consumedAmount: String(event.detail.value) }
-      : item)
-    this.setData({ confirmedFoods })
-  },
   onMealTotalInput(event: WechatMiniprogram.Input) {
     const mealTotalAmount = event.detail.value
     const confirmedFoods = applyRatioAmounts(this.data.confirmedFoods, mealTotalAmount)
@@ -228,7 +189,7 @@ Page({
         result,
         errorMessage: '',
         confirmedFoods: [], nutrition: [], coverageText: '', warnings: [],
-        mealTotalAmount: '', ratioTotal: 0, ratioAdjustmentSequence: 0,
+        mealTotalAmount: '200', ratioTotal: 0, ratioAdjustmentSequence: 0,
         foods: items.map((item, index) => ({
           badge: item.observedName.slice(0, 1), name: item.observedName,
           details: [item.form, item.count === null ? null : `${item.count} 份`, item.amountHint || '份量待确认', `置信度 ${Math.round(item.confidence * 100)}%`].filter(Boolean).join(' · '),
@@ -288,6 +249,7 @@ Page({
       observedName: candidate?.observedName || food.canonicalNameZh,
       foodId: food.foodId,
       canonicalNameZh: food.canonicalNameZh,
+      badge: food.canonicalNameZh.slice(0, 1),
       servedAmount: current?.servedAmount || '',
       consumedAmount: current?.consumedAmount || '',
       ratioPercent: current?.ratioPercent || 0,
@@ -297,9 +259,7 @@ Page({
     let confirmedFoods = currentIndex >= 0
       ? this.data.confirmedFoods.map((item, index) => index === currentIndex ? selected : item)
       : [...this.data.confirmedFoods, selected]
-    if (this.data.amountMode === 'RATIO') {
-      confirmedFoods = applyRatioAmounts(initialRatios(confirmedFoods), this.data.mealTotalAmount)
-    }
+    confirmedFoods = applyRatioAmounts(initialRatios(confirmedFoods), this.data.mealTotalAmount || '200')
     const foods = this.data.foods.map((item) => item.index === candidateIndex ? { ...item, mappedName: food.canonicalNameZh } : item)
     this.setData({
       confirmedFoods, foods, query: '', pendingCandidateIndex: -1, scrollIntoView: 'confirm-section',
@@ -312,9 +272,7 @@ Page({
     const removed = this.data.confirmedFoods[index]
     if (!removed) return
     let confirmedFoods = this.data.confirmedFoods.filter((_item, itemIndex) => itemIndex !== index)
-    if (this.data.amountMode === 'RATIO') {
-      confirmedFoods = applyRatioAmounts(initialRatios(confirmedFoods), this.data.mealTotalAmount)
-    }
+    confirmedFoods = applyRatioAmounts(initialRatios(confirmedFoods), this.data.mealTotalAmount)
     const foods = this.data.foods.map((item) => item.index === removed.candidateIndex ? { ...item, mappedName: '' } : item)
     this.setData({ confirmedFoods, foods, nutrition: [], coverageText: '', warnings: [], ratioTotal: ratioTotal(confirmedFoods) })
   },
@@ -342,13 +300,11 @@ Page({
     const foods = this.data.confirmedFoods
     if (!mealId) { wx.showToast({ title: '请从新增记录进入拍照', icon: 'none' }); return }
     if (!foods.length) { wx.showToast({ title: '请至少确认一种标准食品', icon: 'none' }); return }
-    if (this.data.amountMode === 'RATIO') {
-      if (!/^\d+(?:\.\d{1,6})?$/.test(this.data.mealTotalAmount) || Number(this.data.mealTotalAmount) <= 0) {
-        wx.showToast({ title: '请填写本餐实际摄入总克数', icon: 'none' }); return
-      }
-      if (this.data.ratioTotal !== 100) {
-        wx.showToast({ title: `食材占比合计需为100%，当前${this.data.ratioTotal}%`, icon: 'none' }); return
-      }
+    if (!/^\d+(?:\.\d{1,6})?$/.test(this.data.mealTotalAmount) || Number(this.data.mealTotalAmount) <= 0) {
+      wx.showToast({ title: '请填写本餐实际摄入总克数', icon: 'none' }); return
+    }
+    if (this.data.ratioTotal !== 100) {
+      wx.showToast({ title: `食材占比合计需为100%，当前${this.data.ratioTotal}%`, icon: 'none' }); return
     }
     for (const food of foods) {
       const consumedAmount = food.consumedAmount.trim()
