@@ -64,11 +64,13 @@ Component({
         success: (res) => {
           const isAndroid = res.platform === 'android'
           const isDevtools = res.platform === 'devtools'
+          // 部分 Android 冷启动时 safeArea.top 会暂时返回 0，而状态栏仍有高度。
+          const topInset = res.statusBarHeight > 0 ? res.statusBarHeight : (res.safeArea?.top || 0)
           this.setData({
             ios: !isAndroid,
             innerPaddingRight: `padding-right: ${res.windowWidth - rect.left}px`,
             leftWidth: `width: ${res.windowWidth - rect.left }px`,
-            safeAreaTop: isDevtools || isAndroid ? `height: calc(var(--height) + ${res.safeArea.top}px); padding-top: ${res.safeArea.top}px` : ``
+            safeAreaTop: isDevtools || isAndroid ? `height: calc(var(--height) + ${topInset}px); padding-top: ${topInset}px` : ``
           })
         }
       })
