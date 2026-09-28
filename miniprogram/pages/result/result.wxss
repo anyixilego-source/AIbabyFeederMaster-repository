@@ -95,9 +95,15 @@
 .meal-weight-card .meal-total-row { border: 0; padding: 8rpx 4rpx 10rpx; box-shadow: none; background: transparent; }
 .meal-weight-card .meal-total-copy text:last-child { font-size: 18rpx; }
 .meal-weight-card .meal-total-input { background: #fff; }
-.meal-weight-slider-area { position: relative; padding: 54rpx 8rpx 0; }
-.meal-weight-bubble { position: absolute; z-index: 3; top: 0; min-width: 124rpx; max-width: 220rpx; padding: 7rpx 15rpx; border-radius: 14rpx; color: #ed6745; background: #fff; box-shadow: 0 5rpx 16rpx rgba(166,95,56,.17); font-size: 18rpx; font-weight: 700; text-align: center; white-space: nowrap; transform: translateX(-50%); }
+.meal-weight-slider-area { position: relative; padding: 104rpx 8rpx 0; }
+.meal-weight-bubble { position: absolute; z-index: 3; top: -5rpx; max-width: 360rpx; min-height: 65rpx; padding: 5rpx 18rpx 5rpx 6rpx; border-radius: 18rpx; display: flex; align-items: center; gap: 7rpx; color: #f06a3d; background: #fff; box-shadow: 0 6rpx 20rpx rgba(166,95,56,.18); font-size: 20rpx; font-weight: 700; white-space: nowrap; transform: translateX(-50%); }
+.meal-weight-bubble.start { transform: none; }
+.meal-weight-bubble.end { transform: translateX(-100%); }
 .meal-weight-bubble::after { content: ''; position: absolute; left: calc(50% - 7rpx); bottom: -7rpx; width: 14rpx; height: 14rpx; background: #fff; transform: rotate(45deg); }
+.meal-weight-bubble.start::after { left: 13rpx; }
+.meal-weight-bubble.end::after { left: auto; right: 13rpx; }
+.weight-reference-icon { position: relative; width: 32px; height: 38px; overflow: hidden; flex-shrink: 0; border-radius: 18px; background: #fff8ed; }
+.weight-reference-sprite { position: absolute; top: -12px; width: 370px; height: 107px; }
 .meal-weight-warning { position: absolute; top: 0; left: 8rpx; right: 8rpx; padding: 7rpx 12rpx; border-radius: 12rpx; color: #bd6134; background: #fff2e3; font-size: 18rpx; line-height: 1.45; }
 .meal-weight-slider-control { position: relative; height: 48rpx; margin: 0 10rpx; }
 .meal-weight-track { position: absolute; left: 0; right: 0; top: 17rpx; height: 15rpx; border-radius: 10rpx; background: #dedfe3; }
@@ -108,26 +114,5 @@
 .meal-weight-tick { min-width: 44rpx; display: flex; flex-direction: column; align-items: center; gap: 4rpx; color: #8b8b9e; font-size: 16rpx; }
 .meal-weight-mark { width: 7rpx; height: 14rpx; border-radius: 4rpx; background: #ffb862; }
 .meal-weight-tick:nth-child(2n+1) .meal-weight-mark { background: #ff8a72; }
-.meal-weight-examples { width: 100%; margin-top: 10rpx; white-space: nowrap; }
-.meal-weight-example-list { display: flex; gap: 8rpx; width: max-content; }
-.meal-weight-example { width: 96rpx; min-height: 122rpx; padding: 9rpx 5rpx; border: 2rpx solid #f5e6db; border-radius: 16rpx; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4rpx; background: #fff8f1; white-space: normal; text-align: center; }
-.meal-weight-example.active { border-color: #ff8b5c; background: #fff0e4; box-shadow: 0 3rpx 10rpx rgba(220,119,70,.13); }
-.meal-weight-example-icon { height: 52rpx; display: flex; align-items: flex-end; justify-content: center; }
-.weight-food { position: relative; width: 36rpx; height: 40rpx; flex: 0 0 36rpx; filter: drop-shadow(0 3rpx 2rpx rgba(110,67,34,.13)); }
-.weight-food + .weight-food { margin-left: -10rpx; }
-.weight-food.egg { width: 29rpx; height: 38rpx; flex-basis: 29rpx; border-radius: 52% 52% 48% 48%; background: linear-gradient(130deg,#fff8e8,#f2d9b9); transform: rotate(-13deg); }
-.weight-food.egg:nth-child(2) { transform: rotate(13deg); }
-.weight-food.half-egg { width: 37rpx; height: 25rpx; flex-basis: 37rpx; border-radius: 50% 50% 42% 42%; background: #fff8e7; box-shadow: inset 0 0 0 3rpx #efdcc1; }
-.weight-food-yolk { width: 19rpx; height: 19rpx; margin: 3rpx auto 0; border-radius: 50%; background: #ffbd4d; }
-.weight-food.banana { width: 41rpx; height: 29rpx; flex-basis: 41rpx; border: 9rpx solid #ffcf51; border-top: 0; border-left-width: 5rpx; border-radius: 0 0 42rpx 34rpx; transform: rotate(-25deg); }
-.weight-food.banana:nth-child(2) { transform: rotate(-7deg); }
-.weight-food.apple { width: 36rpx; height: 35rpx; flex-basis: 36rpx; border-radius: 46% 46% 45% 45%; background: linear-gradient(145deg,#ff6b65,#e9474c); }
-.weight-food.apple::before { content: ''; position: absolute; top: -9rpx; left: 17rpx; width: 4rpx; height: 11rpx; border-radius: 3rpx; background: #805531; transform: rotate(20deg); }
-.weight-food.apple::after { content: ''; position: absolute; top: -7rpx; left: 20rpx; width: 15rpx; height: 8rpx; border-radius: 90% 0 90% 0; background: #50b967; transform: rotate(-20deg); }
-.weight-food.orange { width: 37rpx; height: 37rpx; flex-basis: 37rpx; border-radius: 50%; background: linear-gradient(140deg,#ffb04a,#f47b2d); }
-.weight-food.orange::before { content: ''; position: absolute; top: -7rpx; left: 16rpx; width: 15rpx; height: 9rpx; border-radius: 90% 0 90% 0; background: #58bd64; transform: rotate(-22deg); }
-.meal-weight-example-grams { color: #312b2a; font-size: 19rpx; font-weight: 700; }
-.meal-weight-example.active .meal-weight-example-grams { color: #f0714a; }
-.meal-weight-example-name { min-height: 30rpx; color: #777080; font-size: 14rpx; line-height: 1.2; }
 .meal-weight-note { margin-top: 12rpx; padding: 12rpx; border-radius: 14rpx; display: flex; align-items: center; gap: 9rpx; color: #82726c; background: #fff4e5; font-size: 17rpx; line-height: 1.35; }
 .meal-weight-note .guide-icon { width: 26rpx; height: 26rpx; font-size: 17rpx; }

@@ -274,15 +274,21 @@ async function main() {
       assert.equal(data.scrollIntoView, 'confirm-section', '自动映射后应定位到份量确认区')
       assert.deepEqual(data.confirmedFoods.map((item) => item.ratioPercent), [100], '自动映射单一食材时应固定占比100%')
       assert.equal(data.confirmedFoods[0].consumedAmount, '200', '自动映射单一食材应换算为全部摄入量')
+      assert.equal(data.weightHint, '约1个橙子', '200克应只展示橙子参照')
+      assert.ok(await result.$('.weight-reference-sprite'), '当前重量参照应使用用户提供的食物插画')
+      assert.equal(await result.$('.meal-weight-examples'), null, '页面下方不应再展示全部重量图例')
+      const defaultWeightTarget = screenshotPath('result-weight-200')
+      await miniProgram.screenshot({ path: defaultWeightTarget })
       await result.callMethod('onMealWeightChanging', { detail: { value: 47 } })
       data = await result.data()
       assert.equal(data.mealTotalAmount, '50', '滑块接近50克刻度时应吸附')
       await result.callMethod('onMealWeightChange', { detail: { value: 43 } })
       data = await result.data()
       assert.equal(data.mealTotalAmount, '43', '离刻度较远时应保留原重量')
-      await result.callMethod('selectWeightExample', { currentTarget: { dataset: { grams: 170 } } })
+      assert.equal(data.weightHint, '', '非指定参照重量不应展示食物图片与说明')
+      await result.callMethod('onMealTotalInput', { detail: { value: '170' } })
       data = await result.data()
-      assert.equal(data.activeExampleWeight, 170, '点击苹果示例应选中170克')
+      assert.equal(data.weightHint, '约1个苹果', '170克应只展示苹果参照')
       assert.equal(data.confirmedFoods[0].consumedAmount, '170', '总量改变后食材摄入量应联动')
       const weightTarget = screenshotPath('result-weight-picker')
       await miniProgram.screenshot({ path: weightTarget })
@@ -297,9 +303,9 @@ async function main() {
       await result.callMethod('onMealTotalInput', { detail: { value: '1001' } })
       data = await result.data()
       assert.ok(data.weightWarning.includes('1000'), '超过1000克应提示上限')
-      await result.callMethod('selectWeightExample', { currentTarget: { dataset: { grams: 200 } } })
+      await result.callMethod('onMealWeightChange', { detail: { value: 200 } })
       data = await result.data()
-      assert.equal(data.mealTotalAmount, '200', '选择示例后应恢复可记录的重量')
+      assert.equal(data.mealTotalAmount, '200', '滑回200克后应恢复橙子参照')
       await miniProgram.mockWxMethod('showActionSheet', { tapIndex: 0 })
       const row = await result.$('.food-row')
       assert.ok(row, '候选食物应可点击')
@@ -356,6 +362,7 @@ async function main() {
         autoMappingWorks: true,
         manualRemappingWorks: true,
         weightPickerWorks: true,
+        defaultWeightScreenshot: defaultWeightTarget,
         weightScreenshot: weightTarget,
         highWeightScreenshot: highWeightTarget,
         ratioOnlyModeWorks: true,

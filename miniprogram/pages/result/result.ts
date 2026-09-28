@@ -42,30 +42,28 @@ const warningNames: Record<string, string> = {
   TRACE_VALUE_PRESENT: '计算包含微量值', NUTRIENT_ABSENT_FOR_ITEM: '部分食品缺少该营养素数据',
 }
 const weightExamples = [
-  { grams: 25, foods: ['half-egg'], label: '半个蛋' },
-  { grams: 50, foods: ['egg'], label: '一个蛋' },
-  { grams: 80, foods: ['banana'], label: '香蕉' },
-  { grams: 100, foods: ['egg', 'egg'], label: '两个蛋' },
-  { grams: 150, foods: ['banana', 'banana'], label: '两根香蕉' },
-  { grams: 170, foods: ['apple'], label: '苹果' },
-  { grams: 200, foods: ['orange'], label: '橙子' },
-  { grams: 250, foods: ['apple', 'banana'], label: '苹果+香蕉' },
-  { grams: 300, foods: ['apple', 'banana', 'egg'], label: '苹果+香蕉+鸡蛋' },
-].map((example) => ({ ...example, icons: example.foods.map((kind, id) => ({ kind, id })) }))
+  { grams: 25, hint: '约半个蛋', spriteX: 6 },
+  { grams: 50, hint: '约1个蛋', spriteX: 44 },
+  { grams: 80, hint: '约1根香蕉', spriteX: 83 },
+  { grams: 100, hint: '约2个蛋', spriteX: 122 },
+  { grams: 150, hint: '约2根香蕉', spriteX: 161 },
+  { grams: 170, hint: '约1个苹果', spriteX: 201 },
+  { grams: 200, hint: '约1个橙子', spriteX: 241 },
+  { grams: 250, hint: '约苹果+香蕉', spriteX: 283 },
+  { grams: 300, hint: '约苹果+香蕉+鸡蛋', spriteX: 325 },
+]
 const weightTicks = [0, 50, 100, 150, 200, 250, 300].map((grams) => ({ grams, label: `${grams}g` }))
 function weightPresentation(value: string) {
   const grams = Number(value)
   const valid = value.trim() !== '' && Number.isFinite(grams) && grams >= 0
   const sliderAmount = valid ? Math.min(300, grams) : 0
-  const example = valid && grams <= 300 && grams > 0
-    ? weightExamples.reduce((closest, current) => Math.abs(current.grams - grams) < Math.abs(closest.grams - grams) ? current : closest)
-    : null
+  const example = valid ? weightExamples.find((item) => item.grams === grams) : undefined
   return {
     sliderAmount,
     sliderPercent: sliderAmount / 3,
-    bubblePercent: Math.max(16, Math.min(84, sliderAmount / 3)),
-    activeExampleWeight: example?.grams || 0,
-    weightHint: example ? (grams === example.grams ? `约${example.label}` : `接近${example.grams}克：${example.label}`) : '',
+    bubbleAlign: sliderAmount <= 40 ? 'start' : sliderAmount >= 260 ? 'end' : 'center',
+    weightHint: example?.hint || '',
+    weightIconX: example?.spriteX || 0,
     weightWarning: valid && grams > 1000 ? '最多可记录 1000 克，请修改重量'
       : valid && grams > 300 ? '超过 300 克常用范围，请核对本餐实际摄入总量' : '',
   }
@@ -187,7 +185,7 @@ Page({
     foods: [] as Array<{ badge: string; name: string; details: string; uncertainty: string; tone: string; index: number; mappedName: string }>,
     query: '', searchResults: [] as FoodResult[], pendingCandidateIndex: -1,
     confirmedFoods: [] as ConfirmedFoodItem[],
-    mealTotalAmount: '200', ...weightPresentation('200'), weightExamples, weightTicks,
+    mealTotalAmount: '200', ...weightPresentation('200'), weightTicks,
     ratioTotal: 0, ratioAdjustmentSequence: 0,
     nutrition: [] as Array<{ name: string; badge: string; value: string; tone: string }>,
     coverageText: '', warnings: [] as string[],
@@ -237,11 +235,6 @@ Page({
   },
   onMealWeightChange(event: WechatMiniprogram.SliderChange) {
     this.updateMealTotalFromSlider(event)
-  },
-  selectWeightExample(event: WechatMiniprogram.TouchEvent) {
-    const mealTotalAmount = String(event.currentTarget.dataset.grams)
-    const confirmedFoods = applyRatioAmounts(this.data.confirmedFoods, mealTotalAmount)
-    this.setData({ mealTotalAmount, ...weightPresentation(mealTotalAmount), confirmedFoods })
   },
   updateLinkedRatio(event: WechatMiniprogram.SliderChange, showFeedback: boolean) {
     const index = Number(event.currentTarget.dataset.index)
