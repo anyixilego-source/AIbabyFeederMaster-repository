@@ -84,7 +84,7 @@
 .consent-checkbox .check-icon { width: 19rpx; height: 11rpx; margin-top: -4rpx; border-width: 0 0 4rpx 4rpx; color: #fff; }
 .consent-link { padding: 12rpx 0; color: #ff5268; white-space: nowrap; }
 .consent-divider { width: 1rpx; height: 23rpx; margin: 0 7rpx; background: #c9c7c8; }
-.consent-retention { padding: 12rpx 0; white-space: nowrap; }
+.consent-retention { padding: 12rpx 0; color: #ff5268; white-space: nowrap; }
 .consent-primary { width: 100%; height: 84rpx; margin-top: 0; font-size: 31rpx; background: linear-gradient(105deg,#ff9d8b,#ff4f69); box-shadow: 0 13rpx 28rpx rgba(255,94,105,.20); }
 .consent-error { display: block; margin-top: 12rpx; color: #c35d55; font-size: 18rpx; line-height: 1.5; }
 
@@ -118,5 +118,4 @@
 .meal-weight-tick { min-width: 44rpx; display: flex; flex-direction: column; align-items: center; gap: 4rpx; color: #8b8b9e; font-size: 16rpx; }
 .meal-weight-mark { width: 7rpx; height: 14rpx; border-radius: 4rpx; background: #ffb862; }
 .meal-weight-tick:nth-child(2n+1) .meal-weight-mark { background: #ff8a72; }
-.meal-weight-note { margin-top: 12rpx; padding: 12rpx; border-radius: 14rpx; display: flex; align-items: center; gap: 9rpx; color: #82726c; background: #fff4e5; font-size: 17rpx; line-height: 1.35; }
-.meal-weight-note .guide-icon { width: 26rpx; height: 26rpx; font-size: 17rpx; }
+.manual-search button { display: flex; align-items: center; justify-content: center; line-height: 1; }
