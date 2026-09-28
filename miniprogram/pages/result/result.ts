@@ -42,28 +42,36 @@ const warningNames: Record<string, string> = {
   TRACE_VALUE_PRESENT: '计算包含微量值', NUTRIENT_ABSENT_FOR_ITEM: '部分食品缺少该营养素数据',
 }
 const weightExamples = [
-  { grams: 25, hint: '约半个蛋', spriteX: 6 },
-  { grams: 50, hint: '约1个蛋', spriteX: 44 },
-  { grams: 80, hint: '约1根香蕉', spriteX: 83 },
-  { grams: 100, hint: '约2个蛋', spriteX: 122 },
-  { grams: 150, hint: '约2根香蕉', spriteX: 161 },
-  { grams: 170, hint: '约1个苹果', spriteX: 201 },
-  { grams: 200, hint: '约1个橙子', spriteX: 241 },
-  { grams: 250, hint: '约苹果+香蕉', spriteX: 283 },
-  { grams: 300, hint: '约苹果+香蕉+鸡蛋', spriteX: 325 },
+  { grams: 25, hint: '约半个蛋', icons: ['/assets/weight-egg-half-v1.png'] },
+  { grams: 50, hint: '约1个蛋', icons: ['/assets/weight-egg-v1.png'] },
+  { grams: 80, hint: '约1根香蕉', icons: ['/assets/weight-banana-v1.png'] },
+  { grams: 100, hint: '约2个蛋', icons: ['/assets/weight-egg-v1.png', '/assets/weight-egg-v1.png'] },
+  { grams: 150, hint: '约2根香蕉', icons: ['/assets/weight-banana-v1.png', '/assets/weight-banana-v1.png'] },
+  { grams: 170, hint: '约1个苹果', icons: ['/assets/weight-apple-v1.png'] },
+  { grams: 200, hint: '约1个橙子', icons: ['/assets/weight-orange-v1.png'] },
+  { grams: 250, hint: '约苹果+香蕉', icons: ['/assets/weight-apple-v1.png', '/assets/weight-banana-v1.png'] },
+  { grams: 300, hint: '约苹果+香蕉+鸡蛋', icons: ['/assets/weight-apple-v1.png', '/assets/weight-banana-v1.png', '/assets/weight-egg-v1.png'] },
 ]
 const weightTicks = [0, 50, 100, 150, 200, 250, 300].map((grams) => ({ grams, label: `${grams}g` }))
-function weightPresentation(value: string) {
+function weightPresentation(value: string, previewGrams?: number) {
   const grams = Number(value)
   const valid = value.trim() !== '' && Number.isFinite(grams) && grams >= 0
   const sliderAmount = valid ? Math.min(300, grams) : 0
-  const example = valid ? weightExamples.find((item) => item.grams === grams) : undefined
+  const preview = previewGrams ?? grams
+  const example = valid && Number.isFinite(preview)
+    ? weightExamples.reduce<(typeof weightExamples)[number] | undefined>((closest, item) => {
+      const distance = Math.abs(item.grams - preview)
+      return distance <= 10 && (!closest || distance < Math.abs(closest.grams - preview)) ? item : closest
+    }, undefined)
+    : undefined
   return {
     sliderAmount,
     sliderPercent: sliderAmount / 3,
-    bubbleAlign: sliderAmount <= 40 ? 'start' : sliderAmount >= 260 ? 'end' : 'center',
+    bubblePercent: example ? example.grams / 3 : 0,
+    bubbleAlign: example && example.grams <= 40 ? 'start' : example && example.grams >= 260 ? 'end' : 'center',
     weightHint: example?.hint || '',
-    weightIconX: example?.spriteX || 0,
+    weightIcons: example?.icons.map((src, index) => ({ src, key: `${example.grams}-${index}` })) || [],
+    weightIconLayout: example?.icons.length === 3 ? 'trio' : example?.icons.length === 2 ? 'pair' : 'single',
     weightWarning: valid && grams > 1000 ? '最多可记录 1000 克，请修改重量'
       : valid && grams > 300 ? '超过 300 克常用范围，请核对本餐实际摄入总量' : '',
   }
@@ -226,9 +234,27 @@ Page({
     this.setData({ mealTotalAmount, ...weightPresentation(mealTotalAmount), weightBubbleVisible: false, confirmedFoods })
   },
   updateMealTotalFromSlider(event: WechatMiniprogram.SliderChange, weightBubbleVisible: boolean) {
-    const mealTotalAmount = String(snappedWeight(Number(event.detail.value)))
-    const confirmedFoods = applyRatioAmounts(this.data.confirmedFoods, mealTotalAmount)
-    this.setData({ mealTotalAmount, ...weightPresentation(mealTotalAmount), weightBubbleVisible, confirmedFoods })
+    const rawAmount = Math.max(0, Math.min(300, Math.round(Number(event.detail.value))))
+    const mealTotalAmount = String(snappedWeight(rawAmount))
+    const presentation = weightPresentation(mealTotalAmount, rawAmount)
+    const sliderAmount = weightBubbleVisible ? rawAmount : presentation.sliderAmount
+    const updates: Partial<typeof this.data> = {}
+    if (this.data.sliderAmount !== sliderAmount) updates.sliderAmount = sliderAmount
+    if (this.data.sliderPercent !== sliderAmount / 3) updates.sliderPercent = sliderAmount / 3
+    if (this.data.weightBubbleVisible !== weightBubbleVisible) updates.weightBubbleVisible = weightBubbleVisible
+    if (this.data.mealTotalAmount !== mealTotalAmount) {
+      updates.mealTotalAmount = mealTotalAmount
+      updates.confirmedFoods = applyRatioAmounts(this.data.confirmedFoods, mealTotalAmount)
+    }
+    if (this.data.weightHint !== presentation.weightHint) {
+      updates.weightHint = presentation.weightHint
+      updates.weightIcons = presentation.weightIcons
+      updates.weightIconLayout = presentation.weightIconLayout
+      updates.bubbleAlign = presentation.bubbleAlign
+      updates.bubblePercent = presentation.bubblePercent
+    }
+    if (this.data.weightWarning !== presentation.weightWarning) updates.weightWarning = presentation.weightWarning
+    if (Object.keys(updates).length) this.setData(updates)
   },
   onMealWeightChanging(event: WechatMiniprogram.SliderChange) {
     this.updateMealTotalFromSlider(event, true)
