@@ -274,6 +274,32 @@ async function main() {
       assert.equal(data.scrollIntoView, 'confirm-section', '自动映射后应定位到份量确认区')
       assert.deepEqual(data.confirmedFoods.map((item) => item.ratioPercent), [100], '自动映射单一食材时应固定占比100%')
       assert.equal(data.confirmedFoods[0].consumedAmount, '200', '自动映射单一食材应换算为全部摄入量')
+      await result.callMethod('onMealWeightChanging', { detail: { value: 47 } })
+      data = await result.data()
+      assert.equal(data.mealTotalAmount, '50', '滑块接近50克刻度时应吸附')
+      await result.callMethod('onMealWeightChange', { detail: { value: 43 } })
+      data = await result.data()
+      assert.equal(data.mealTotalAmount, '43', '离刻度较远时应保留原重量')
+      await result.callMethod('selectWeightExample', { currentTarget: { dataset: { grams: 170 } } })
+      data = await result.data()
+      assert.equal(data.activeExampleWeight, 170, '点击苹果示例应选中170克')
+      assert.equal(data.confirmedFoods[0].consumedAmount, '170', '总量改变后食材摄入量应联动')
+      const weightTarget = screenshotPath('result-weight-picker')
+      await miniProgram.screenshot({ path: weightTarget })
+      await result.callMethod('onMealTotalInput', { detail: { value: '650' } })
+      data = await result.data()
+      assert.equal(data.mealTotalAmount, '650', '手动输入应支持超过300克')
+      assert.equal(data.sliderAmount, 300, '超过滑块范围时滑块停在300克')
+      assert.ok(data.weightWarning.includes('核对'), '超过300克应提示用户核对')
+      assert.equal(data.confirmedFoods[0].consumedAmount, '650', '手动输入仍应联动食材重量')
+      const highWeightTarget = screenshotPath('result-weight-over-300')
+      await miniProgram.screenshot({ path: highWeightTarget })
+      await result.callMethod('onMealTotalInput', { detail: { value: '1001' } })
+      data = await result.data()
+      assert.ok(data.weightWarning.includes('1000'), '超过1000克应提示上限')
+      await result.callMethod('selectWeightExample', { currentTarget: { dataset: { grams: 200 } } })
+      data = await result.data()
+      assert.equal(data.mealTotalAmount, '200', '选择示例后应恢复可记录的重量')
       await miniProgram.mockWxMethod('showActionSheet', { tapIndex: 0 })
       const row = await result.$('.food-row')
       assert.ok(row, '候选食物应可点击')
@@ -329,6 +355,9 @@ async function main() {
         scrollIntoView: data.scrollIntoView,
         autoMappingWorks: true,
         manualRemappingWorks: true,
+        weightPickerWorks: true,
+        weightScreenshot: weightTarget,
+        highWeightScreenshot: highWeightTarget,
         ratioOnlyModeWorks: true,
         draftCleaned: !(await miniProgram.callWxMethod('getStorageSync', 'foodmaster.currentMealId')),
         screenshot: target,

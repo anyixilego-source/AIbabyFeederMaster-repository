@@ -41,6 +41,40 @@ const warningNames: Record<string, string> = {
   ESTIMATED_ZERO_USED: '计算包含估计零值', PARTIAL_VALUE_USED: '计算包含部分已知值',
   TRACE_VALUE_PRESENT: '计算包含微量值', NUTRIENT_ABSENT_FOR_ITEM: '部分食品缺少该营养素数据',
 }
+const weightExamples = [
+  { grams: 25, foods: ['half-egg'], label: '半个蛋' },
+  { grams: 50, foods: ['egg'], label: '一个蛋' },
+  { grams: 80, foods: ['banana'], label: '香蕉' },
+  { grams: 100, foods: ['egg', 'egg'], label: '两个蛋' },
+  { grams: 150, foods: ['banana', 'banana'], label: '两根香蕉' },
+  { grams: 170, foods: ['apple'], label: '苹果' },
+  { grams: 200, foods: ['orange'], label: '橙子' },
+  { grams: 250, foods: ['apple', 'banana'], label: '苹果+香蕉' },
+  { grams: 300, foods: ['apple', 'banana', 'egg'], label: '苹果+香蕉+鸡蛋' },
+].map((example) => ({ ...example, icons: example.foods.map((kind, id) => ({ kind, id })) }))
+const weightTicks = [0, 50, 100, 150, 200, 250, 300].map((grams) => ({ grams, label: `${grams}g` }))
+function weightPresentation(value: string) {
+  const grams = Number(value)
+  const valid = value.trim() !== '' && Number.isFinite(grams) && grams >= 0
+  const sliderAmount = valid ? Math.min(300, grams) : 0
+  const example = valid && grams <= 300 && grams > 0
+    ? weightExamples.reduce((closest, current) => Math.abs(current.grams - grams) < Math.abs(closest.grams - grams) ? current : closest)
+    : null
+  return {
+    sliderAmount,
+    sliderPercent: sliderAmount / 3,
+    bubblePercent: Math.max(16, Math.min(84, sliderAmount / 3)),
+    activeExampleWeight: example?.grams || 0,
+    weightHint: example ? (grams === example.grams ? `约${example.label}` : `接近${example.grams}克：${example.label}`) : '',
+    weightWarning: valid && grams > 1000 ? '最多可记录 1000 克，请修改重量'
+      : valid && grams > 300 ? '超过 300 克常用范围，请核对本餐实际摄入总量' : '',
+  }
+}
+function snappedWeight(value: number): number {
+  const bounded = Math.max(0, Math.min(300, Math.round(value)))
+  const tick = Math.round(bounded / 50) * 50
+  return Math.abs(bounded - tick) <= 6 ? tick : bounded
+}
 function numberText(value: string): string {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed.toString() : value
@@ -153,7 +187,8 @@ Page({
     foods: [] as Array<{ badge: string; name: string; details: string; uncertainty: string; tone: string; index: number; mappedName: string }>,
     query: '', searchResults: [] as FoodResult[], pendingCandidateIndex: -1,
     confirmedFoods: [] as ConfirmedFoodItem[],
-    mealTotalAmount: '200', ratioTotal: 0, ratioAdjustmentSequence: 0,
+    mealTotalAmount: '200', ...weightPresentation('200'), weightExamples, weightTicks,
+    ratioTotal: 0, ratioAdjustmentSequence: 0,
     nutrition: [] as Array<{ name: string; badge: string; value: string; tone: string }>,
     coverageText: '', warnings: [] as string[],
     errorMessage: '', scrollIntoView: '', manualFocus: false,
@@ -190,7 +225,23 @@ Page({
   onMealTotalInput(event: WechatMiniprogram.Input) {
     const mealTotalAmount = event.detail.value
     const confirmedFoods = applyRatioAmounts(this.data.confirmedFoods, mealTotalAmount)
-    this.setData({ mealTotalAmount, confirmedFoods })
+    this.setData({ mealTotalAmount, ...weightPresentation(mealTotalAmount), confirmedFoods })
+  },
+  updateMealTotalFromSlider(event: WechatMiniprogram.SliderChange) {
+    const mealTotalAmount = String(snappedWeight(Number(event.detail.value)))
+    const confirmedFoods = applyRatioAmounts(this.data.confirmedFoods, mealTotalAmount)
+    this.setData({ mealTotalAmount, ...weightPresentation(mealTotalAmount), confirmedFoods })
+  },
+  onMealWeightChanging(event: WechatMiniprogram.SliderChange) {
+    this.updateMealTotalFromSlider(event)
+  },
+  onMealWeightChange(event: WechatMiniprogram.SliderChange) {
+    this.updateMealTotalFromSlider(event)
+  },
+  selectWeightExample(event: WechatMiniprogram.TouchEvent) {
+    const mealTotalAmount = String(event.currentTarget.dataset.grams)
+    const confirmedFoods = applyRatioAmounts(this.data.confirmedFoods, mealTotalAmount)
+    this.setData({ mealTotalAmount, ...weightPresentation(mealTotalAmount), confirmedFoods })
   },
   updateLinkedRatio(event: WechatMiniprogram.SliderChange, showFeedback: boolean) {
     const index = Number(event.currentTarget.dataset.index)
@@ -225,7 +276,7 @@ Page({
         result,
         errorMessage: '',
         confirmedFoods: [], nutrition: [], coverageText: '', warnings: [],
-        mealTotalAmount: '200', ratioTotal: 0, ratioAdjustmentSequence: 0,
+        mealTotalAmount: '200', ...weightPresentation('200'), ratioTotal: 0, ratioAdjustmentSequence: 0,
         foods: items.map((item, index) => ({
           badge: item.observedName.slice(0, 1), name: item.observedName,
           details: [item.form, item.count === null ? null : `${item.count} 份`, item.amountHint || '份量待确认', `置信度 ${Math.round(item.confidence * 100)}%`].filter(Boolean).join(' · '),
@@ -352,8 +403,8 @@ Page({
     const foods = this.data.confirmedFoods
     if (!mealId) { wx.showToast({ title: '请从新增记录进入拍照', icon: 'none' }); return }
     if (!foods.length) { wx.showToast({ title: '请至少确认一种标准食品', icon: 'none' }); return }
-    if (!/^\d+(?:\.\d{1,6})?$/.test(this.data.mealTotalAmount) || Number(this.data.mealTotalAmount) <= 0) {
-      wx.showToast({ title: '请填写本餐实际摄入总克数', icon: 'none' }); return
+    if (!/^\d+(?:\.\d{1,6})?$/.test(this.data.mealTotalAmount) || Number(this.data.mealTotalAmount) <= 0 || Number(this.data.mealTotalAmount) > 1000) {
+      wx.showToast({ title: '请输入 1～1000 克的实际摄入总量', icon: 'none' }); return
     }
     if (this.data.ratioTotal !== 100) {
       wx.showToast({ title: `食材占比合计需为100%，当前${this.data.ratioTotal}%`, icon: 'none' }); return
@@ -367,6 +418,16 @@ Page({
       if (servedAmount && (!/^\d+(?:\.\d{1,6})?$/.test(servedAmount) || Number(servedAmount) < Number(consumedAmount))) {
         wx.showToast({ title: `${food.canonicalNameZh}端上桌克数不能小于实际摄入`, icon: 'none' }); return
       }
+    }
+    if (Number(this.data.mealTotalAmount) > 300) {
+      const confirmed = await new Promise<boolean>((resolve) => wx.showModal({
+        title: '核对本餐总量',
+        content: `本餐实际摄入总量为 ${this.data.mealTotalAmount} 克，超过 300 克常用范围。确认记录这个重量吗？`,
+        confirmText: '确认记录',
+        success: ({ confirm }) => resolve(confirm),
+        fail: () => resolve(false),
+      }))
+      if (!confirmed) return
     }
     this.setData({ busy: true })
     try {

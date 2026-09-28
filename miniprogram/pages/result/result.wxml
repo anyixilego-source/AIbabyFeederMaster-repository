@@ -15,7 +15,17 @@
     <view class="estimate-title"><view><text class="section-title">调整食材占比</text><text class="portion-subtitle">确认标准食品，再调整本餐实际摄入比例</text></view><view class="info-icon">i</view></view>
     <view class="manual-search"><input value="{{query}}" focus="{{manualFocus}}" bindinput="onQueryInput" bindblur="onManualBlur" placeholder="输入食品名称，或点击上方 AI 候选"></input><button bindtap="searchFood">搜索</button></view>
     <text class="mapping-tip">可逐项确认多种食材，已确认食材将自动分配初始占比。</text>
-    <view class="meal-total-row"><view class="total-meal-icon"><view class="bowl-icon"></view></view><view class="meal-total-copy"><text>本餐实际摄入总量</text><text>默认 200 克，可按本餐实际情况修改</text></view><view class="meal-total-input"><input type="digit" value="{{mealTotalAmount}}" bindinput="onMealTotalInput" placeholder="200"></input><text>克</text></view></view>
+    <view class="meal-weight-card">
+      <view class="meal-total-row"><view class="total-meal-icon"><view class="bowl-icon"></view></view><view class="meal-total-copy"><text>本餐实际摄入总量</text><text>滑动快速选择，或直接输入重量</text></view><view class="meal-total-input"><input type="digit" value="{{mealTotalAmount}}" bindinput="onMealTotalInput" placeholder="200"></input><text>克</text></view></view>
+      <view class="meal-weight-slider-area">
+        <view wx:if="{{weightHint}}" class="meal-weight-bubble" style="left: {{bubblePercent}}%;">{{weightHint}}</view>
+        <view wx:if="{{weightWarning}}" class="meal-weight-warning">{{weightWarning}}</view>
+        <view class="meal-weight-slider-control"><view class="meal-weight-track"><view class="meal-weight-fill" style="width: {{sliderPercent}}%;"></view><view class="meal-weight-thumb" style="left: {{sliderPercent}}%;"></view></view><slider class="meal-weight-native" min="0" max="300" step="1" value="{{sliderAmount}}" activeColor="transparent" backgroundColor="transparent" block-color="transparent" block-size="30" bindchanging="onMealWeightChanging" bindchange="onMealWeightChange"/></view>
+        <view class="meal-weight-ticks"><view class="meal-weight-tick" wx:for="{{weightTicks}}" wx:key="grams"><view class="meal-weight-mark"></view><text>{{item.label}}</text></view></view>
+      </view>
+      <scroll-view class="meal-weight-examples" scroll-x enhanced show-scrollbar="{{false}}"><view class="meal-weight-example-list"><view class="meal-weight-example {{activeExampleWeight === item.grams ? 'active' : ''}}" wx:for="{{weightExamples}}" wx:key="grams" data-grams="{{item.grams}}" bindtap="selectWeightExample"><view class="meal-weight-example-icon"><view class="weight-food {{foodIcon.kind}}" wx:for="{{item.icons}}" wx:for-item="foodIcon" wx:key="id"><view wx:if="{{foodIcon.kind === 'half-egg'}}" class="weight-food-yolk"></view></view></view><text class="meal-weight-example-grams">{{item.grams}}g</text><text class="meal-weight-example-name">{{item.label}}</text></view></view></scroll-view>
+      <view class="meal-weight-note"><view class="guide-icon">i</view><text>图例仅供重量参考；滑动接近 50 克刻度时自动吸附</text></view>
+    </view>
     <view wx:if="{{confirmedFoods.length}}" class="ratio-guide"><view class="guide-icon">i</view><text>拖动任一滑条，未调整食材优先自动联动，总占比保持 100%</text></view>
     <view class="confirmed-list">
       <view class="confirmed-food" wx:for="{{confirmedFoods}}" wx:key="localId">
