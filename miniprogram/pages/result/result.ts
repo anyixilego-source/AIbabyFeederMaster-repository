@@ -207,7 +207,7 @@ Page({
 
   goBack() { wx.navigateBack({ fail: () => wx.redirectTo({ url: '/pages/camera/camera' }) }) },
   retry() { wx.navigateBack({ delta: 1, fail: () => wx.redirectTo({ url: '/pages/camera/camera' }) }) },
-  onConsentChange(event: WechatMiniprogram.CustomEvent) { this.setData({ accepted: event.detail.value.length > 0 }) },
+  toggleConsent() { this.setData({ accepted: !this.data.accepted }) },
   openConsentDetails() {
     wx.showModal({
       title: '图片处理授权说明',

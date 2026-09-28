@@ -190,6 +190,33 @@ async function main() {
       return
     }
 
+    if (command === 'consent') {
+      const result = await miniProgram.reLaunch('/pages/result/result')
+      await result.waitFor(500)
+      let data = await result.data()
+      assert.equal(data.accepted, false, '图片授权不能默认勾选')
+      assert.ok(await result.$('.consent-camera'), '授权卡应显示相机图标')
+      assert.ok(await result.$('.consent-link'), '授权说明应保留独立入口')
+      await (await result.$('.consent-check')).tap()
+      await result.waitFor(300)
+      data = await result.data()
+      assert.equal(data.accepted, true, '点击勾选行应同意图片处理')
+      const target = screenshotPath('result-consent-agreed')
+      await miniProgram.screenshot({ path: target })
+      await result.callMethod('toggleConsent')
+      data = await result.data()
+      assert.equal(data.accepted, false, '再次点击应能撤销同意')
+      await result.callMethod('onConsentPrimaryAction')
+      data = await result.data()
+      assert.equal(data.accepted, true, '未授权时点击主按钮只勾选授权')
+      assert.equal(data.result, null, '首次授权不应立即上传图片识别')
+      await result.callMethod('onRetentionChange', { detail: { value: '1' } })
+      data = await result.data()
+      assert.equal(data.retentionIndex, 1, '本地保存期限仍应可选择')
+      console.log(JSON.stringify({ consentLayout: true, manualConsentWorks: true, firstActionDoesNotUpload: true, retentionWorks: true, screenshot: target }))
+      return
+    }
+
     if (command === 'fixture') {
       await miniProgram.callWxMethod('removeStorageSync', 'foodmaster.currentMealId')
       await miniProgram.callWxMethod('removeStorageSync', 'mealPhoto')
