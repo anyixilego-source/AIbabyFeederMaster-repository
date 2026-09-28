@@ -195,8 +195,10 @@ async function main() {
       await result.waitFor(500)
       let data = await result.data()
       assert.equal(data.accepted, false, '图片授权不能默认勾选')
+      assert.deepEqual(data.retentionOptions.map((option) => option.label), ['30天', '180天', '365天'], '本地图片期限应按天数展示')
       assert.ok(await result.$('.consent-camera'), '授权卡应显示相机图标')
       assert.ok(await result.$('.consent-link'), '授权说明应保留独立入口')
+      assert.ok(await result.$('.consent-retention-duration'), '仅保存期限数字应使用强调色')
       await (await result.$('.consent-check')).tap()
       await result.waitFor(300)
       data = await result.data()
@@ -213,6 +215,7 @@ async function main() {
       await result.callMethod('onRetentionChange', { detail: { value: '1' } })
       data = await result.data()
       assert.equal(data.retentionIndex, 1, '本地保存期限仍应可选择')
+      assert.equal(data.retentionOptions[data.retentionIndex].label, '180天', '第二档应展示180天')
       console.log(JSON.stringify({ consentLayout: true, manualConsentWorks: true, firstActionDoesNotUpload: true, retentionWorks: true, screenshot: target }))
       return
     }

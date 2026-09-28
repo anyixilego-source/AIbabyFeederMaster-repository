@@ -1,10 +1,11 @@
 const IMAGE_RETENTION_KEY = 'foodmaster.image.retention'
-const monthsByChoice = { ONE_MONTH: 1, SIX_MONTHS: 6, ONE_YEAR: 12 } as const
-export type RetentionChoice = keyof typeof monthsByChoice
+// 保留服务端已接受的枚举值；新保存的图片按页面所示天数计算到期时间。
+const daysByChoice = { ONE_MONTH: 30, SIX_MONTHS: 180, ONE_YEAR: 365 } as const
+export type RetentionChoice = keyof typeof daysByChoice
 export const retentionOptions: Array<{ value: RetentionChoice; label: string }> = [
-  { value: 'ONE_MONTH', label: '保存 1 个月' },
-  { value: 'SIX_MONTHS', label: '保存半年' },
-  { value: 'ONE_YEAR', label: '保存 1 年' },
+  { value: 'ONE_MONTH', label: '30天' },
+  { value: 'SIX_MONTHS', label: '180天' },
+  { value: 'ONE_YEAR', label: '365天' },
 ]
 
 interface RetentionRecord { filePath: string; retention: RetentionChoice; expiresAt: number }
@@ -25,10 +26,9 @@ export function cleanupExpiredLocalImages(now = Date.now()): void {
 
 export function saveLocalImage(tempFilePath: string, retention: RetentionChoice): Promise<string> {
   const remember = (filePath: string) => {
-    const expiry = new Date()
-    expiry.setMonth(expiry.getMonth() + monthsByChoice[retention])
+    const expiresAt = Date.now() + daysByChoice[retention] * 24 * 60 * 60 * 1000
     const next = records().filter((record) => record.filePath !== filePath)
-    next.push({ filePath, retention, expiresAt: expiry.getTime() })
+    next.push({ filePath, retention, expiresAt })
     wx.setStorageSync(IMAGE_RETENTION_KEY, next)
     return filePath
   }
