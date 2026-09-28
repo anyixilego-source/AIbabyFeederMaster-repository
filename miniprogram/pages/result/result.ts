@@ -185,7 +185,7 @@ Page({
     foods: [] as Array<{ badge: string; name: string; details: string; uncertainty: string; tone: string; index: number; mappedName: string }>,
     query: '', searchResults: [] as FoodResult[], pendingCandidateIndex: -1,
     confirmedFoods: [] as ConfirmedFoodItem[],
-    mealTotalAmount: '200', ...weightPresentation('200'), weightTicks,
+    mealTotalAmount: '200', ...weightPresentation('200'), weightBubbleVisible: false, weightTicks,
     ratioTotal: 0, ratioAdjustmentSequence: 0,
     nutrition: [] as Array<{ name: string; badge: string; value: string; tone: string }>,
     coverageText: '', warnings: [] as string[],
@@ -223,18 +223,18 @@ Page({
   onMealTotalInput(event: WechatMiniprogram.Input) {
     const mealTotalAmount = event.detail.value
     const confirmedFoods = applyRatioAmounts(this.data.confirmedFoods, mealTotalAmount)
-    this.setData({ mealTotalAmount, ...weightPresentation(mealTotalAmount), confirmedFoods })
+    this.setData({ mealTotalAmount, ...weightPresentation(mealTotalAmount), weightBubbleVisible: false, confirmedFoods })
   },
-  updateMealTotalFromSlider(event: WechatMiniprogram.SliderChange) {
+  updateMealTotalFromSlider(event: WechatMiniprogram.SliderChange, weightBubbleVisible: boolean) {
     const mealTotalAmount = String(snappedWeight(Number(event.detail.value)))
     const confirmedFoods = applyRatioAmounts(this.data.confirmedFoods, mealTotalAmount)
-    this.setData({ mealTotalAmount, ...weightPresentation(mealTotalAmount), confirmedFoods })
+    this.setData({ mealTotalAmount, ...weightPresentation(mealTotalAmount), weightBubbleVisible, confirmedFoods })
   },
   onMealWeightChanging(event: WechatMiniprogram.SliderChange) {
-    this.updateMealTotalFromSlider(event)
+    this.updateMealTotalFromSlider(event, true)
   },
   onMealWeightChange(event: WechatMiniprogram.SliderChange) {
-    this.updateMealTotalFromSlider(event)
+    this.updateMealTotalFromSlider(event, false)
   },
   updateLinkedRatio(event: WechatMiniprogram.SliderChange, showFeedback: boolean) {
     const index = Number(event.currentTarget.dataset.index)
@@ -269,7 +269,7 @@ Page({
         result,
         errorMessage: '',
         confirmedFoods: [], nutrition: [], coverageText: '', warnings: [],
-        mealTotalAmount: '200', ...weightPresentation('200'), ratioTotal: 0, ratioAdjustmentSequence: 0,
+        mealTotalAmount: '200', ...weightPresentation('200'), weightBubbleVisible: false, ratioTotal: 0, ratioAdjustmentSequence: 0,
         foods: items.map((item, index) => ({
           badge: item.observedName.slice(0, 1), name: item.observedName,
           details: [item.form, item.count === null ? null : `${item.count} 份`, item.amountHint || '份量待确认', `置信度 ${Math.round(item.confidence * 100)}%`].filter(Boolean).join(' · '),

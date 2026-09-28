@@ -95,8 +95,8 @@
 .meal-weight-card .meal-total-row { border: 0; padding: 8rpx 4rpx 10rpx; box-shadow: none; background: transparent; }
 .meal-weight-card .meal-total-copy text:last-child { font-size: 18rpx; }
 .meal-weight-card .meal-total-input { background: #fff; }
-.meal-weight-slider-area { position: relative; padding: 104rpx 8rpx 0; }
-.meal-weight-bubble { position: absolute; z-index: 3; top: -5rpx; max-width: 360rpx; min-height: 65rpx; padding: 5rpx 18rpx 5rpx 6rpx; border-radius: 18rpx; display: flex; align-items: center; gap: 7rpx; color: #f06a3d; background: #fff; box-shadow: 0 6rpx 20rpx rgba(166,95,56,.18); font-size: 20rpx; font-weight: 700; white-space: nowrap; transform: translateX(-50%); }
+.meal-weight-slider-area { position: relative; padding: 20rpx 8rpx 0; }
+.meal-weight-bubble { position: absolute; z-index: 3; top: -76rpx; max-width: 360rpx; min-height: 65rpx; padding: 5rpx 18rpx 5rpx 6rpx; border-radius: 18rpx; display: flex; align-items: center; gap: 7rpx; color: #f06a3d; background: #fff; box-shadow: 0 6rpx 20rpx rgba(166,95,56,.18); font-size: 20rpx; font-weight: 700; white-space: nowrap; transform: translateX(-50%); pointer-events: none; }
 .meal-weight-bubble.start { transform: none; }
 .meal-weight-bubble.end { transform: translateX(-100%); }
 .meal-weight-bubble::after { content: ''; position: absolute; left: calc(50% - 7rpx); bottom: -7rpx; width: 14rpx; height: 14rpx; background: #fff; transform: rotate(45deg); }
