@@ -10,6 +10,7 @@ async function context(): Promise<SessionContext> {
 }
 
 function referencePresentation(nutrient: NutrientView) {
+  const suspended = ['CARBOHYDRATE', 'VITAMIN_A_RAE', 'FOLATE', 'IODINE'].includes(nutrient.nutrientCode)
   const recommended = nutrient.recommendedValue === null ? null : Number(nutrient.recommendedValue)
   const upper = nutrient.upperLimitValue === null ? null : Number(nutrient.upperLimitValue)
   const lowerRange = nutrient.rangeLowerValue === null ? null : Number(nutrient.rangeLowerValue)
@@ -18,7 +19,7 @@ function referencePresentation(nutrient: NutrientView) {
   const isEnergyEstimate = nutrient.referenceType === 'EER'
   const isCarbEstimate = nutrient.referenceType === 'AMDR_DERIVED'
   const current = nutrient.numericValue || 0
-  let referenceText = '当前规则未提供适用参考值'
+  let referenceText = suspended ? '数据口径或覆盖待核对，暂不展示参考值' : '当前规则未提供适用参考值'
   let scaleMax = Math.max(current, 1)
   if (hasRange) {
     referenceText = isCarbEstimate
@@ -44,13 +45,13 @@ function referencePresentation(nutrient: NutrientView) {
     rangeWidthPercent: hasRange ? Math.round((upperRange - lowerRange) / scaleMax * 100) : 0,
     showCurrentMarker: !isCarbEstimate && nutrient.numericValue !== null
       && nutrient.status !== 'UNIT_MISMATCH' && nutrient.status !== 'INSUFFICIENT_COVERAGE',
-    referenceMainText: hasRange ? '两端为一般参考区间的下限和上限' : isEnergyEstimate
+    referenceMainText: suspended ? '目前仅展示可计算的已记录量' : hasRange ? '两端为一般参考区间的下限和上限' : isEnergyEstimate
       ? '按月龄和性别估计的一般能量需要量' : '已记录摄入与当前月龄的一般参考值对照',
-    referenceSubText: isCarbEstimate
+    referenceSubText: suspended ? '来源定义或食品覆盖仍待核对，不据此判断摄入是否充足。' : isCarbEstimate
       ? '由能量供能比推算；食品碳水口径待核对，暂不判断达标。'
       : hasRange ? '区间上限不是安全摄入上限，也不是过量判断线。'
         : '仅供了解，不代表营养达标、缺乏或医学判断。',
-    expandableConclusion: !['EER', 'AI_RANGE', 'AMDR_DERIVED'].includes(nutrient.referenceType || ''),
+    expandableConclusion: !suspended && !['EER', 'AI_RANGE', 'AMDR_DERIVED'].includes(nutrient.referenceType || ''),
   }
 }
 

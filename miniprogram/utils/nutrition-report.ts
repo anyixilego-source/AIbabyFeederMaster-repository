@@ -115,7 +115,7 @@ export interface ReportBundle {
 export const nutrientNames: Record<string, string> = {
   ENERGY: '能量', ENERGY_KCAL: '能量', PROTEIN: '蛋白质', FAT_TOTAL: '脂肪', CARBOHYDRATE: '碳水化合物',
   CALCIUM: '钙', IRON: '铁', SODIUM: '钠', VITAMIN_A_RAE: '维生素A', VITAMIN_C: '维生素C',
-  FIBER_DIETARY: '膳食纤维', ZINC: '锌',
+  FIBER_DIETARY: '膳食纤维', ZINC: '锌', FOLATE: '叶酸', IODINE: '碘',
 }
 
 export const unitNames: Record<string, string> = {
@@ -128,6 +128,7 @@ const statusLabels: Record<string, string> = {
   NO_INTAKE_DATA: '暂无可计算的摄入数据', INSUFFICIENT_COVERAGE: '数据不足，暂不比较',
   NO_REFERENCE_VALUE: '当前规则无适用参考值', UNIT_MISMATCH: '单位不同，暂不比较',
   REFERENCE_INFORMATION_ONLY: '一般参考信息，仅供了解',
+  REFERENCE_COMPARISON_SUSPENDED: '参考对照待核对，仅展示已记录量',
 }
 
 const warningLabels: Record<string, string> = {
@@ -141,6 +142,42 @@ const warningLabels: Record<string, string> = {
   REFERENCE_UPPER_LIMIT_EXCEEDED: '已记录量超过上限参考值，请结合完整饮食记录理解。',
   INCOMPLETE: '部分食物缺少该营养素数据，当前数值仅代表已知部分。',
   INCONSISTENT_OR_MISSING_UNIT: '数据单位缺失或不一致，暂不进行参考值比较。',
+  REFERENCE_COMPARISON_SUSPENDED_PENDING_SOURCE_AUDIT: '数据口径或覆盖仍待核对，暂不作参考值比较。',
+}
+
+const suspendedReferenceCodes = new Set(['CARBOHYDRATE', 'VITAMIN_A_RAE', 'FOLATE', 'IODINE'])
+const suspendedWarning = 'REFERENCE_COMPARISON_SUSPENDED_PENDING_SOURCE_AUDIT'
+
+// The public API and historical snapshots may still use the older comparison
+// policy. Normalize at the report boundary without changing stored history.
+export function suspendReportComparison(report: AssessmentReport): AssessmentReport {
+  const nutrients = report.result.assessment.nutrients.map((item) => {
+    if (!suspendedReferenceCodes.has(item.nutrientCode)) return item
+    const noIntake = item.averageDailyValue === null
+    const incomplete = !noIntake && Number(item.coverageRatio) < 1
+    return {
+      ...item,
+      status: noIntake ? 'NO_INTAKE_DATA' : incomplete ? 'INSUFFICIENT_COVERAGE' : 'REFERENCE_COMPARISON_SUSPENDED',
+      referenceType: null, recommendedValue: null, upperLimitValue: null,
+      rangeLowerValue: null, rangeUpperValue: null,
+      warnings: noIntake ? ['NO_INTAKE_DATA'] : incomplete
+        ? ['INSUFFICIENT_COVERAGE_NO_COMPARISON', suspendedWarning] : [suspendedWarning],
+    }
+  })
+  const warnings = report.warnings.filter((warning) => {
+    const [code, reason] = warning.split(':')
+    return !suspendedReferenceCodes.has(code)
+      || !['BELOW_REFERENCE_NOT_DIAGNOSIS', 'REFERENCE_UPPER_LIMIT_EXCEEDED', 'NO_REFERENCE_VALUE',
+        'UNIT_MISMATCH_NO_COMPARISON'].includes(reason)
+  })
+  for (const nutrient of nutrients) {
+    if (nutrient.warnings.includes(suspendedWarning)) warnings.push(`${nutrient.nutrientCode}:${suspendedWarning}`)
+  }
+  return {
+    ...report,
+    warnings: [...new Set(warnings)],
+    result: { ...report.result, assessment: { ...report.result.assessment, nutrients } },
+  }
 }
 
 const categoryOrder: Record<NutrientView['category'], number> = { MACRO: 0, MINERAL: 1, VITAMIN: 2, OTHER: 3 }
@@ -191,18 +228,19 @@ export function loadReportBundle(subjectId: string, force = false): Promise<Repo
 async function createReportBundle(subjectId: string, force: boolean): Promise<ReportBundle> {
   const now = new Date()
   const today = dateOnly(now)
-  const [subject, mealSummaries, existingReports] = await Promise.all([
+  const [subject, mealSummaries, fetchedReports] = await Promise.all([
     request<SubjectSummary>(`/subjects/${subjectId}`),
     request<MealSummary[]>(`/subjects/${subjectId}/meals`),
     request<AssessmentReport[]>(`/subjects/${subjectId}/assessment-reports`),
   ])
+  const existingReports = fetchedReports.map(suspendReportComparison)
   let report = force ? undefined : latestReport(existingReports, today)
   if (!report) {
     const scope = `assessment:${subjectId}:${today}`
     const payload = operationPayload(scope, {
       periodStart: today, periodEndExclusive: tomorrow(now), timezoneOffsetMinutes: -now.getTimezoneOffset(),
     })
-    report = await request<AssessmentReport>(`/subjects/${subjectId}/assessment-reports`, { method: 'POST', data: payload })
+    report = suspendReportComparison(await request<AssessmentReport>(`/subjects/${subjectId}/assessment-reports`, { method: 'POST', data: payload }))
     completeOperation(scope, payload.operationId)
   }
   const todaySummaries = mealSummaries.filter((meal) => meal.status === 'CONFIRMED' && dateOnly(new Date(meal.occurredAt)) === today)
@@ -236,7 +274,8 @@ function nutrientView(item: AssessmentNutrient, sources: NutrientSource[]): Nutr
   const name = nutrientNames[item.nutrientCode] || '其他营养素'
   const coverage = Number(item.coverageRatio)
   const numericValue = item.averageDailyValue === null ? null : Number(item.averageDailyValue)
-  const informational = ['EER', 'AI_RANGE', 'AMDR_DERIVED'].includes(item.referenceType || '')
+  const suspended = suspendedReferenceCodes.has(item.nutrientCode)
+  const informational = suspended || ['EER', 'AI_RANGE', 'AMDR_DERIVED'].includes(item.referenceType || '')
   const rangeLowerValue = item.rangeLowerValue ?? null
   const rangeUpperValue = item.rangeUpperValue ?? null
   const referenceRaw = item.recommendedValue ?? item.upperLimitValue
@@ -252,7 +291,7 @@ function nutrientView(item: AssessmentNutrient, sources: NutrientSource[]): Nutr
     ? `${item.recommendedValue !== null ? '约占参考值' : '约占上限参考'} ${Math.round(progressRatio)}%`
     : reference !== null && Number.isFinite(reference) && reference > 0
       ? '暂无摄入值，暂不能计算参考进度'
-      : '当前月龄暂无适用参考值'
+      : suspended ? '数据口径待核对，暂不展示参考进度' : '当前月龄暂无适用参考值'
   return {
     nutrientCode: item.nutrientCode, name, badge: name.slice(0, 1), iconPath: nutrientIcon(item.nutrientCode), category: nutrientCategory(item.nutrientCode),
     progressPercent: progressRatio === null ? 0 : Math.max(0, Math.min(100, progressRatio)),
