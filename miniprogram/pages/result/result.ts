@@ -42,15 +42,15 @@ const warningNames: Record<string, string> = {
   TRACE_VALUE_PRESENT: '计算包含微量值', NUTRIENT_ABSENT_FOR_ITEM: '部分食品缺少该营养素数据',
 }
 const weightExamples = [
-  { grams: 25, hint: '约半个蛋', icons: ['/assets/weight-egg-half-v1.png'] },
-  { grams: 50, hint: '约1个蛋', icons: ['/assets/weight-egg-v1.png'] },
-  { grams: 80, hint: '约1根香蕉', icons: ['/assets/weight-banana-v1.png'] },
-  { grams: 100, hint: '约2个蛋', icons: ['/assets/weight-egg-v1.png', '/assets/weight-egg-v1.png'] },
-  { grams: 150, hint: '约2根香蕉', icons: ['/assets/weight-banana-v1.png', '/assets/weight-banana-v1.png'] },
-  { grams: 170, hint: '约1个苹果', icons: ['/assets/weight-apple-v1.png'] },
-  { grams: 200, hint: '约1个橙子', icons: ['/assets/weight-orange-v1.png'] },
-  { grams: 250, hint: '约苹果+香蕉', icons: ['/assets/weight-apple-v1.png', '/assets/weight-banana-v1.png'] },
-  { grams: 300, hint: '约苹果+香蕉+鸡蛋', icons: ['/assets/weight-apple-v1.png', '/assets/weight-banana-v1.png', '/assets/weight-egg-v1.png'] },
+  { grams: 25, hint: '约半个蛋', icon: '/assets/weight-example-25-v1.png' },
+  { grams: 50, hint: '约1个蛋', icon: '/assets/weight-example-50-v1.png' },
+  { grams: 80, hint: '约1根香蕉', icon: '/assets/weight-example-80-v1.png' },
+  { grams: 100, hint: '约2个蛋', icon: '/assets/weight-example-100-v1.png' },
+  { grams: 150, hint: '约2根香蕉', icon: '/assets/weight-example-150-v1.png' },
+  { grams: 170, hint: '约1个苹果', icon: '/assets/weight-example-170-v1.png' },
+  { grams: 200, hint: '约1个橙子', icon: '/assets/weight-example-200-v1.png' },
+  { grams: 250, hint: '约苹果+香蕉', icon: '/assets/weight-example-250-v1.png' },
+  { grams: 300, hint: '约苹果+香蕉+鸡蛋', icon: '/assets/weight-example-300-v1.png' },
 ]
 const weightTicks = [0, 50, 100, 150, 200, 250, 300].map((grams) => ({ grams, label: `${grams}g` }))
 function weightPresentation(value: string, previewGrams?: number) {
@@ -70,8 +70,7 @@ function weightPresentation(value: string, previewGrams?: number) {
     bubblePercent: example ? example.grams / 3 : 0,
     bubbleAlign: example && example.grams <= 40 ? 'start' : example && example.grams >= 260 ? 'end' : 'center',
     weightHint: example?.hint || '',
-    weightIcons: example?.icons.map((src, index) => ({ src, key: `${example.grams}-${index}` })) || [],
-    weightIconLayout: example?.icons.length === 3 ? 'trio' : example?.icons.length === 2 ? 'pair' : 'single',
+    weightIcon: example?.icon || '',
     weightWarning: valid && grams > 1000 ? '最多可记录 1000 克，请修改重量'
       : valid && grams > 300 ? '超过 300 克常用范围，请核对本餐实际摄入总量' : '',
   }
@@ -248,8 +247,7 @@ Page({
     }
     if (this.data.weightHint !== presentation.weightHint) {
       updates.weightHint = presentation.weightHint
-      updates.weightIcons = presentation.weightIcons
-      updates.weightIconLayout = presentation.weightIconLayout
+      updates.weightIcon = presentation.weightIcon
       updates.bubbleAlign = presentation.bubbleAlign
       updates.bubblePercent = presentation.bubblePercent
     }
