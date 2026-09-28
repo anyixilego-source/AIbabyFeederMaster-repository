@@ -36,6 +36,7 @@ page { background: #fff9f3; color: #2f1f1d; }
 .marker-value { position: absolute; top: -42rpx; transform: translateX(-50%); font-size: 20rpx; font-weight: 800; white-space: nowrap; }
 .ruler { height: 22rpx; position: relative; border-radius: 11rpx; background: #f3ebe7; }
 .ruler-fill { position: absolute; left: 25%; right: 25%; top: 0; bottom: 0; background: linear-gradient(90deg,#ffe1d8,#ffb7aa); }
+.range-boundary { position: absolute; top: -8rpx; width: 3rpx; height: 38rpx; transform: translateX(-50%); background: #f77b61; border-radius: 2rpx; }
 .marker { position: absolute; top: -8rpx; width: 18rpx; height: 38rpx; transform: translateX(-50%); border-radius: 9rpx; background: #ff656b; box-shadow: 0 4rpx 10rpx rgba(255,101,107,.3); }
 .ruler-labels { margin-top: 8rpx; display: flex; justify-content: space-between; color: #8a7774; font-size: 20rpx; }
 .conclusion { margin-top: 25rpx; min-height: 78rpx; padding: 0 20rpx; display: flex; align-items: center; justify-content: space-between; border-radius: 20rpx; background: #fff8f4; font-size: 25rpx; font-weight: 800; }

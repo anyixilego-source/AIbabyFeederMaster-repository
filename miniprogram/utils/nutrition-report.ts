@@ -6,11 +6,14 @@ import type { SubjectSummary } from './session'
 export interface AssessmentNutrient {
   nutrientCode: string
   status: string
+  referenceType?: string | null
   averageDailyValue: string | null
   unitCode: string
   coverageRatio: string
   recommendedValue: string | null
   upperLimitValue: string | null
+  rangeLowerValue?: string | null
+  rangeUpperValue?: string | null
   warnings: string[]
 }
 
@@ -66,6 +69,7 @@ export interface NutrientView {
   progressPercent: number
   progressLabel: string
   progressTone: string
+  showProgress: boolean
   category: 'MACRO' | 'MINERAL' | 'VITAMIN' | 'OTHER'
   amountText: string
   numericValue: number | null
@@ -76,6 +80,9 @@ export interface NutrientView {
   dataNote: string
   recommendedValue: string | null
   upperLimitValue: string | null
+  rangeLowerValue: string | null
+  rangeUpperValue: string | null
+  referenceType: string | null
   sources: NutrientSource[]
   sourceText: string
 }
@@ -120,6 +127,7 @@ const statusLabels: Record<string, string> = {
   ABOVE_UPPER_LIMIT: '已记录量超过上限参考', WITHIN_UPPER_LIMIT: '已记录量未超过上限',
   NO_INTAKE_DATA: '暂无可计算的摄入数据', INSUFFICIENT_COVERAGE: '数据不足，暂不比较',
   NO_REFERENCE_VALUE: '当前规则无适用参考值', UNIT_MISMATCH: '单位不同，暂不比较',
+  REFERENCE_INFORMATION_ONLY: '一般参考信息，仅供了解',
 }
 
 const warningLabels: Record<string, string> = {
@@ -228,12 +236,19 @@ function nutrientView(item: AssessmentNutrient, sources: NutrientSource[]): Nutr
   const name = nutrientNames[item.nutrientCode] || '其他营养素'
   const coverage = Number(item.coverageRatio)
   const numericValue = item.averageDailyValue === null ? null : Number(item.averageDailyValue)
+  const informational = ['EER', 'AI_RANGE', 'AMDR_DERIVED'].includes(item.referenceType || '')
+  const rangeLowerValue = item.rangeLowerValue ?? null
+  const rangeUpperValue = item.rangeUpperValue ?? null
   const referenceRaw = item.recommendedValue ?? item.upperLimitValue
   const reference = referenceRaw === null ? null : Number(referenceRaw)
   const hasComparableReference = numericValue !== null && Number.isFinite(numericValue)
     && reference !== null && Number.isFinite(reference) && reference > 0
-  const progressRatio = hasComparableReference ? numericValue / reference * 100 : null
-  const progressLabel = progressRatio !== null
+  const progressRatio = !informational && hasComparableReference ? numericValue / reference * 100 : null
+  const progressLabel = rangeLowerValue !== null && rangeUpperValue !== null
+    ? `一般参考区间 ${formatNumber(rangeLowerValue)}–${formatNumber(rangeUpperValue)} ${unitNames[item.unitCode] || ''}/日（非达标判断）`
+    : item.referenceType === 'EER' && reference !== null
+      ? `一般能量估计值约 ${formatNumber(reference)} ${unitNames[item.unitCode] || ''}/日`
+    : progressRatio !== null
     ? `${item.recommendedValue !== null ? '约占参考值' : '约占上限参考'} ${Math.round(progressRatio)}%`
     : reference !== null && Number.isFinite(reference) && reference > 0
       ? '暂无摄入值，暂不能计算参考进度'
@@ -243,12 +258,14 @@ function nutrientView(item: AssessmentNutrient, sources: NutrientSource[]): Nutr
     progressPercent: progressRatio === null ? 0 : Math.max(0, Math.min(100, progressRatio)),
     progressLabel,
     progressTone: nutrientProgressTone(item.nutrientCode),
+    showProgress: !informational,
     amountText: item.averageDailyValue === null ? '暂无数值' : formatNumber(item.averageDailyValue),
     numericValue,
     unitText: unitNames[item.unitCode] || '单位待核对', status: item.status,
     statusText: statusLabels[item.status] || '暂无法比较', statusTone: statusTone(item.status),
     dataNote: coverage < 1 ? `部分食物缺少${name}数据` : '',
-    recommendedValue: item.recommendedValue, upperLimitValue: item.upperLimitValue, sources,
+    recommendedValue: item.recommendedValue, upperLimitValue: item.upperLimitValue,
+    rangeLowerValue, rangeUpperValue, referenceType: item.referenceType ?? null, sources,
     sourceText: sources.length > 0 ? sources.slice(0, 3).map((source) => source.name).join('、') : '暂无可计算来源',
   }
 }

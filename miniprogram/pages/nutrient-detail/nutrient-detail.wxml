@@ -34,22 +34,24 @@
       <view class="reference-note">
         <view class="reference-icon">▥</view>
         <view>
-          <text class="reference-main">已记录摄入与当前月龄的一般参考值对照</text>
-          <text class="reference-sub">仅供了解，不代表营养达标、缺乏或医学判断。</text>
+          <text class="reference-main">{{referenceMainText}}</text>
+          <text class="reference-sub">{{referenceSubText}}</text>
         </view>
       </view>
       <text class="reference-text">{{referenceText}}</text>
       <view wx:if="{{referenceAvailable}}" class="ruler-wrap">
-        <text class="marker-value" style="left: {{markerPercent}}%">{{amountText}} {{unitText}}</text>
+        <text wx:if="{{showCurrentMarker}}" class="marker-value" style="left: {{markerPercent}}%">{{amountText}} {{unitText}}</text>
         <view class="ruler">
-          <view class="ruler-fill"></view>
-          <view class="marker" style="left: {{markerPercent}}%"></view>
+          <view wx:if="{{hasRange}}" class="ruler-fill" style="left: {{rangeStartPercent}}%; width: {{rangeWidthPercent}}%; right: auto"></view>
+          <view wx:if="{{hasRange}}" class="range-boundary" style="left: {{rangeStartPercent}}%"></view>
+          <view wx:if="{{hasRange}}" class="range-boundary" style="left: {{rangeStartPercent + rangeWidthPercent}}%"></view>
+          <view wx:if="{{showCurrentMarker}}" class="marker" style="left: {{markerPercent}}%"></view>
         </view>
         <view class="ruler-labels"><text>0</text><text>{{scaleMaxText}}</text></view>
       </view>
       <view class="conclusion {{conclusionTone}}" bindtap="toggleConclusion">
-        <view class="conclusion-left"><text class="alert-icon">!</text><text>{{conclusion}}</text></view>
-        <view class="expand-arrow {{conclusionExpanded ? 'expanded' : ''}}"></view>
+        <view class="conclusion-left"><text class="alert-icon">{{expandableConclusion ? '!' : 'i'}}</text><text>{{conclusion}}</text></view>
+        <view wx:if="{{expandableConclusion}}" class="expand-arrow {{conclusionExpanded ? 'expanded' : ''}}"></view>
       </view>
       <view wx:if="{{conclusionExpanded}}" class="explanation">
         <text class="explanation-title">可能原因</text>

@@ -16,6 +16,7 @@ interface TrendBar {
   labelInside: boolean
 }
 interface ChartTick { valueText: string; topPercent: number }
+interface ChartReference { key: string; label: string; percent: number; tone: string }
 
 const defaultTrendOptions: TrendOption[] = [
   { code: 'ENERGY', label: '能量' },
@@ -37,10 +38,14 @@ function nutrientForCode(nutrients: AssessmentNutrient[], code: string): Assessm
   return nutrients.find((item) => item.nutrientCode === code)
 }
 
-function referenceAgeBand(birthDate: string, date: Date): '6_TO_12' | '12_TO_24' | null {
+function referenceAgeBand(birthDate: string, date: Date): string | null {
   const months = ageMonths(birthDate, date)
   if (months >= 6 && months < 12) return '6_TO_12'
   if (months >= 12 && months < 24) return '12_TO_24'
+  if (months >= 24 && months < 36) return '24_TO_36'
+  if (months >= 36 && months < 48) return '36_TO_48'
+  if (months >= 48 && months < 60) return '48_TO_60'
+  if (months >= 60 && months < 72) return '60_TO_72'
   return null
 }
 
@@ -51,7 +56,8 @@ function latestReferenceNutrient(bundle: ReportBundle, code: string): Assessment
     .sort((left, right) => right.generatedAt.localeCompare(left.generatedAt))
     .filter((report) => referenceAgeBand(bundle.subject.birthDate, new Date(`${report.periodStart}T12:00:00`)) === currentBand)
     .map((report) => nutrientForCode(report.result.assessment.nutrients, code))
-    .find((nutrient) => nutrient && (nutrient.recommendedValue !== null || nutrient.upperLimitValue !== null))
+    .find((nutrient) => nutrient && (nutrient.recommendedValue !== null || nutrient.upperLimitValue !== null
+      || (nutrient.rangeLowerValue != null && nutrient.rangeUpperValue != null)))
 }
 
 function lastSevenDates(): Date[] {
@@ -87,6 +93,8 @@ Page({
     referenceAvailable: false,
     referenceLabel: '',
     referencePercent: 0,
+    referenceLines: [] as ChartReference[],
+    referenceExplanation: '',
     foodRecords: [] as ReportBundle['foodRecords'],
     scrollTop: 0,
     showBackToTop: false,
@@ -148,6 +156,9 @@ Page({
     const referenceNutrient = latestReferenceNutrient(currentBundle, this.data.selectedTrend)
     const referenceRaw = referenceNutrient?.recommendedValue || referenceNutrient?.upperLimitValue
     const reference = referenceRaw === null || referenceRaw === undefined ? null : Number(referenceRaw)
+    const lower = referenceNutrient?.rangeLowerValue == null ? null : Number(referenceNutrient.rangeLowerValue)
+    const upper = referenceNutrient?.rangeUpperValue == null ? null : Number(referenceNutrient.rangeUpperValue)
+    const hasRange = lower !== null && upper !== null && Number.isFinite(lower) && Number.isFinite(upper)
     const values = lastSevenDates().map((date) => {
       const report = reportsByDate.get(dateOnly(date))
       const nutrient = report ? nutrientForCode(report.result.assessment.nutrients, this.data.selectedTrend) : undefined
@@ -155,7 +166,7 @@ Page({
       return { date, value: value !== null && Number.isFinite(value) ? value : null }
     })
     const availableValues = values.map((item) => item.value).filter((value): value is number => value !== null)
-    const maximumValue = Math.max(reference || 0, ...availableValues, 1)
+    const maximumValue = Math.max(reference || 0, upper || 0, ...availableValues, 1)
     const tickStep = niceStep(maximumValue / 4)
     const scaleMax = tickStep * 4
     const chartTicks: ChartTick[] = Array.from({ length: 5 }, (_, index) => ({
@@ -163,6 +174,19 @@ Page({
       topPercent: index * 25,
     }))
     const referencePercent = reference === null ? null : Math.round(reference / scaleMax * 100)
+    const referenceLines: ChartReference[] = hasRange
+      ? [
+        { key: 'lower', label: `参考下限 ${formatNumber(lower)}`, percent: Math.round(lower / scaleMax * 100), tone: 'lower' },
+        { key: 'upper', label: `参考上限 ${formatNumber(upper)}`, percent: Math.round(upper / scaleMax * 100), tone: 'upper' },
+      ]
+      : referencePercent === null ? [] : [{
+        key: 'single',
+        label: referenceNutrient?.referenceType === 'EER'
+          ? `一般能量估计值 ${formatNumber(reference!)}`
+          : `参考值 ${formatNumber(reference!)}`,
+        percent: referencePercent,
+        tone: 'single',
+      }]
     const trendBars: TrendBar[] = values.map((item, index) => {
       const heightPercent = item.value === null ? 0 : Math.max(4, Math.round(item.value / scaleMax * 100))
       return {
@@ -172,23 +196,31 @@ Page({
         heightPercent,
         current: index === values.length - 1,
         missing: item.value === null,
-        labelInside: item.value !== null && referencePercent !== null
-          && heightPercent >= 14 && Math.abs(heightPercent - referencePercent) <= 10,
+        labelInside: item.value !== null && heightPercent >= 14
+          && referenceLines.some((line) => Math.abs(heightPercent - line.percent) <= 10),
       }
     })
     const unitCode = currentNutrient?.unitCode || ''
     const currentAgeMonths = ageMonths(currentBundle.subject.birthDate)
-    const noReferenceText = currentAgeMonths < 6 || currentAgeMonths >= 24
-      ? `当前为${currentAgeMonths}个月，现有参考规则适用于6～23个月`
+    const noReferenceText = currentAgeMonths < 6 || currentAgeMonths >= 72
+      ? `当前为${currentAgeMonths}个月，现有参考规则适用于6个月至6岁生日前`
       : '当前营养素暂无适用参考值'
     this.setData({
       selectedTrendName: nutrientNames[currentNutrient?.nutrientCode || this.data.selectedTrend] || '营养素',
       selectedUnit: unitNames[unitCode] || '',
       trendBars,
       chartTicks,
-      referenceAvailable: reference !== null && Number.isFinite(reference),
-      referenceLabel: reference === null ? noReferenceText : `参考达标线 ${formatNumber(reference)}`,
+      referenceAvailable: referenceLines.length > 0,
+      referenceLabel: referenceLines.length === 0 ? noReferenceText : '',
       referencePercent: referencePercent || 0,
+      referenceLines,
+      referenceExplanation: hasRange
+        ? referenceNutrient?.referenceType === 'AMDR_DERIVED'
+          ? '两条虚线分别是一般参考区间的下限和上限。碳水区间按能量估计值推算，暂不用于判断摄入是否达标。'
+          : '两条虚线分别是一般参考区间的下限和上限；上限不是安全摄入上限，也不是过量判断线。'
+        : referenceNutrient?.referenceType === 'EER'
+          ? '虚线是按月龄和性别估计的一般能量需要量，不代表个人必须达到的分数线。'
+          : '',
     })
   },
 

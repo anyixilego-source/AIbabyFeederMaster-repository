@@ -78,7 +78,7 @@
             </view>
           </view>
           <view wx:if="{{item.progressLabel}}" class="nutrient-progress">
-            <view class="nutrient-progress-track"><view class="nutrient-progress-fill {{item.progressTone}}" style="width: {{item.progressPercent}}%"></view></view>
+            <view wx:if="{{item.showProgress}}" class="nutrient-progress-track"><view class="nutrient-progress-fill {{item.progressTone}}" style="width: {{item.progressPercent}}%"></view></view>
             <text>{{item.progressLabel}}</text>
           </view>
           <text class="source-text">主要来源：{{item.sourceText}}</text>
