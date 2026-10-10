@@ -1,6 +1,9 @@
+import {backTo,navigateRoot} from '../../utils/navigation'
+import { gramUnits, validNewWeight, weightNotice } from '../../utils/meal-edit'
 import { ApiError, request, uploadRecognitionImage } from '../../utils/api'
 import { cleanupExpiredLocalImages, retentionOptions, saveLocalImage } from '../../utils/image-retention'
 import { completeOperation, getPendingOperation, operationPayload } from '../../utils/operation'
+import { abandonCurrentMeal, discardAbandonedMeals } from '../../utils/pending-meal'
 
 interface RecognitionItem {
   observedName: string
@@ -71,8 +74,7 @@ function weightPresentation(value: string, previewGrams?: number) {
     bubbleAlign: example && example.grams <= 40 ? 'start' : example && example.grams >= 260 ? 'end' : 'center',
     weightHint: example?.hint || '',
     weightIcon: example?.icon || '',
-    weightWarning: valid && grams > 1000 ? '最多可记录 1000 克，请修改重量'
-      : valid && grams > 300 ? '超过 300 克常用范围，请核对本餐实际摄入总量' : '',
+    weightWarning: valid ? weightNotice(value) : '',
   }
 }
 function snappedWeight(value: number): number {
@@ -185,8 +187,9 @@ function confirmedFoodSelection(
 }
 
 Page({
-  data: {
-    photo: '/assets/camera-food-guide-v5.jpg', samplePhoto: true, busy: false,
+  data: { reviewLabel:wx.getSystemInfoSync().platform==='devtools'?(wx.getStorageSync('foodmaster.reviewEnvironment')?.label || ''):'',
+    manualEntry: false, searchMessage:'', searchExample:'构造样例食品',
+    photo: '/assets/camera-food-guide-v5.jpg', samplePhoto: true, busy: false, saving: false, abandoned: false,
     accepted: false, retentionIndex: 0, retentionOptions,
     result: null as RecognitionResult | null,
     foods: [] as Array<{ badge: string; name: string; details: string; uncertainty: string; tone: string; index: number; mappedName: string }>,
@@ -200,13 +203,48 @@ Page({
   },
 
   onLoad() {
+    this.setData({ abandoned: false, saving: false,manualEntry:Boolean(wx.getStorageSync('foodmaster.manualEntry')) })
     cleanupExpiredLocalImages()
     const photo = wx.getStorageSync('mealPhoto') as string | undefined
     if (photo && !photo.startsWith('/assets/')) this.setData({ photo, samplePhoto: false })
   },
-
-  goBack() { wx.navigateBack({ fail: () => wx.redirectTo({ url: '/pages/camera/camera' }) }) },
-  retry() { wx.navigateBack({ delta: 1, fail: () => wx.redirectTo({ url: '/pages/camera/camera' }) }) },
+  onShow() {
+    if (this.data.abandoned && !this.data.saving) {
+      abandonCurrentMeal()
+      void discardAbandonedMeals()
+      backTo('/pages/camera/camera',this)
+    }
+  },
+  onHide() {
+    this.setData({ abandoned: true })
+    if (!this.data.saving) {
+      abandonCurrentMeal()
+      void discardAbandonedMeals()
+    }
+  },
+  onUnload() {
+    abandonCurrentMeal()
+    void discardAbandonedMeals()
+  },
+  async leaveRecognition(confirmDiscard: boolean) {
+    if (this.data.saving) { wx.showToast({ title: '正在保存，请稍候', icon: 'none' }); return }
+    if (confirmDiscard && wx.getStorageSync('foodmaster.currentMealId')) {
+      const confirmed = await new Promise<boolean>((resolve) => wx.showModal({
+        title: '退出本次识别？',
+        content: '未保存的内容会放弃，下次需要重新选择图片并识别。',
+        confirmText: '退出',
+        success: ({ confirm }) => resolve(confirm),
+        fail: () => resolve(false),
+      }))
+      if (!confirmed) return
+    }
+    this.setData({ abandoned: true })
+    abandonCurrentMeal()
+    await discardAbandonedMeals()
+    backTo('/pages/camera/camera',this)
+  },
+  goBack() { void this.leaveRecognition(true) },
+  retry() { void this.leaveRecognition(this.data.confirmedFoods.length > 0) },
   toggleConsent() { this.setData({ accepted: !this.data.accepted }) },
   openConsentDetails() {
     wx.showModal({
@@ -237,7 +275,11 @@ Page({
     const mealTotalAmount = String(snappedWeight(rawAmount))
     const presentation = weightPresentation(mealTotalAmount, rawAmount)
     const sliderAmount = weightBubbleVisible ? rawAmount : presentation.sliderAmount
-    const updates: Partial<typeof this.data> = {}
+    const updates: Partial<{
+      sliderAmount: number; sliderPercent: number; weightBubbleVisible: boolean
+      mealTotalAmount: string; confirmedFoods: ConfirmedFoodItem[]
+      weightHint: string; weightIcon: string; bubbleAlign: string; bubblePercent: number; weightWarning: string
+    }> = {}
     if (this.data.sliderAmount !== sliderAmount) updates.sliderAmount = sliderAmount
     if (this.data.sliderPercent !== sliderAmount / 3) updates.sliderPercent = sliderAmount / 3
     if (this.data.weightBubbleVisible !== weightBubbleVisible) updates.weightBubbleVisible = weightBubbleVisible
@@ -281,7 +323,7 @@ Page({
     if (this.data.busy) return
     if (this.data.samplePhoto) { wx.showToast({ title: '请先拍照或选择图片', icon: 'none' }); return }
     if (!this.data.accepted) { wx.showToast({ title: '请先同意图片处理授权', icon: 'none' }); return }
-    this.setData({ busy: true })
+    this.setData({ busy: true, saving: true })
     try {
       const retention = this.data.retentionOptions[this.data.retentionIndex]
       const localPath = await saveLocalImage(this.data.photo, retention.value)
@@ -309,7 +351,14 @@ Page({
       const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '识别失败，请手工搜索'
       this.setData({ errorMessage: message })
       wx.showToast({ title: message, icon: 'none' })
-    } finally { this.setData({ busy: false }) }
+    } finally {
+      this.setData({ busy: false, saving: false })
+      if (this.data.abandoned && wx.getStorageSync('foodmaster.currentMealId')) {
+        abandonCurrentMeal()
+        void discardAbandonedMeals()
+        backTo('/pages/camera/camera',this)
+      }
+    }
   },
 
   useCandidate(event: WechatMiniprogram.TouchEvent) {
@@ -322,6 +371,7 @@ Page({
     this.setData({ pendingCandidateIndex: -1, scrollIntoView: 'confirm-section', manualFocus: true })
   },
 
+  searchSample() { this.setData({query:this.data.searchExample,pendingCandidateIndex:-1});void this.searchFood() },
   async searchFood(): Promise<void> {
     const query = this.data.query.trim()
     if (!query) { wx.showToast({ title: '请输入食品名称', icon: 'none' }); return }
@@ -329,8 +379,8 @@ Page({
     try {
       const response = await request<{ items: FoodResult[] }>(`/foods/search?q=${encodeURIComponent(query)}&limit=8`)
       const searchResults = response.items || []
-      this.setData({ searchResults })
-      if (!searchResults.length) { wx.showToast({ title: '没有找到标准食品', icon: 'none' }); return }
+      this.setData({ searchResults,searchMessage:searchResults.length?'':this.data.reviewLabel?'当前隔离食品库只有构造样例食品1、2，不含鸡蛋等真实食品；可搜索下方样例。':'没有找到匹配的标准食品，请换用食品全名或核对生熟状态。' })
+      if (!searchResults.length) { wx.showToast({ title: this.data.reviewLabel?'隔离食品库暂无此食品':'没有找到标准食品', icon: 'none' }); return }
       wx.showActionSheet({
         itemList: searchResults.map((item) => item.canonicalNameZh).slice(0, 6),
         success: ({ tapIndex }) => {
@@ -401,7 +451,7 @@ Page({
     const items = this.data.confirmedFoods.map((item) => ({ foodId: item.foodId, amount: item.consumedAmount.trim(), unit: 'g' }))
     if (!items.length || items.some((item) => !/^\d+(?:\.\d{1,6})?$/.test(item.amount) || Number(item.amount) <= 0)) return null
     const calculation = await request<CalculationResult>('/nutrition/calculate', {
-      method: 'POST', data: { items },
+      method: 'POST', data: { items, targetScopeVersion: 'core-13-v1' },
     })
     const nutrients = calculation.nutrients.filter((item) => item.knownValue !== null).slice(0, 6).map((item) => ({
       name: nutrientNames[item.nutrientCode] || item.nutrientCode,
@@ -415,13 +465,13 @@ Page({
   },
 
   async save(): Promise<void> {
-    if (this.data.busy) return
+    if (this.data.busy || this.data.saving) return
     const mealId = wx.getStorageSync('foodmaster.currentMealId') as string | undefined
     const foods = this.data.confirmedFoods
-    if (!mealId) { wx.showToast({ title: '请从新增记录进入拍照', icon: 'none' }); return }
+    if (!mealId) { wx.showToast({ title: '请从新增记录进入', icon: 'none' }); return }
     if (!foods.length) { wx.showToast({ title: '请至少确认一种标准食品', icon: 'none' }); return }
-    if (!/^\d+(?:\.\d{1,6})?$/.test(this.data.mealTotalAmount) || Number(this.data.mealTotalAmount) <= 0 || Number(this.data.mealTotalAmount) > 1000) {
-      wx.showToast({ title: '请输入 1～1000 克的实际摄入总量', icon: 'none' }); return
+    if (!validNewWeight(this.data.mealTotalAmount)) {
+      wx.showToast({ title: '请填写有效的大于0的总克数（最多1位小数）', icon: 'none' }); return
     }
     if (this.data.ratioTotal !== 100) {
       wx.showToast({ title: `食材占比合计需为100%，当前${this.data.ratioTotal}%`, icon: 'none' }); return
@@ -429,47 +479,56 @@ Page({
     for (const food of foods) {
       const consumedAmount = food.consumedAmount.trim()
       const servedAmount = food.servedAmount.trim()
-      if (!/^\d+(?:\.\d{1,6})?$/.test(consumedAmount) || Number(consumedAmount) <= 0) {
+      if (!validNewWeight(consumedAmount)) {
         wx.showToast({ title: `请填写${food.canonicalNameZh}实际吃下克数`, icon: 'none' }); return
       }
-      if (servedAmount && (!/^\d+(?:\.\d{1,6})?$/.test(servedAmount) || Number(servedAmount) < Number(consumedAmount))) {
-        wx.showToast({ title: `${food.canonicalNameZh}端上桌克数不能小于实际摄入`, icon: 'none' }); return
+      if (servedAmount && (!/^\d+(?:\.\d{1,6})?$/.test(servedAmount) || Number(servedAmount) <= 0)) {
+        wx.showToast({ title: `${food.canonicalNameZh}原记录提供量须大于0`, icon: 'none' }); return
       }
     }
-    if (Number(this.data.mealTotalAmount) > 300) {
+    const actualTotal=foods.reduce((sum,food)=>sum+(gramUnits(food.consumedAmount.trim()) || 0),0)
+    if(!Number.isSafeInteger(actualTotal)){wx.showToast({title:'合计超出数字精度范围，请核对克数',icon:'none'});return}
+    if (actualTotal > 300000000) {
       const confirmed = await new Promise<boolean>((resolve) => wx.showModal({
         title: '核对本餐总量',
-        content: `本餐实际摄入总量为 ${this.data.mealTotalAmount} 克，超过 300 克常用范围。确认记录这个重量吗？`,
+        content: weightNotice(String(actualTotal/1000000))+'确认记录这个重量吗？',
         confirmText: '确认记录',
         success: ({ confirm }) => resolve(confirm),
         fail: () => resolve(false),
       }))
       if (!confirmed) return
     }
-    this.setData({ busy: true })
+    this.setData({ busy: true, saving: true })
     try {
-      await this.calculate()
       const operations: Array<{ scope: string; operationId: unknown }> = []
       for (const food of foods) {
         const scope = `add-meal-item:${mealId}:${food.localId}`
         const base: Record<string, unknown> = {
           foodId: food.foodId, observedName: food.observedName, consumedAmount: food.consumedAmount.trim(),
-          source: food.source, status: 'CONFIRMED',
+          source: food.source, status: 'CONFIRMED', weightOrigin: 'USER_ACCEPTED_ESTIMATE',
         }
         if (food.servedAmount.trim()) base.servedAmount = food.servedAmount.trim()
         const payload = getPendingOperation(scope) || operationPayload(scope, base)
         await request(`/meals/${mealId}/items`, { method: 'POST', data: payload })
         operations.push({ scope, operationId: payload.operationId })
       }
-      await request(`/meals/${mealId}/confirm`, { method: 'POST' })
+      const saved = await request<{ reportUpdate?: { status: string } }>(`/meals/${mealId}/confirm`, { method: 'POST' })
+      wx.setStorageSync('foodmaster.reportUpdateState', saved.reportUpdate?.status || 'UNKNOWN')
       operations.forEach((operation) => completeOperation(operation.scope, operation.operationId))
       wx.setStorageSync('mealSaved', true)
+      wx.setStorageSync('foodmaster.mealSavedAction', '本餐已保存')
       wx.setStorageSync('foodmaster.reportNeedsRefresh', true)
       wx.removeStorageSync('foodmaster.currentMealId')
-      wx.redirectTo({ url: '/pages/records/records?saved=1' })
+      navigateRoot('/pages/records/records?saved=1')
     } catch (caught) {
       const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '保存失败'
       wx.showModal({ title: '保存失败', content: message, showCancel: false })
-    } finally { this.setData({ busy: false }) }
+    } finally {
+      this.setData({ busy: false, saving: false })
+      if (this.data.abandoned && wx.getStorageSync('foodmaster.currentMealId')) {
+        abandonCurrentMeal()
+        void discardAbandonedMeals()
+      }
+    }
   },
 })

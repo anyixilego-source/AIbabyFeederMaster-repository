@@ -1,51 +1,103 @@
+import { emptyHomeMenu, homeMenuPreview, chinaMenuDates } from '../../utils/home-menu'
+import type { MenuLatest } from '../../utils/diet-plan'
+import { openPage, navigateRoot } from '../../utils/navigation'
 import { ApiError, request } from '../../utils/api'
 import { ageDisplay } from '../../utils/age'
 import { ensureSessionContext, SessionContext, SubjectSummary } from '../../utils/session'
 
-interface ReportSummary {
-  periodStart: string
-  coverageRatio: string
-  warnings: string[]
-  result: { assessment: { status: string; nutrients: Array<{ nutrientCode: string; status: string; coverageRatio: string }> } }
-}
-const nutrientNames: Record<string, string> = {
-  ENERGY: '能量', ENERGY_KCAL: '能量', PROTEIN: '蛋白质', FAT_TOTAL: '脂肪', CALCIUM: '钙', IRON: '铁',
-  VITAMIN_A_RAE: '维生素A', VITAMIN_C: '维生素C', CARBOHYDRATE: '碳水',
-  FIBER_DIETARY: '膳食纤维', ZINC: '锌', SODIUM: '钠',
-}
-const statusLabels: Record<string, string> = {
-  AT_OR_ABOVE_REFERENCE: '达到参考值', BELOW_REFERENCE: '低于参考值（非诊断）', ABOVE_UPPER_LIMIT: '高于上限参考',
-  INSUFFICIENT_COVERAGE: '覆盖不足', NO_INTAKE_DATA: '暂无数据', NO_REFERENCE_VALUE: '无参考值', UNIT_MISMATCH: '单位不匹配',
-}
-const warningLabels: Record<string, string> = {
-  NO_CONFIRMED_INTAKE: '本时段没有已确认的实际摄入记录',
-  NO_NUTRIENT_DATA: '本时段暂无可用于计算的营养数据',
-  NO_INTAKE_DATA: '没有已确认的摄入数据',
-  INSUFFICIENT_COVERAGE: '数据覆盖不足，暂不作参考值比较',
-  INSUFFICIENT_COVERAGE_NO_COMPARISON: '部分营养数据不完整，当前数值仅代表已知部分',
-  NO_REFERENCE_VALUE: '当前规则没有提供适用参考值',
-  UNIT_MISMATCH: '摄入数据与参考规则单位不一致',
-  INCOMPLETE: '部分食物缺少该营养素数据',
-}
-function warningLabel(warning: string): string {
-  const [nutrientCode, code] = warning.split(':')
-  if (code) return `${nutrientNames[nutrientCode] || '部分营养素'}：${warningLabels[code] || '存在尚未归类的数据说明'}`
-  return warningLabels[warning] || '存在尚未归类的数据说明'
-}
+import { nutrientView, warningLabel, suspendReportComparison } from '../../utils/nutrition-report'
+import type { AssessmentReport } from '../../utils/nutrition-report'
 async function context(): Promise<SessionContext> {
   const app = getApp<IAppOption>()
   return app.globalData.ready || ensureSessionContext()
 }
 
 Component({
-  data: {
+  options: { pureDataPattern: /^_homeMenu/ },
+  data: { _homeMenuSequence: 0, _homeMenuVisible: false, _homeMenuTimer: 0, _homeMenuLatest: null as MenuLatest | null, reviewLabel:wx.getSystemInfoSync().platform==='devtools'?(wx.getStorageSync('foodmaster.reviewEnvironment')?.label || ''):'',
+    homeScrollHeight: 0, homeMenuSubjectId: '', homeMenu: emptyHomeMenu('LOADING', '正在查看饮食搭配…', ''),
     loading: true, babyName: '宝宝', genderText: '', ageText: '', warnings: [] as string[],
     reportTitle: '今天还没有营养报告', reportDescription: '记录并确认实际摄入后生成营养参考',
     nutrients: [] as Array<{ name: string; value: number; state: string; color: string; warn: boolean }>,
-    advice: [] as Array<{ tone: string; badge: string; title: string; description: string }>,
+    advice: [] as Array<{ tone: string; badge: string; title: string; description: string; nutrientCode?:string; reportId?:string }>,
   },
-  pageLifetimes: { show() { void this.load() } },
+  pageLifetimes: { show() { this.startHomeMenu() }, hide() { this.stopHomeMenu() }, resize() { this.updateHomeScrollHeight() } },
+  lifetimes: { detached() { this.stopHomeMenu() } },
   methods: {
+    onShow() { this.startHomeMenu() },
+    onResize() { this.updateHomeScrollHeight() },
+    updateHomeScrollHeight() {
+      wx.nextTick(() => {
+        if (!this.data._homeMenuVisible) return
+        this.createSelectorQuery().select('.home-scroll').boundingClientRect(rect => {
+          if (!rect || Array.isArray(rect)) return
+          this.setData({ homeScrollHeight: Math.max(1, wx.getSystemInfoSync().windowHeight - rect.top) })
+        }).exec()
+      })
+    },
+    onHide() { this.stopHomeMenu() },
+    onUnload() { this.stopHomeMenu() },
+    startHomeMenu() {
+      if (this.data._homeMenuVisible) return
+      this.setData({ _homeMenuVisible: true })
+      this.updateHomeScrollHeight()
+      void this.load()
+      void this.loadHomeMenu()
+    },
+    stopHomeMenu() {
+      this.setData({ _homeMenuVisible: false, _homeMenuSequence: this.data._homeMenuSequence + 1 })
+      clearTimeout(this.data._homeMenuTimer)
+    },
+    async loadHomeMenu() {
+      const seq = this.data._homeMenuSequence + 1
+      this.setData({ _homeMenuSequence: seq })
+      clearTimeout(this.data._homeMenuTimer)
+      const cached = this.data._homeMenuLatest
+      const sameBaby = this.data.homeMenuSubjectId === getApp<IAppOption>().globalData.subjectId
+      if (cached && sameBaby && this.data.homeMenu.state === 'READY') {
+        this.setData({ homeMenu: homeMenuPreview(cached) })
+      } else {
+        this.setData({ _homeMenuLatest: null })
+        this.setData({ homeMenuSubjectId: '', homeMenu: emptyHomeMenu('LOADING', '正在查看饮食搭配…', '') })
+      }
+      let subjectId = ''
+      try {
+        const active = await context(), app = getApp<IAppOption>()
+        if (seq !== this.data._homeMenuSequence || !this.data._homeMenuVisible) return
+        subjectId = app.globalData.subjectId || active.subjectId || ''
+        if (!subjectId) {
+          this.setData({ homeMenu: emptyHomeMenu('PROFILE', '先建立宝宝档案，再规划饮食搭配', '建立档案') })
+          return
+        }
+        if (!active.subjects.some(s => s.subjectId === subjectId)) throw new Error('宝宝会话已变更')
+        this.setData({ homeMenuSubjectId: subjectId })
+        const latest = await request<MenuLatest>(`/subjects/${subjectId}/diet-plans/latest`)
+        if (seq !== this.data._homeMenuSequence || !this.data._homeMenuVisible) return
+        if (getApp<IAppOption>().globalData.subjectId !== subjectId) { void this.loadHomeMenu(); return }
+        this.setData({ _homeMenuLatest: latest })
+        const homeMenu = homeMenuPreview(latest)
+        this.setData({ homeMenu })
+        const delay = homeMenu.generating ? Math.min(5000, chinaMenuDates().refreshIn) : chinaMenuDates().refreshIn
+        this.setData({ _homeMenuTimer: setTimeout(() => { if (this.data._homeMenuVisible) void this.loadHomeMenu() }, delay) as unknown as number })
+      } catch {
+        if (seq !== this.data._homeMenuSequence || !this.data._homeMenuVisible) return
+        if (subjectId && getApp<IAppOption>().globalData.subjectId !== subjectId) { void this.loadHomeMenu(); return }
+        this.setData({ homeMenu: emptyHomeMenu('ERROR', '搭配暂时未能加载', '重新加载') })
+      }
+    },
+    openHomeMenu() {
+      if (this.data.homeMenu.state === 'LOADING') return
+      if (this.data.homeMenu.state === 'ERROR') { void this.loadHomeMenu(); return }
+      if (this.data.homeMenu.state === 'PROFILE') { this.openProfile(); return }
+      const subjectId = this.data.homeMenuSubjectId
+      if (!subjectId || getApp<IAppOption>().globalData.subjectId !== subjectId) { void this.loadHomeMenu(); return }
+      const preview = this.data.homeMenu
+      const dates = chinaMenuDates()
+      if (preview.state === 'READY' && preview.date !== dates.today && preview.date !== dates.tomorrow) { void this.loadHomeMenu(); return }
+      const target = preview.state === 'READY' ? `&date=${encodeURIComponent(preview.date)}&planId=${encodeURIComponent(preview.taskId)}` : ''
+      openPage(`/pages/diet-menu/diet-menu?subjectId=${encodeURIComponent(subjectId)}${target}`)
+    },
+
     async load() {
       this.setData({ loading: true })
       try {
@@ -53,36 +105,28 @@ Component({
         if (!active.subjectId) throw new Error('请先建立宝宝档案')
         const [subject, reports] = await Promise.all([
           request<SubjectSummary>(`/subjects/${active.subjectId}`),
-          request<ReportSummary[]>(`/subjects/${active.subjectId}/assessment-reports`),
+          request<AssessmentReport[]>(`/subjects/${active.subjectId}/assessment-reports`),
         ])
         const today = new Date()
         const todayKey = `${today.getFullYear()}-${`${today.getMonth() + 1}`.padStart(2, '0')}-${`${today.getDate()}`.padStart(2, '0')}`
-        const report = reports.find((item) => item.periodStart === todayKey)
+        const savedReport = reports.find((item) => item.periodStart === todayKey)
+        const report = savedReport ? suspendReportComparison(savedReport) : undefined
         const reportNeedsRefresh = Boolean(wx.getStorageSync('foodmaster.reportNeedsRefresh'))
+        const legacyReport = Boolean(report && !report.result.evidence)
         const assessment = report?.result.assessment
-        const coverage = report ? Math.round(Number(report.coverageRatio) * 100) : 0
-        const nutrients = (assessment?.nutrients || []).filter((item) => nutrientNames[item.nutrientCode]).slice(0, 4).map((item) => ({
-          name: nutrientNames[item.nutrientCode] || item.nutrientCode,
-          value: Math.round(Number(item.coverageRatio) * 100),
-          state: statusLabels[item.status] || item.status,
-          color: item.status === 'AT_OR_ABOVE_REFERENCE' ? '#73c959' : item.status === 'ABOVE_UPPER_LIMIT' ? '#ef6c64' : '#f6a623',
-          warn: item.status !== 'AT_OR_ABOVE_REFERENCE' && item.status !== 'WITHIN_UPPER_LIMIT',
-        }))
-        const advice = (!reportNeedsRefresh && coverage > 0 ? nutrients : []).slice(0, 3).map((item) => ({
-          tone: item.color === '#73c959' ? 'vegetable' : 'grain', badge: item.name.slice(0, 1),
-          title: item.name, description: item.state,
-        }))
+        const nutrients = (assessment?.nutrients || []).map(item => { const view=nutrientView(item,[]);return {name:view.name,value:0,state:view.statusText,color:'#817570',warn:false,nutrientCode:item.nutrientCode} })
+        const advice = (!reportNeedsRefresh && !legacyReport && report?.result.evidence?.records.length ? nutrients : []).slice(0,3).map(item=>({tone:'grain',badge:item.name.slice(0,1),title:item.name,description:item.state,nutrientCode:item.nutrientCode,reportId:report!.reportId}))
         this.setData({
           babyName: subject.displayName, genderText: subject.sex === 'FEMALE' ? '女' : subject.sex === 'MALE' ? '男' : '',
           ageText: ageDisplay(subject.birthDate),
-          reportTitle: reportNeedsRefresh ? '今日营养报告待更新' : report ? '今日营养报告已生成' : '今天还没有营养报告',
-          reportDescription: reportNeedsRefresh ? '新记录已保存，打开报告生成最新营养参考' : report ? '查看已记录摄入、主要来源和参考信息' : '记录并确认实际摄入后生成营养参考',
-          warnings: reportNeedsRefresh ? [] : (report?.warnings || []).map(warningLabel),
-          nutrients: reportNeedsRefresh ? [] : nutrients,
+          reportTitle: legacyReport ? '今日报告暂不支持新版解读' : reportNeedsRefresh ? '今日营养报告待更新' : report ? '今日营养报告已生成' : '今天还没有营养报告',
+          reportDescription: legacyReport ? '已保存餐食不受影响，可在记录页查看；报告页将说明当前兼容限制' : reportNeedsRefresh ? '新记录已保存，打开报告生成最新营养参考' : report ? '查看已记录摄入、主要来源和参考信息' : '记录并确认实际摄入后生成营养参考',
+          warnings: reportNeedsRefresh || legacyReport ? [] : (report?.warnings || []).map(warningLabel),
+          nutrients: reportNeedsRefresh || legacyReport ? [] : nutrients,
           advice: advice.length ? advice : [{
             tone: 'grain', badge: '记',
-            title: reportNeedsRefresh ? '报告等待更新' : '尚无报告结论',
-            description: reportNeedsRefresh ? '打开今日营养报告即可生成最新结果' : '先记录并确认实际摄入，再查看营养参考',
+            title: legacyReport ? '报告暂不支持新版解读' : reportNeedsRefresh ? '报告等待更新' : '尚无报告结论',
+            description: legacyReport ? '已保存餐食可在记录页查看' : reportNeedsRefresh ? '打开今日营养报告即可生成最新结果' : '先记录并确认实际摄入，再查看营养参考',
           }],
         })
       } catch (caught) {
@@ -96,14 +140,15 @@ Component({
       try {
         const active = await context()
         if (!active.subjectId) throw new Error('请先建立宝宝档案')
-        wx.navigateTo({ url: '/pages/camera/camera' })
+        openPage('/pages/camera/camera')
       } catch (caught) {
         const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '创建餐食失败'
         wx.showToast({ title: message, icon: 'none' })
       } finally { this.setData({ loading: false }) }
     },
-    openReport() { wx.redirectTo({ url: '/pages/report/report' }) },
-    openProfile() { wx.redirectTo({ url: '/pages/profile/profile' }) },
+    openAdvice(e:WechatMiniprogram.TouchEvent) { const row=this.data.advice[Number(e.currentTarget.dataset.index)]; if(row?.reportId&&row.nutrientCode)openPage('/pages/nutrient-detail/nutrient-detail?code='+encodeURIComponent(row.nutrientCode)+'&reportId='+encodeURIComponent(row.reportId)) },
+    openReport() { openPage('/pages/report/report') },
+    openProfile() { navigateRoot('/pages/profile/profile') },
     showNotice() { wx.showToast({ title: this.data.warnings[0] || '今天没有新的数据警告', icon: 'none' }) },
   },
 })

@@ -1,6 +1,6 @@
 <navigation-bar title="" back="{{false}}" color="#2d2623" background="transparent"></navigation-bar>
-<scroll-view class="home-scroll" scroll-y enhanced show-scrollbar="{{false}}">
-  <view class="page-shell home-page">
+<scroll-view class="home-scroll" style="{{homeScrollHeight ? 'height:'+homeScrollHeight+'px' : ''}}" scroll-y enhanced show-scrollbar="{{false}}">
+  <view wx:if="{{reviewLabel}}" style="margin:20rpx;padding:18rpx;background:#fff0cc;color:#82600f;border-radius:15rpx;font-size:23rpx">{{reviewLabel}} · 请只录入合成测试数据</view><view class="page-shell home-page">
     <view class="profile-row" bindtap="openProfile" aria-role="button" aria-label="查看宝宝档案">
       <image class="avatar" src="/assets/baby-avatar-v2.jpg" mode="aspectFill"></image>
       <view class="profile-copy"><view class="name-row"><text class="baby-name">{{babyName}}</text><text wx:if="{{genderText}}" class="gender-mark">{{genderText}}</text></view><text class="baby-age">{{ageText}}</text></view>
@@ -19,13 +19,20 @@
       </view>
       <view wx:if="{{warnings.length}}" class="report-warning"><view class="bulb-icon"></view><text>{{warnings[0]}}</text></view>
     </view>
+    <view id="home-menu-card" class="home-menu-card ui-card" bindtap="openHomeMenu" aria-role="button" aria-label="饮食推荐">
+      <view class="card-heading"><text class="section-title">饮食推荐</text><text wx:if="{{homeMenu.dateLabel}}" id="home-menu-date" class="home-menu-date">{{homeMenu.dateLabel}}</text></view>
+      <view wx:if="{{homeMenu.meals.length}}" id="home-menu-meals" class="home-menu-meals"><view wx:for="{{homeMenu.meals}}" wx:key="slot" class="home-menu-row"><text class="home-menu-slot">{{item.label}}</text><text class="home-menu-dish">{{item.names}}<text wx:if="{{item.optional}}" class="home-menu-optional">（按需）</text></text></view></view>
+      <text wx:else id="home-menu-message" class="home-menu-message">{{homeMenu.message}}</text>
+      <text wx:if="{{homeMenu.state==='READY' && homeMenu.generating}}" class="home-menu-progress">新菜单生成中</text>
+      <view class="home-menu-footer"><text class="home-menu-hint">{{homeMenu.state==='READY'?'AI生成，仅供参考':'按宝宝条件规划'}}</text><view wx:if="{{homeMenu.link}}" class="home-menu-link"><text>{{homeMenu.link}}</text><view class="chevron"></view></view></view>
+    </view>
     <view class="advice-card ui-card">
       <view class="advice-title"><view class="spark-icon"></view><text class="section-title">今日记录提醒</text></view>
       <view class="advice-content">
         <image class="advice-baby" src="/assets/baby-eating-centered-v3.jpg" mode="aspectFill"></image>
-        <view class="advice-list"><view class="advice-row" wx:for="{{advice}}" wx:key="title"><view class="food-badge {{item.tone}}">{{item.badge}}</view><view class="advice-copy"><text class="advice-row-title">{{item.title}}</text><text class="advice-desc">{{item.description}}</text></view><view class="chevron"></view></view></view>
+        <view class="advice-list"><view class="advice-row" wx:for="{{advice}}" wx:key="title" data-index="{{index}}" bindtap="openAdvice"><view class="food-badge {{item.tone}}">{{item.badge}}</view><view class="advice-copy"><text class="advice-row-title">{{item.title}}</text><text class="advice-desc">{{item.description}}</text></view><view wx:if="{{item.reportId && item.nutrientCode}}" class="chevron"></view></view></view>
       </view>
     </view>
   </view>
 </scroll-view>
-<app-tabbar active="home" showCamera="{{true}}"></app-tabbar>
+<app-tabbar id="main-tabbar" active="home" showCamera="{{true}}"></app-tabbar>

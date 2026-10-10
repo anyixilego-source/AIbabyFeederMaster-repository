@@ -9,7 +9,15 @@
     "pages/report-overview/report-overview",
     "pages/profile/profile",
     "pages/about/about",
-    "pages/menu/menu"
+    "pages/menu/menu",
+    "pages/nutrient-trend/nutrient-trend",
+    "pages/report-history/report-history",
+    "pages/report-overview-history/report-overview-history",
+    "pages/meal-edit/meal-edit",
+    "pages/feedback/feedback",
+    "pages/diet-menu/diet-menu",
+    "pages/diet-favorites/diet-favorites",
+    "pages/feedback-management/feedback-management"
   ],
   "window": {
     "navigationBarTextStyle": "black",

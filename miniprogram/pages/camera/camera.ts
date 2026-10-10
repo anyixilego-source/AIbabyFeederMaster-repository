@@ -1,6 +1,8 @@
+import {openPage,backPage} from '../../utils/navigation'
 import { ApiError, request } from '../../utils/api'
 import { completeOperation, getPendingOperation, operationPayload } from '../../utils/operation'
 import { ensureSessionContext, SessionContext } from '../../utils/session'
+import { abandonCurrentMeal, discardAbandonedMeals } from '../../utils/pending-meal'
 
 async function context(): Promise<SessionContext> {
   const app = getApp<IAppOption>()
@@ -38,38 +40,38 @@ Page({
       if (!mealId) {
         const scope = `create-meal:${active.subjectId}`
         const payload = getPendingOperation(scope) || operationPayload(scope, {
-          mealType: 'OTHER', occurredAt: new Date().toISOString(), notes: '拍照记录',
+          mealType: 'OTHER', occurredAt: new Date().toISOString(), notes: photoPath ? '拍照记录' : '手工记录',
         })
         const meal = await request<{ mealId: string }>(`/subjects/${active.subjectId}/meals`, { method: 'POST', data: payload })
         completeOperation(scope, payload.operationId)
         mealId = meal.mealId
         wx.setStorageSync('foodmaster.currentMealId', mealId)
       }
-      wx.setStorageSync('mealPhoto', photoPath)
+      if(photoPath)wx.setStorageSync('mealPhoto', photoPath);else wx.removeStorageSync('mealPhoto')
+      wx.setStorageSync('foodmaster.manualEntry', !photoPath)
       this.setData({ pendingPhoto: '' })
-      wx.navigateTo({ url: '/pages/result/result' })
+      openPage('/pages/result/result',{
+        fail: (error) => {
+          this.setData({ preparationError: `无法打开识别页：${error.errMsg}` })
+          wx.showToast({ title: '无法打开识别页，请重试', icon: 'none' })
+        },
+      })
     } catch (caught) {
       const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '餐食记录准备失败'
-      this.setData({ preparationError: `${message}，请重新选择图片`, pendingPhoto: photoPath })
+      this.setData({ preparationError: `${message}，请重试新增记录`, pendingPhoto: photoPath })
       wx.showToast({ title: message, icon: 'none' })
     } finally { this.setData({ preparing: false }) }
   },
+  startManualRecord() { void this.continueWithPhoto('') },
   readyForPhoto(): boolean {
     if (this.data.preparing) { wx.showToast({ title: '正在创建餐食记录', icon: 'none' }); return false }
     return true
   },
   async discardPendingMeal() {
-    const mealId = wx.getStorageSync('foodmaster.currentMealId') as string | undefined
-    if (!mealId) return
-    wx.removeStorageSync('foodmaster.currentMealId')
-    try {
-      const meal = await request<{ status: string }>(`/meals/${mealId}`)
-      if (meal.status === 'DRAFT') await request(`/meals/${mealId}`, { method: 'DELETE', data: { reason: '照护者放弃未保存的拍照记录' } })
-    } catch (_caught) {
-      // 放弃清理失败不阻断离开页面；服务端草稿不会进入已确认摄入。
-    }
+    abandonCurrentMeal()
+    await discardAbandonedMeals()
   },
-  goBack() { void this.discardPendingMeal(); wx.navigateBack({ fail: () => wx.redirectTo({ url: '/pages/index/index' }) }) },
+  goBack() { void this.discardPendingMeal(); backPage('/pages/index/index',this) },
   dismissTip() { this.setData({ tipVisible: false }) },
   chooseAlbum() {
     if (!this.readyForPhoto()) return

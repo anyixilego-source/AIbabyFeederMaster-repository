@@ -120,3 +120,7 @@
 .meal-weight-mark { width: 7rpx; height: 14rpx; border-radius: 4rpx; background: #ffb862; }
 .meal-weight-tick:nth-child(2n+1) .meal-weight-mark { background: #ff8a72; }
 .manual-search button { display: flex; align-items: center; justify-content: center; line-height: 1; }
+
+.result-actions .save-weight-warning{grid-column:1 / -1;display:block;box-sizing:border-box;color:#b65341;font-size:24rpx;line-height:1.45;margin-bottom:0}.result-page{padding-bottom:calc(320rpx + env(safe-area-inset-bottom))}
+
+.meal-weight-warning{position:static;margin-bottom:12rpx;font-size:22rpx}.result-actions{padding-bottom:calc(14rpx + env(safe-area-inset-bottom))}

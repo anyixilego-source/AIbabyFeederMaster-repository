@@ -1,36 +1,36 @@
-<navigation-bar title="营养素详情" back="{{true}}" color="#171722" background="transparent"></navigation-bar>
-<view class="page-shell">
+<navigation-bar title="营养素详情" back="{{true}}" delta="{{0}}" bind:back="goBack" color="#171722" background="transparent"></navigation-bar>
+<view class="page-shell"><view wx:if="{{reviewLabel}}" class="review">{{reviewLabel}}</view>
 
   <view wx:if="{{errorMessage}}" class="error-card">{{errorMessage}}</view>
   <view wx:elif="{{loading}}" class="loading-card">正在整理营养素详情…</view>
-  <block wx:else>
+  <block wx:else><text class="scope-note">{{dateLabel}} · 仅分析已保存并确认的饮食记录，未记录食物不计入。</text>
     <view class="summary-card">
       <view class="summary-top">
         <view class="nutrient-badge">{{badge}}</view>
         <view class="summary-copy">
           <text class="nutrient-name">{{name}}</text>
-          <view class="amount-line"><text class="amount-value">{{amountText}}</text><text class="amount-unit">{{unitText}}</text></view>
-          <text class="source-count">主要来源于 {{sourceCount}} 种食物</text>
+          <view class="amount-line"><text class="amount-value">{{amountText}}</text><text wx:if="{{hasValue}}" class="amount-unit">{{unitText}}</text></view>
+          <text wx:if="{{sourceSnapshotAvailable}}" class="source-count">记录包含 {{foodCards.length}} 种食物 · {{sourceCount}} 种可计算</text><text wx:else class="source-count">旧报告未保存来源明细</text>
         </view>
-        <image class="baby-image" src="/assets/baby-eating-centered-v3.jpg" mode="aspectFill" />
+
       </view>
 
-      <view wx:if="{{sources.length}}" class="source-progress">
+      <text wx:if="{{sources.length}}" class="scope-note">以下占比仅表示各食物在本项已知量中的贡献。</text><view wx:if="{{sources.length}}" class="source-progress">
         <view wx:for="{{sources}}" wx:key="foodId" class="source-progress-part" style="width: {{item.percent}}%"></view>
       </view>
-      <view wx:if="{{sources.length}}" class="source-grid">
-        <view wx:for="{{sources}}" wx:key="foodId" class="source-item">
-          <view class="food-badge">{{item.badge}}</view>
-          <text class="food-name">{{item.name}}</text>
-          <text class="food-value">{{item.valueText}} {{unitText}}</text>
-          <text class="food-percent">{{item.percent}}%</text>
+      <view wx:if="{{foodCards.length}}" id="food-contribution-list" class="source-table">
+        <view class="source-table-row source-table-head"><text>食物名称</text><text>记录重量</text><text>贡献占比</text></view>
+        <view wx:for="{{foodCards}}" wx:key="foodId" class="source-table-row {{item.calculable?'':'unavailable'}}">
+          <view class="source-table-name"><text>{{item.name}}</text><text wx:if="{{item.calculable && item.hasMissing}}" class="food-note">部分可计算</text></view>
+          <text class="source-table-weight">{{item.recordWeightText}}</text>
+          <text class="source-table-percent {{item.percent===null?'unavailable':''}}">{{item.percentText}}</text>
         </view>
       </view>
-      <view wx:else class="source-empty">当前记录中暂无可拆解的来源食物</view>
+      <view wx:else class="source-empty">当前记录中暂无可展示的食物明细</view>
     </view>
 
     <view class="reference-card">
-      <text class="section-title">参考信息</text>
+      <text class="section-title">参考信息与记录解释</text>
       <view class="reference-note">
         <view class="reference-icon">▥</view>
         <view>
@@ -38,25 +38,25 @@
           <text class="reference-sub">{{referenceSubText}}</text>
         </view>
       </view>
-      <text class="reference-text">{{referenceText}}</text>
+      <text class="reference-text">{{referenceText}}</text><text wx:if="{{referenceSource}}" class="scope-note">{{referenceSource}}</text>
       <view wx:if="{{referenceAvailable}}" class="ruler-wrap">
-        <text wx:if="{{showCurrentMarker}}" class="marker-value" style="left: {{markerPercent}}%">{{amountText}} {{unitText}}</text>
+        <text wx:if="{{showCurrentMarker}}" class="marker-value {{markerPercent<12?'at-start':markerPercent>88?'at-end':''}}" style="left: {{markerPercent}}%">{{currentMarkerText}} {{unitText}}</text>
         <view class="ruler">
           <view wx:if="{{hasRange}}" class="ruler-fill" style="left: {{rangeStartPercent}}%; width: {{rangeWidthPercent}}%; right: auto"></view>
           <view wx:if="{{hasRange}}" class="range-boundary" style="left: {{rangeStartPercent}}%"></view>
           <view wx:if="{{hasRange}}" class="range-boundary" style="left: {{rangeStartPercent + rangeWidthPercent}}%"></view>
-          <view wx:if="{{showCurrentMarker}}" class="marker" style="left: {{markerPercent}}%"></view>
+          <view wx:if="{{showCurrentMarker}}" class="marker {{informationalMarker?'informational':''}}" style="left: {{markerPercent}}%"></view>
         </view>
-        <view class="ruler-labels"><text>0</text><text>{{scaleMaxText}}</text></view>
+        <view class="ruler-labels"><text class="ruler-end first">0</text><view wx:if="{{hasRange}}" class="range-tick lower" style="left: {{rangeStartPercent}}%"><text class="range-tick-value">{{rangeLowerText}}</text></view><view wx:if="{{hasRange}}" class="range-tick upper" style="left: {{rangeStartPercent + rangeWidthPercent}}%"><text class="range-tick-value">{{rangeUpperText}}</text></view><text class="ruler-end last">{{scaleMaxText}}</text></view>
       </view>
       <view class="conclusion {{conclusionTone}}" bindtap="toggleConclusion">
         <view class="conclusion-left"><text class="alert-icon">{{expandableConclusion ? '!' : 'i'}}</text><text>{{conclusion}}</text></view>
         <view wx:if="{{expandableConclusion}}" class="expand-arrow {{conclusionExpanded ? 'expanded' : ''}}"></view>
       </view>
       <view wx:if="{{conclusionExpanded}}" class="explanation">
-        <text class="explanation-title">可能原因</text>
+        <text class="explanation-title">这份记录能说明什么</text>
         <text wx:for="{{reasons}}" wx:key="*this" class="explanation-item">• {{item}}</text>
-        <text class="explanation-title suggestion-title">建议</text>
+        <text class="explanation-title suggestion-title">解释范围</text>
         <text wx:for="{{suggestions}}" wx:key="*this" class="explanation-item">• {{item}}</text>
       </view>
     </view>
@@ -68,6 +68,7 @@
       </view>
       <view wx:if="{{aboutExpanded}}" class="about-body">
         <text>• 本页数值是已记录食物中可计算的{{name}}合计。</text>
+        <view wx:for="{{sources}}" wx:key="foodId"><text class="scope-note">{{item.name}}：记录重量{{item.recordWeightText}}；本项贡献{{item.valueText}} {{unitText}}；营养数据版本{{item.sourceVersionText}}</text><text class="scope-note" wx:for="{{item.evidenceIds}}" wx:for-item="evidenceId" wx:key="*this">依据编号 {{evidenceId}}</text></view>
         <text>• 如果仍有未记录的奶量或食物，实际摄入可能不同。</text>
         <text wx:if="{{dataNote}}">• {{dataNote}}，当前结果仅代表已知部分。</text>
       </view>

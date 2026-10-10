@@ -1,0 +1,27 @@
+  <view id="recipe-image-frame" class="image-frame recipe-hero" bindtap="openImageViewer">
+    <image wx:if="{{imagePath}}" id="recipe-image" class="recipe-image hero-photo" src="{{imagePath}}" mode="aspectFill"/>
+    <view class="hero-shade" aria-hidden="true"/>
+    <view class="hero-copy">
+      <text id="recipe-detail-name" class="hero-name">{{recipe.name}}</text>
+      <text wx:if="{{recipe.description}}" id="recipe-description" class="hero-intro">{{recipe.description}}</text>
+      <view class="hero-meta"><view class="recipe-ui-icon icon-clock" aria-hidden="true"/><text>预计 {{recipe.preparationMinutes}} 分钟</text></view>
+      <view class="hero-meta"><view class="recipe-ui-icon icon-cutlery" aria-hidden="true"/><text>{{recipe.servings}} 份量参考</text></view>
+    </view>
+    <view wx:if="{{!imagePath || imageGenerating || imageStatus==='FAILED'}}" id="recipe-image-placeholder" class="image-placeholder hero-placeholder {{imagePath?'image-overlay':''}}">
+      <text wx:if="{{!imagePath}}" class="hero-placeholder-title">食谱示意图</text>
+      <view wx:if="{{imageStatus==='RUNNING'}}" id="recipe-image-progress" class="image-progress" aria-label="示意图正在生成"><view class="image-progress-fill"/></view>
+      <text class="note">{{imageMessage}}</text>
+      <button wx:if="{{imageStatus==='FAILED' && !imageGenerating}}" id="generate-recipe-image" style="width:100%" catchtap="retryImage">{{recipeCollectionView?'重试图片':'重新生成示意图'}}</button>
+    </view>
+    <view wx:if="{{imagePath}}" id="recipe-image-expand" class="hero-expand" role="button" aria-label="查看大图"><image class="hero-expand-icon" src="/assets/menu-expand-image-v1.png" mode="aspectFit" aria-hidden="true"/></view>
+    <view wx:if="{{imagePath && !recipeCollectionView}}" id="recipe-image-actions" class="hero-image-actions"><view id="recipe-image-collect" class="hero-image-action" catchtap="collectRecipe" role="button" aria-label="{{recipeCollected?'取消收藏菜品':'收藏菜品'}}"><image class="hero-collection-icon" src="{{recipeCollected?'/assets/menu-collection-yellow-v1.png':'/assets/menu-collection-gray-v1.png'}}" mode="aspectFit"/></view><view id="recipe-image-like" class="hero-image-action hero-like-action" catchtap="likeRecipeImage" role="button" aria-label="{{imageLiked?'取消点赞':'点赞图片'}}"><image class="hero-like-icon" src="{{imageLiked?'/assets/menu-liked-image-v2.png':'/assets/menu-like-image-v2.png'}}" mode="aspectFit"/><text id="recipe-image-like-count" class="hero-like-count">{{imageLikeCount}}</text></view></view>
+  </view>
+  <view wx:if="{{false}}" id="recipe-feeding-tip" class="recipe-tip"><view class="recipe-tip-inner"><view class="recipe-ui-icon icon-bulb" aria-hidden="true"/><view class="recipe-tip-copy"><text class="recipe-tip-title">喂养小贴士</text><text class="recipe-tip-text">生的可食部分；水用毫升。不是实际吃下量，也不要求吃完。</text></view></view></view>
+  <view id="recipe-ingredients" class="recipe-card">
+    <view class="recipe-section-heading"><view class="recipe-ui-icon icon-basket" aria-hidden="true"/><text class="recipe-section-title">原料·备餐估算量</text><text class="recipe-serving">{{recipe.servings}}份参考量</text></view>
+    <view wx:for="{{recipe.ingredients}}" wx:key="name" class="recipe-ingredient"><text class="recipe-ingredient-name">{{item.name}}</text><text class="recipe-ingredient-amount">{{item.quantity}} {{item.unit==='g'?'克':item.unit==='ml'?'毫升':item.unit}}</text></view>
+  </view>
+  <view class="recipe-card">
+    <view class="recipe-section-heading"><view class="recipe-ui-icon icon-chef" aria-hidden="true"/><text class="recipe-section-title">做法</text></view>
+    <view id="recipe-steps"><view wx:for="{{recipe.steps}}" wx:key="*this" class="recipe-step"><text class="recipe-step-number">{{index+1}}.</text><text class="recipe-step-copy">{{item}}</text></view><text wx:if="{{recipe.textureAdvice}}" class="recipe-supplement">{{recipe.textureAdvice}}</text><text wx:if="{{recipe.replacement}}" class="recipe-supplement">替代说明：{{recipe.replacement}}</text></view>
+  </view>

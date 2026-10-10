@@ -1,4 +1,4 @@
-import { AuthSession, getAuth, request, setAuth } from './api'
+import { AuthSession, getAuth, request, setAuth, reviewEnvironment } from './api'
 
 export interface HouseholdSummary {
   householdId: string
@@ -48,11 +48,14 @@ async function loadSessionContext(): Promise<SessionContext> {
     await login()
     households = await request<HouseholdSummary[]>('/households')
   }
-  const householdId = households[0]?.householdId ?? null
+  const selected = reviewEnvironment()
+  if (selected?.householdId && !households.some(household => household.householdId === selected.householdId)) throw new Error('验证家庭已不可用，请重新选择验证会话')
+  const householdId = selected?.householdId || households[0]?.householdId || null
   const subjects = householdId
     ? await request<SubjectSummary[]>(`/households/${householdId}/subjects`)
     : []
-  return { householdId, subjectId: subjects[0]?.subjectId ?? null, households, subjects }
+  if (selected?.subjectId && !subjects.some(subject => subject.subjectId === selected.subjectId)) throw new Error('验证宝宝已不可用，请重新选择验证会话')
+  return { householdId, subjectId: selected?.subjectId || subjects[0]?.subjectId || null, households, subjects }
 }
 
 export async function ensureSessionContext(): Promise<SessionContext> {

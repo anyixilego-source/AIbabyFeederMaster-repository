@@ -1,3 +1,4 @@
+import {backPage} from '../../utils/navigation'
 import { ApiError, request } from '../../utils/api'
 import { ageDisplayFromMonths, ageMonths } from '../../utils/age'
 import { ensureSessionContext, SessionContext, SubjectSummary } from '../../utils/session'
@@ -79,6 +80,6 @@ Page({
       wx.showToast({ title: message, icon: 'none' })
     } finally { this.setData({ loading: false }) }
   },
-  goBack() { wx.navigateBack({ fail: () => wx.redirectTo({ url: '/pages/profile/profile' }) }) },
+  goBack() { backPage('/pages/profile/profile',this) },
   explainCandidate() { wx.showToast({ title: '候选不会自动记为实际摄入', icon: 'none' }) },
 })

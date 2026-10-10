@@ -1,0 +1,33 @@
+<navigation-bar title="{{mode === 'DETAIL' ? '反馈详情' : '反馈管理'}}" back="{{false}}" color="#2d2623" background="transparent"><view slot="left" class="nav-circle" bindtap="goBack"><view class="back-icon"></view></view></navigation-bar>
+<scroll-view class="management-scroll" scroll-y enhanced show-scrollbar="{{false}}" bindscrolltolower="more" refresher-enabled="{{mode === 'LIST' && authorized}}" refresher-triggered="{{refreshing}}" bindrefresherrefresh="refresh">
+  <view class="management-shell">
+    <view wx:if="{{reviewLabel}}" class="review-label">{{reviewLabel}} · 请只录入合成测试数据</view>
+    <view wx:if="{{checking}}" class="status">正在核对查看权限…</view>
+    <block wx:else>
+      <view wx:if="{{errorMessage}}" id="management-error" class="notice"><text>{{errorMessage}}</text><button id="management-retry" class="text-action" bindtap="retry">重新加载</button></view>
+      <block wx:if="{{authorized && mode === 'LIST'}}">
+        <view class="filters ui-card">
+          <view class="ranges"><button wx:for="{{ranges}}" wx:key="key" data-key="{{item.key}}" bindtap="chooseRange" id="management-range-{{item.key}}" class="range {{range === item.key ? 'active' : ''}}">{{item.label}}</button></view>
+          <button id="management-module-filter" class="module-filter" bindtap="openModulePicker">{{moduleLabel || '全部功能位置'}}<text>选择</text></button>
+          <text wx:if="{{moduleError}}" class="muted">{{moduleError}}</text>
+        </view>
+        <view wx:if="{{loading}}" class="status">正在加载反馈…</view>
+        <view wx:elif="{{!items.length && !errorMessage}}" id="management-empty" class="status">当前筛选下暂无反馈</view>
+        <view wx:for="{{items}}" wx:key="feedbackId" class="feedback-row ui-card" data-id="{{item.feedbackId}}" bindtap="openDetail">
+          <view class="row-heading"><text class="time">{{item.time}}</text><text class="image-count">{{item.imageCount}}张图片</text></view>
+          <view class="location">{{item.location}}</view><view class="excerpt">{{item.description}}</view>
+        </view>
+        <button wx:if="{{nextCursor}}" id="management-more" class="load-more" disabled="{{loadingMore}}" bindtap="more">{{loadingMore ? '正在加载…' : '加载更多'}}</button>
+        <view wx:elif="{{items.length && !loading}}" class="status end">已显示当前筛选下的全部反馈</view>
+      </block>
+      <block wx:if="{{authorized && mode === 'DETAIL' && detail}}">
+        <view class="ui-card detail-card"><text class="section-title">反馈内容</text><view class="content">{{detail.description}}</view><view class="detail-meta">{{detailTime}}</view><view class="detail-meta">功能位置：{{detailLocation}}</view></view>
+        <view wx:if="{{pictures.length}}" class="ui-card detail-card"><text class="section-title">反馈图片</text><view class="pictures"><view wx:for="{{pictures}}" wx:key="id" class="picture" data-id="{{item.id}}" bindtap="preview"><image wx:if="{{item.path}}" src="{{item.path}}" mode="aspectFill"></image><text wx:else>{{item.loading ? '加载中…' : item.failed ? '图片暂不可用，点击重试' : '等待加载'}}</text></view></view></view>
+        <view class="ui-card detail-card"><view class="row-heading"><text class="section-title">联系方式</text><button wx:if="{{detail.contact}}" id="management-copy-contact" class="text-action" bindtap="copyContact">复制</button></view><view class="contact">{{detail.contact || '未提供'}}</view></view>
+        <view class="ui-card detail-card"><view class="row-heading"><text class="section-title">跟踪信息</text><button id="management-copy-id" class="text-action" bindtap="copyId">复制反馈编号</button></view><view class="identifier">反馈编号：{{detail.feedbackId}}</view><view class="identifier">内部账号：{{detail.accountId}}</view><text class="detail-meta">内部账号标识不是微信号。</text></view>
+        <view id="management-environment" class="ui-card detail-card" bindtap="toggleEnvironment"><view class="row-heading"><text class="section-title">环境信息</text><text class="text-action">{{showEnvironment ? '收起' : '展开'}}</text></view><view wx:if="{{showEnvironment}}" class="environment"><view>小程序版本：{{detail.context.appVersion || '未记录'}}</view><view>运行环境：{{environmentLabel}}</view><view class="identifier">页面位置：{{detail.context.pagePath || '未记录'}}</view></view></view>
+      </block>
+    </block>
+  </view>
+</scroll-view>
+<view wx:if="{{showModulePicker}}" class="picker-mask" bindtap="closeModulePicker"><view class="picker-sheet" catchtap="stopTap"><view class="row-heading"><text class="section-title">选择反馈的模块</text><button class="text-action" bindtap="closeModulePicker">关闭</button></view><scroll-view class="trail" scroll-x><text data-index="-1" bindtap="moduleLevel">全部</text><text wx:for="{{moduleTrail}}" wx:key="code" data-index="{{index}}" bindtap="moduleLevel"> › {{item.name}}</text></scroll-view><scroll-view class="picker-options" scroll-y><button wx:for="{{moduleOptions}}" wx:key="code" data-code="{{item.code}}" class="module-option" bindtap="chooseModule">{{item.name}}</button></scroll-view><view class="picker-actions"><button id="management-module-clear" class="filter-button" bindtap="clearModule">全部功能位置</button><button wx:if="{{moduleTrail.length}}" id="management-module-commit" class="filter-button selected" bindtap="commitModule">查看此模块及下级</button></view></view></view>

@@ -113,6 +113,25 @@ async function main() {
       return
     }
 
+    if (command === 'records') {
+      const page = await miniProgram.reLaunch('/pages/records/records')
+      await page.waitFor(1800)
+      const data = await page.data()
+      assert.equal(data.errorMessage, '', '记录页应成功读取餐食')
+      assert.ok(data.meals.every((meal) => !meal.title.includes('草稿')), '记录列表不应出现草稿')
+      assert.ok(data.meals.every((meal) => meal.items.every((item) => !/\.\d{2,}/.test(item.consumed))), '摄入重量不应展示冗长小数')
+      let detailScreenshot = null
+      if (data.meals.length) {
+        await page.callMethod('openMeal', { currentTarget: { dataset: { mealId: data.meals[0].mealId } } })
+        await page.waitFor(350)
+        assert.ok((await page.data()).selectedMeal, '点击记录后应显示详情')
+        detailScreenshot = screenshotPath('records-detail')
+        await miniProgram.screenshot({ path: detailScreenshot })
+      }
+      console.log(JSON.stringify({ savedMealCount: data.meals.length, detailScreenshot }))
+      return
+    }
+
     if (command === 'overview') {
       const overview = await miniProgram.reLaunch('/pages/report-overview/report-overview')
       await overview.waitFor(2500)
@@ -259,12 +278,15 @@ async function main() {
       }
       assert.equal(retakeResult.path, 'pages/result/result', '重拍重新选图后应回到识别结果页')
       const secondMealId = await miniProgram.callWxMethod('getStorageSync', 'foodmaster.currentMealId')
-      assert.equal(secondMealId, firstMealId, '同一次重拍应复用当前餐食草稿')
+      assert.ok(firstMealId && secondMealId && secondMealId !== firstMealId, '放弃识别后重新选图应创建新餐食，不复用旧草稿')
+      await miniProgram.reLaunch('/pages/index/index')
+      await delay(900)
+      assert.equal(await miniProgram.callWxMethod('getStorageSync', 'foodmaster.currentMealId'), '', '离开流程后不应保留当前草稿')
       console.log(JSON.stringify({
         route: retakeResult.path,
         samplePhoto: resultData.samplePhoto,
         hasMealDraft: !!secondMealId,
-        retakeReusedDraft: true,
+        retakeCreatesNewDraft: true,
         screenshot: target,
       }))
       return

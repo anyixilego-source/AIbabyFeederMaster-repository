@@ -1,3 +1,4 @@
+import { navigateRoot } from '../../utils/navigation'
 Component({
   properties: {
     active: { type: String, value: 'home' },
@@ -10,12 +11,11 @@ Component({
         home: '/pages/index/index',
         records: '/pages/records/records',
         camera: '/pages/camera/camera',
-        report: '/pages/report/report',
+        report: '/pages/report-overview/report-overview',
         profile: '/pages/profile/profile'
       }
       const url = routes[key]
-      if (!url || key === this.data.active) return
-      wx.redirectTo({ url })
+      if (url) navigateRoot(url)
     }
   }
 })

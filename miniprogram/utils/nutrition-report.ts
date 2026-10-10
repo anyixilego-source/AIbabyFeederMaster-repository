@@ -1,5 +1,5 @@
-import { request } from './api'
-import { ageDisplay } from './age'
+import { ApiError, request, getAuth } from './api'
+import { ageDisplay, ageDisplayFromMonths } from './age'
 import { completeOperation, operationPayload } from './operation'
 import type { SubjectSummary } from './session'
 
@@ -15,42 +15,34 @@ export interface AssessmentNutrient {
   rangeLowerValue?: string | null
   rangeUpperValue?: string | null
   warnings: string[]
+  outputEligibility?: string
+  numericRelation?: string
+  statement?: string
+  reasonCodes?: string[]
+  indicators?: Array<{ rule: { source: string; sourceVersion: string; code: string; reviewedBy: string; referenceType: string }; ambiguous: boolean }>
 }
 
 export interface AssessmentReport {
   reportId: string
+  subjectId?: string
   periodStart: string
   coverageRatio: string
   warnings: string[]
   generatedAt: string
-  result: { assessment: { status: string; nutrients: AssessmentNutrient[]; boundaryStatement: string } }
+  inputFingerprint?: string | null
+  supersedesReportId?: string | null
+  result: {
+    assessment: { status: string; nutrients: AssessmentNutrient[]; boundaryStatement: string; assessmentAlgorithmVersion?: string }
+    evidence?: { ageMonths: number; date: string; subject: { birthDate: string }; records: ReportRecord[]; facts: ReportFact[] }
+    observations?: Array<{ id: string; nutrientCode: string; text: string }>
+    limitations?: Array<{ nutrientCode: string; text: string; reasonCodes: string[] }>
+    actions?: Array<{ id: string; text: string }>
+    knowledge?: { version: string; scopeDeclaration: string; claims: Array<{ id: string; title: string; text: string; evidence: Array<{ id: string; source: string; bookPages: string }> }> }
+  }
 }
 
-interface MealSummary {
-  mealId: string
-  mealType: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK' | 'OTHER'
-  occurredAt: string
-  status: 'DRAFT' | 'CONFIRMED'
-  notes: string | null
-}
-
-interface MealItem {
-  mealItemId: string
-  foodId: string | null
-  observedName: string | null
-  servedAmount: string | null
-  consumedAmount: string | null
-  unit: string
-  status: string
-}
-
-interface MealDetail extends MealSummary { items: MealItem[] }
-
-interface FoodSnapshot {
-  foodId: string
-  canonicalNameZh: string
-  nutrients: Array<{ nutrientCode: string; valuePer100g: string | null; status: string; unitCode: string }>
-}
+interface ReportRecord { mealId: string; mealItemId: string; foodId: string; name: string; consumedGrams: string; weightOrigin: string }
+interface ReportFact { mealItemId: string; foodId: string; nutrientCode: string; contribution: string | null; nutrientFactId?: string; sourceReleaseId?: string; sourceVersion: string }
 
 export interface NutrientSource {
   foodId: string
@@ -59,6 +51,9 @@ export interface NutrientSource {
   value: number
   valueText: string
   percent: number
+  recordWeightText: string
+  sourceVersionText: string
+  evidenceIds: string[]
 }
 
 export interface NutrientView {
@@ -85,6 +80,11 @@ export interface NutrientView {
   referenceType: string | null
   sources: NutrientSource[]
   sourceText: string
+  outputEligibility: string
+  numericRelation: string
+  reasonCodes: string[]
+  referenceSource: string
+  referenceLabel: string
 }
 
 export interface FoodRecord {
@@ -110,6 +110,9 @@ export interface ReportBundle {
   nutrients: NutrientView[]
   warnings: string[]
   foodRecords: FoodRecord[]
+  weightLabel: string
+  snapshotAvailable: boolean
+  updateState: 'CURRENT' | 'FAILED' | 'LEGACY'
 }
 
 export const nutrientNames: Record<string, string> = {
@@ -185,6 +188,7 @@ const nutrientOrder = ['ENERGY', 'ENERGY_KCAL', 'PROTEIN', 'FAT_TOTAL', 'CARBOHY
 const tones = ['blue', 'green', 'orange', 'purple', 'cyan', 'yellow']
 
 let bundleCacheKey = ''
+let bundleSequence = 0
 let bundleCache: Promise<ReportBundle> | null = null
 
 export function dateOnly(date: Date): string {
@@ -208,74 +212,75 @@ export function formatNumber(value: string | number): string {
 
 export function warningLabel(warning: string): string {
   const [prefix, code] = warning.split(':')
-  if (code && nutrientNames[prefix]) return `${nutrientNames[prefix]}：${warningLabels[code] || '存在尚未归类的数据说明。'}`
+  if (code && nutrientNames[prefix]) return `${nutrientNames[prefix]}：${warningLabels[code] || '本项有数据或规则限制，详情见报告。'}`
   if (prefix === 'RULES_UNAVAILABLE') return '当前月龄或条件没有匹配的参考规则。'
   if (prefix === 'AMBIGUOUS_RULE') return `${nutrientNames[code] || '部分营养素'}存在多条适用规则，暂不比较。`
-  return warningLabels[warning] || '存在尚未归类的数据说明。'
+  return warningLabels[warning] || '本项有数据或规则限制，详情见报告。'
 }
 
-export function loadReportBundle(subjectId: string, force = false): Promise<ReportBundle> {
-  const key = `${subjectId}:${dateOnly(new Date())}`
+export function loadReportBundle(subjectId: string, force = false, reportId = '', selectedDate = ''): Promise<ReportBundle> {
+  const key = subjectId + ':' + (reportId || selectedDate || dateOnly(new Date())) + ':' + (getAuth()?.accessToken || '')
   if (!force && bundleCache && bundleCacheKey === key) return bundleCache
   bundleCacheKey = key
-  bundleCache = createReportBundle(subjectId, force).catch((error: unknown) => {
-    bundleCache = null
+  const sequence = ++bundleSequence
+  const promise = createReportBundle(subjectId, reportId, sequence, selectedDate).catch((error: unknown) => {
+    if (bundleCache === promise) bundleCache = null
     throw error
   })
-  return bundleCache
+  bundleCache = promise
+  return promise
 }
 
-async function createReportBundle(subjectId: string, force: boolean): Promise<ReportBundle> {
-  const now = new Date()
-  const today = dateOnly(now)
-  const [subject, mealSummaries, fetchedReports] = await Promise.all([
-    request<SubjectSummary>(`/subjects/${subjectId}`),
-    request<MealSummary[]>(`/subjects/${subjectId}/meals`),
-    request<AssessmentReport[]>(`/subjects/${subjectId}/assessment-reports`),
-  ])
-  const existingReports = fetchedReports.map(suspendReportComparison)
-  let report = force ? undefined : latestReport(existingReports, today)
-  if (!report) {
-    const scope = `assessment:${subjectId}:${today}`
-    const payload = operationPayload(scope, {
-      periodStart: today, periodEndExclusive: tomorrow(now), timezoneOffsetMinutes: -now.getTimezoneOffset(),
-    })
-    report = suspendReportComparison(await request<AssessmentReport>(`/subjects/${subjectId}/assessment-reports`, { method: 'POST', data: payload }))
-    completeOperation(scope, payload.operationId)
+async function createReportBundle(subjectId: string, reportId: string, sequence: number, selectedDate = ''): Promise<ReportBundle> {
+  const now = selectedDate ? new Date(selectedDate + 'T12:00:00') : new Date()
+  const subject = await request<SubjectSummary>('/subjects/' + subjectId)
+  let report: AssessmentReport
+  let updateState: 'CURRENT' | 'FAILED' | 'LEGACY' = 'CURRENT'
+  if (reportId) report = await request<AssessmentReport>('/assessment-reports/' + reportId)
+  else {
+    const scope = 'assessment:' + subjectId + ':' + dateOnly(now) + ':' + sequence
+    const payload = operationPayload(scope, {periodStart:dateOnly(now),periodEndExclusive:tomorrow(now),timezoneOffsetMinutes:-now.getTimezoneOffset()})
+    // Two attempts share the operation id. The server independently reuses effective inputs.
+    try {
+      try { report = await request<AssessmentReport>('/subjects/' + subjectId + '/assessment-reports', {method:'POST',data:payload}) }
+      catch (error) {
+        if (error instanceof ApiError && error.statusCode > 0 && error.statusCode < 500) throw error
+        report = await request<AssessmentReport>('/subjects/' + subjectId + '/assessment-reports', {method:'POST',data:payload})
+      }
+      completeOperation(scope,payload.operationId)
+    } catch (error) {
+      if (error instanceof ApiError && [401,403].includes(error.statusCode)) throw error
+      const previous = await request<AssessmentReport[]>('/subjects/' + subjectId + '/assessment-reports')
+      const fallback = previous.filter(r=>r.periodStart===dateOnly(now)).sort((a,b)=>b.generatedAt.localeCompare(a.generatedAt))[0]
+      if (!fallback) throw error
+      report = fallback; updateState='FAILED'
+    }
   }
-  const todaySummaries = mealSummaries.filter((meal) => meal.status === 'CONFIRMED' && dateOnly(new Date(meal.occurredAt)) === today)
-  const mealDetails = await Promise.all(todaySummaries.map((meal) => request<MealDetail>(`/meals/${meal.mealId}`)))
-  const items = mealDetails.flatMap((meal) => meal.items.filter((item) => item.status === 'CONFIRMED' && Number(item.consumedAmount || 0) > 0))
-  const foodIds = [...new Set(items.map((item) => item.foodId).filter((foodId): foodId is string => Boolean(foodId)))]
-  const snapshots = await Promise.all(foodIds.map((foodId) => request<FoodSnapshot>(`/foods/${foodId}/nutrients`).catch(() => null)))
-  const snapshotMap = new Map(snapshots.filter((snapshot): snapshot is FoodSnapshot => snapshot !== null).map((snapshot) => [snapshot.foodId, snapshot]))
-  const sources = buildSources(items, snapshotMap)
-  const nutrients = report.result.assessment.nutrients.map((item) => nutrientView(item, sources.get(item.nutrientCode) || []))
-    .sort((left, right) => categoryOrder[left.category] - categoryOrder[right.category]
-      || nutrientRank(left.nutrientCode) - nutrientRank(right.nutrientCode))
-  const reports = [report, ...existingReports.filter((item) => item.reportId !== report!.reportId)]
-  const foodRecords = buildFoodRecords(items, snapshotMap)
-  const totalConsumed = items.reduce((sum, item) => sum + Number(item.consumedAmount || 0), 0)
-  const warnings = [...new Set(report.warnings.map(warningLabel))]
-  return {
-    subject, report, reports, date: today,
-    dateLabel: `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 周${'日一二三四五六'[now.getDay()]}`,
-    ageText: ageDisplay(subject.birthDate), mealCount: todaySummaries.length,
-    foodCount: foodRecords.length, totalConsumedText: formatNumber(totalConsumed), nutrients, warnings, foodRecords,
-  }
+  if(report.subjectId && report.subjectId !== subjectId)throw new Error('请先切换到该报告所属宝宝')
+  report = suspendReportComparison(report)
+  const records = report.result.evidence?.records || []
+  const facts = report.result.evidence?.facts || []
+  const sources = buildSources(records,facts)
+  const nutrients = report.result.assessment.nutrients.map(item=>{const view=nutrientView(item,sources.get(item.nutrientCode)||[]);return report.result.evidence?view:{...view,sourceText:'旧报告未保存来源明细，不能从当前食品重建'}})
+    .sort((left,right)=>categoryOrder[left.category]-categoryOrder[right.category] || nutrientRank(left.nutrientCode)-nutrientRank(right.nutrientCode))
+  const date = new Date(report.periodStart + 'T12:00:00')
+  const snapshotAvailable = Boolean(report.result.evidence)
+  if (!snapshotAvailable && updateState === 'CURRENT') updateState = 'LEGACY'
+  return { subject,report,reports:[report],date:report.periodStart,
+    dateLabel:report.periodStart + ' 周' + '日一二三四五六'[date.getDay()],
+    ageText:report.result.evidence ? ageDisplayFromMonths(report.result.evidence.ageMonths) : ageDisplay(subject.birthDate,date),
+    mealCount:new Set(records.map(r=>r.mealId)).size,foodCount:new Set(records.map(r=>r.foodId)).size,
+    totalConsumedText:(records.some(r=>r.weightOrigin==='USER_ACCEPTED_ESTIMATE')?'约':'')+formatNumber(records.reduce((sum,r)=>sum+Number(r.consumedGrams),0)),nutrients,
+    warnings:[...new Set(report.warnings.map(warningLabel))],foodRecords:buildFoodRecords(records),snapshotAvailable,updateState,
+    weightLabel:records.some(r=>r.weightOrigin==='USER_ACCEPTED_ESTIMATE') ? '记录重量（含估算）' : '记录重量' }
 }
 
-function latestReport(reports: AssessmentReport[], date: string): AssessmentReport | undefined {
-  return reports.filter((report) => report.periodStart === date)
-    .sort((left, right) => right.generatedAt.localeCompare(left.generatedAt))[0]
-}
-
-function nutrientView(item: AssessmentNutrient, sources: NutrientSource[]): NutrientView {
+export function nutrientView(item: AssessmentNutrient, sources: NutrientSource[]): NutrientView {
   const name = nutrientNames[item.nutrientCode] || '其他营养素'
   const coverage = Number(item.coverageRatio)
   const numericValue = item.averageDailyValue === null ? null : Number(item.averageDailyValue)
   const suspended = suspendedReferenceCodes.has(item.nutrientCode)
-  const informational = suspended || ['EER', 'AI_RANGE', 'AMDR_DERIVED'].includes(item.referenceType || '')
+  const informational = suspended || item.outputEligibility !== 'FULL_COMPARISON'
   const rangeLowerValue = item.rangeLowerValue ?? null
   const rangeUpperValue = item.rangeUpperValue ?? null
   const referenceRaw = item.recommendedValue ?? item.upperLimitValue
@@ -288,23 +293,27 @@ function nutrientView(item: AssessmentNutrient, sources: NutrientSource[]): Nutr
     : item.referenceType === 'EER' && reference !== null
       ? `一般能量估计值约 ${formatNumber(reference)} ${unitNames[item.unitCode] || ''}/日`
     : progressRatio !== null
-    ? `${item.recommendedValue !== null ? '约占参考值' : '约占上限参考'} ${Math.round(progressRatio)}%`
+    ? `已记录量／一般参考值 ${Math.round(progressRatio)}%`
     : reference !== null && Number.isFinite(reference) && reference > 0
-      ? '暂无摄入值，暂不能计算参考进度'
+      ? `参考信息 ${formatNumber(reference)} ${unitNames[item.unitCode] || ''}/日（仅供了解）`
       : suspended ? '数据口径待核对，暂不展示参考进度' : '当前月龄暂无适用参考值'
   return {
     nutrientCode: item.nutrientCode, name, badge: name.slice(0, 1), iconPath: nutrientIcon(item.nutrientCode), category: nutrientCategory(item.nutrientCode),
     progressPercent: progressRatio === null ? 0 : Math.max(0, Math.min(100, progressRatio)),
     progressLabel,
     progressTone: nutrientProgressTone(item.nutrientCode),
-    showProgress: !informational,
+    showProgress: !informational && progressRatio !== null,
     amountText: item.averageDailyValue === null ? '暂无数值' : formatNumber(item.averageDailyValue),
     numericValue,
     unitText: unitNames[item.unitCode] || '单位待核对', status: item.status,
-    statusText: statusLabels[item.status] || '暂无法比较', statusTone: statusTone(item.status),
-    dataNote: coverage < 1 ? `部分食物缺少${name}数据` : '',
+    statusText: item.outputEligibility ? (item.statement || statusLabels[item.status] || '暂无法比较') : '历史策略，仅展示原记录值与参考信息', statusTone: item.outputEligibility === 'FULL_COMPARISON' ? statusTone(item.status) : 'neutral',
+    dataNote: item.reasonCodes?.some(r=>['UNIT_BASIS_OR_SOURCE_UNVERIFIED','REFERENCE_UNIT_MISMATCH','UNIT_CONFLICT','SOURCE_CONFLICT','SOURCE_VERSION_MISSING','SOURCE_LINEAGE_MISSING','BASIS_UNSUPPORTED','DUPLICATE_NUTRIENT_FACTS'].includes(r)) ? '单位、基准或来源尚不可核对，暂不比较' : item.averageDailyValue === null ? '已记录食品暂无本项可计算值' : coverage < 1 ? `部分食物缺少${name}数据` : item.reasonCodes?.includes('PARTIAL_NUTRIENT_DATA') ? `部分${name}数值仍不完整` : '',
     recommendedValue: item.recommendedValue, upperLimitValue: item.upperLimitValue,
     rangeLowerValue, rangeUpperValue, referenceType: item.referenceType ?? null, sources,
+    outputEligibility:item.outputEligibility || 'LEGACY_UNVERIFIED',numericRelation:item.numericRelation || 'NOT_CALCULABLE',
+    reasonCodes:item.reasonCodes || item.warnings,
+    referenceSource:(item.indicators || []).filter(i=>!i.ambiguous).map(i=>i.rule.source + ' · ' + i.rule.sourceVersion).join('；'),
+    referenceLabel:item.referenceType || '',
     sourceText: sources.length > 0 ? sources.slice(0, 3).map((source) => source.name).join('、') : '暂无可计算来源',
   }
 }
@@ -333,8 +342,8 @@ function nutrientIcon(code: string): string {
 
 function nutrientCategory(code: string): NutrientView['category'] {
   if (['ENERGY', 'ENERGY_KCAL', 'PROTEIN', 'FAT_TOTAL', 'CARBOHYDRATE', 'FIBER_DIETARY'].includes(code)) return 'MACRO'
-  if (['CALCIUM', 'IRON', 'ZINC', 'SODIUM'].includes(code)) return 'MINERAL'
-  if (code.startsWith('VITAMIN_')) return 'VITAMIN'
+  if (['CALCIUM', 'IRON', 'ZINC', 'SODIUM', 'IODINE'].includes(code)) return 'MINERAL'
+  if (code.startsWith('VITAMIN_') || code === 'FOLATE') return 'VITAMIN'
   return 'OTHER'
 }
 
@@ -350,47 +359,36 @@ function statusTone(status: string): string {
   return 'neutral'
 }
 
-function buildSources(items: MealItem[], snapshots: Map<string, FoodSnapshot>): Map<string, NutrientSource[]> {
-  const grouped = new Map<string, Map<string, { foodId: string; name: string; value: number }>>()
-  for (const item of items) {
-    if (!item.foodId) continue
-    const snapshot = snapshots.get(item.foodId)
-    if (!snapshot) continue
-    const grams = Number(item.consumedAmount || 0)
-    for (const nutrient of snapshot.nutrients) {
-      if (nutrient.valuePer100g === null || !['MEASURED', 'ESTIMATED_ZERO', 'PARTIAL'].includes(nutrient.status)) continue
-      const value = Number(nutrient.valuePer100g) * grams / 100
-      if (!Number.isFinite(value) || value <= 0) continue
-      const foods = grouped.get(nutrient.nutrientCode) || new Map<string, { foodId: string; name: string; value: number }>()
-      const current = foods.get(item.foodId)
-      foods.set(item.foodId, {
-        foodId: item.foodId, name: item.observedName || snapshot.canonicalNameZh,
-        value: (current?.value || 0) + value,
-      })
-      grouped.set(nutrient.nutrientCode, foods)
-    }
+function buildSources(records: ReportRecord[], facts: ReportFact[]): Map<string,NutrientSource[]> {
+  const grouped = new Map<string,Map<string,{foodId:string;name:string;value:number}>>()
+  for (const fact of facts) {
+    if (fact.contribution === null) continue
+    const value=Number(fact.contribution)
+    if (!Number.isFinite(value) || value < 0) continue
+    const name=records.find(r=>r.mealItemId===fact.mealItemId)?.name || '已确认食物'
+    const foods=grouped.get(fact.nutrientCode) || new Map<string,{foodId:string;name:string;value:number}>()
+    const previous=foods.get(fact.foodId)
+    foods.set(fact.foodId,{foodId:fact.foodId,name,value:(previous?.value || 0)+value})
+    grouped.set(fact.nutrientCode,foods)
   }
-  return new Map([...grouped.entries()].map(([code, foods]) => {
-    const rows = [...foods.values()].sort((left, right) => right.value - left.value)
-    const total = rows.reduce((sum, row) => sum + row.value, 0)
-    return [code, rows.map((row) => ({
-      ...row, badge: row.name.slice(0, 1), valueText: formatNumber(row.value), percent: total > 0 ? Math.round(row.value / total * 100) : 0,
-    }))]
+  return new Map([...grouped].map(([code,foods])=>{
+    const rows=[...foods.values()].sort((a,b)=>b.value-a.value || a.foodId.localeCompare(b.foodId))
+    const total=rows.reduce((sum,r)=>sum+r.value,0)
+    return [code,rows.map(row=>{
+      const usedRecords=records.filter(r=>r.foodId===row.foodId)
+      const usedFacts=facts.filter(f=>f.foodId===row.foodId && f.nutrientCode===code)
+      return {...row,badge:row.name.slice(0,1),valueText:formatNumber(row.value),percent:total>0?Math.round(row.value/total*100):0,
+        recordWeightText:(usedRecords.some(r=>r.weightOrigin==='USER_ACCEPTED_ESTIMATE')?'约':'')+formatNumber(usedRecords.reduce((sum,r)=>sum+Number(r.consumedGrams),0))+' 克',
+        sourceVersionText:[...new Set(usedFacts.map(f=>f.sourceVersion))].sort().join('、'),
+        evidenceIds:[...new Set(usedFacts.map(f=>f.nutrientFactId).filter((id):id is string=>Boolean(id)))].sort()}
+    })]
   }))
 }
-
-function buildFoodRecords(items: MealItem[], snapshots: Map<string, FoodSnapshot>): FoodRecord[] {
-  const grouped = new Map<string, { foodId: string | null; name: string; amount: number }>()
-  for (const item of items) {
-    const name = item.observedName || (item.foodId ? snapshots.get(item.foodId)?.canonicalNameZh : null) || '已确认食物'
-    const key = item.foodId || name
-    const current = grouped.get(key)
-    grouped.set(key, { foodId: item.foodId, name, amount: (current?.amount || 0) + Number(item.consumedAmount || 0) })
-  }
-  return [...grouped.entries()].map(([key, item], index) => ({
-    key, foodId: item.foodId, name: item.name, amount: item.amount,
-    amountText: `${formatNumber(item.amount)} 克`, badge: item.name.slice(0, 1), tone: tones[index % tones.length]!,
-  }))
+function buildFoodRecords(records: ReportRecord[]): FoodRecord[] {
+  const foods=new Map<string,{foodId:string;name:string;amount:number;estimated:boolean}>()
+  for (const r of records) { const p=foods.get(r.foodId);foods.set(r.foodId,{foodId:r.foodId,name:r.name,amount:(p?.amount||0)+Number(r.consumedGrams),estimated:Boolean(p?.estimated)||r.weightOrigin==='USER_ACCEPTED_ESTIMATE'}) }
+  return [...foods.values()].map((r,i)=>({key:r.foodId,foodId:r.foodId,name:r.name,amount:r.amount,
+    amountText:(r.estimated?'约':'')+formatNumber(r.amount)+' 克',badge:r.name.slice(0,1),tone:tones[i%tones.length]!}))
 }
 
 export function latestReportByDate(reports: AssessmentReport[]): Map<string, AssessmentReport> {

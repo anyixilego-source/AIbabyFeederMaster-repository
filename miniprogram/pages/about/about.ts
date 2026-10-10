@@ -1,3 +1,4 @@
+import {backPage} from '../../utils/navigation'
 import { complianceInfo } from '../../config'
 
 interface PrivacyContractApi {
@@ -13,7 +14,7 @@ Page({
     publicSecurityFilingNumber: complianceInfo.publicSecurityFilingNumber,
   },
 
-  goBack() { wx.navigateBack({ fail: () => wx.redirectTo({ url: '/pages/profile/profile' }) }) },
+  goBack() { backPage('/pages/profile/profile',this) },
 
   openPrivacyContract() {
     const privacyApi = wx as unknown as PrivacyContractApi
