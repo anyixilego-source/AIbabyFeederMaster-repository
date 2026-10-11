@@ -124,3 +124,9 @@
 .result-actions .save-weight-warning{grid-column:1 / -1;display:block;box-sizing:border-box;color:#b65341;font-size:24rpx;line-height:1.45;margin-bottom:0}.result-page{padding-bottom:calc(320rpx + env(safe-area-inset-bottom))}
 
 .meal-weight-warning{position:static;margin-bottom:12rpx;font-size:22rpx}.result-actions{padding-bottom:calc(14rpx + env(safe-area-inset-bottom))}
+
+/* 第一批：搜索结果列表与按名称记录 */
+.search-results-list { margin-top: 10rpx; }
+.search-result-item { margin: 0 0 10rpx; width: 100%; text-align: left; padding: 20rpx 24rpx; font-size: 27rpx; background: #fff; border: 1rpx solid #eee4da; border-radius: 14rpx; color: #352e29; }
+.search-more { margin: 4rpx auto 10rpx; display: block; width: 60%; height: 68rpx; line-height: 68rpx; font-size: 25rpx; background: #f6f1ea; color: #6c6257; border-radius: 999rpx; }
+.search-unmatched { margin: 12rpx 0 6rpx; width: 100%; height: 76rpx; line-height: 76rpx; font-size: 25rpx; background: #fff0e7; color: #ab6645; border-radius: 16rpx; }

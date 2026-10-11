@@ -19,14 +19,16 @@ interface ConfirmedFoodItem {
   localId: string
   candidateIndex: number
   observedName: string
-  foodId: string
+  foodId: string | null
   canonicalNameZh: string
   badge: string
   servedAmount: string
   consumedAmount: string
   ratioPercent: number
   ratioAdjustedOrder: number
-  source: 'AI_CANDIDATE' | 'SEARCH'
+  source: 'AI_CANDIDATE' | 'SEARCH' | 'MANUAL'
+  unmatched?: boolean
+  matchReason?: string
 }
 interface CalculationResult {
   coverageRatio: string
@@ -171,18 +173,21 @@ function confirmedFoodSelection(
   candidateIndex: number,
   current?: ConfirmedFoodItem,
 ): ConfirmedFoodItem {
+  const unmatched = !food.foodId
   return {
-    localId: current?.localId || `${Date.now().toString(36)}-${candidateIndex}-${food.foodId}`,
+    localId: current?.localId || `${Date.now().toString(36)}-${candidateIndex}-${food.foodId || 'by-name'}`,
     candidateIndex,
-    observedName: candidate?.observedName || food.canonicalNameZh,
-    foodId: food.foodId,
+    observedName: unmatched ? food.canonicalNameZh : (candidate?.observedName || food.canonicalNameZh),
+    foodId: unmatched ? null : food.foodId,
     canonicalNameZh: food.canonicalNameZh,
     badge: food.canonicalNameZh.slice(0, 1),
     servedAmount: current?.servedAmount || '',
     consumedAmount: current?.consumedAmount || '',
     ratioPercent: current?.ratioPercent || 0,
     ratioAdjustedOrder: current?.ratioAdjustedOrder || 0,
-    source: candidate ? 'AI_CANDIDATE' : 'SEARCH',
+    source: unmatched ? 'MANUAL' : (candidate ? 'AI_CANDIDATE' : 'SEARCH'),
+    unmatched,
+    matchReason: unmatched ? 'NO_MATCH_NO_NUTRITION' : undefined,
   }
 }
 
@@ -193,7 +198,7 @@ Page({
     accepted: false, retentionIndex: 0, retentionOptions,
     result: null as RecognitionResult | null,
     foods: [] as Array<{ badge: string; name: string; details: string; uncertainty: string; tone: string; index: number; mappedName: string }>,
-    query: '', searchResults: [] as FoodResult[], pendingCandidateIndex: -1,
+    query: '', searchResults: [] as FoodResult[], pendingCandidateIndex: -1, searchCursor: '', searchHasMore: false, searchingMore: false,
     confirmedFoods: [] as ConfirmedFoodItem[],
     mealTotalAmount: '200', ...weightPresentation('200'), weightBubbleVisible: false, weightTicks,
     ratioTotal: 0, ratioAdjustmentSequence: 0,
@@ -375,23 +380,35 @@ Page({
   async searchFood(): Promise<void> {
     const query = this.data.query.trim()
     if (!query) { wx.showToast({ title: '请输入食品名称', icon: 'none' }); return }
-    this.setData({ busy: true })
+    this.setData({ busy: true, searchCursor: '', searchHasMore: false })
     try {
-      const response = await request<{ items: FoodResult[] }>(`/foods/search?q=${encodeURIComponent(query)}&limit=8`)
+      const response = await request<{ items: FoodResult[]; nextCursor: string | null; hasMore: boolean }>(`/foods/search?q=${encodeURIComponent(query)}&limit=15`)
       const searchResults = response.items || []
-      this.setData({ searchResults,searchMessage:searchResults.length?'':this.data.reviewLabel?'当前隔离食品库只有构造样例食品1、2，不含鸡蛋等真实食品；可搜索下方样例。':'没有找到匹配的标准食品，请换用食品全名或核对生熟状态。' })
-      if (!searchResults.length) { wx.showToast({ title: this.data.reviewLabel?'隔离食品库暂无此食品':'没有找到标准食品', icon: 'none' }); return }
-      wx.showActionSheet({
-        itemList: searchResults.map((item) => item.canonicalNameZh).slice(0, 6),
-        success: ({ tapIndex }) => {
-          const selected = searchResults[tapIndex]
-          if (selected) this.selectFood(selected)
-        },
-      })
+      this.setData({ searchResults, searchCursor: response.nextCursor || '', searchHasMore: response.hasMore,
+        searchMessage: searchResults.length ? '' : '没有找到匹配的标准食品。可在下方按名称记录（暂无营养资料）。' })
     } catch (caught) {
       const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '食品搜索失败'
-      wx.showToast({ title: message, icon: 'none' })
+      this.setData({ searchResults: [], searchMessage: message })
     } finally { this.setData({ busy: false }) }
+  },
+
+  async loadMoreSearch(): Promise<void> {
+    if (this.data.busy || this.data.searchingMore || !this.data.searchHasMore || !this.data.searchCursor) return
+    this.setData({ searchingMore: true })
+    try {
+      const response = await request<{ items: FoodResult[]; nextCursor: string | null; hasMore: boolean }>(`/foods/search?q=${encodeURIComponent(this.data.query.trim())}&limit=15&cursor=${encodeURIComponent(this.data.searchCursor)}`)
+      const seen = new Set(this.data.searchResults.map((item) => item.foodId))
+      this.setData({ searchResults: [...this.data.searchResults, ...response.items.filter((item) => !seen.has(item.foodId))],
+        searchCursor: response.nextCursor || '', searchHasMore: response.hasMore })
+    } catch (caught) {
+      wx.showToast({ title: caught instanceof Error ? caught.message : '加载更多失败', icon: 'none' })
+    } finally { this.setData({ searchingMore: false }) }
+  },
+
+  chooseUnmatched(): void {
+    const name = this.data.query.trim()
+    if (!name) { wx.showToast({ title: '请先输入食品名称', icon: 'none' }); return }
+    this.selectFood({ foodId: '', canonicalNameZh: name, foodForm: null, processingMethod: null }, this.data.pendingCandidateIndex, true)
   },
 
   async autoMapCandidates(items: RecognitionItem[]): Promise<void> {
@@ -415,6 +432,12 @@ Page({
       confirmedFoods, foods, pendingCandidateIndex: -1, scrollIntoView: 'confirm-section',
       ratioTotal: ratioTotal(confirmedFoods),
     })
+  },
+
+  onSearchResultTap(event: WechatMiniprogram.TouchEvent): void {
+    const index = Number(event.currentTarget.dataset.index)
+    const selected = this.data.searchResults[index]
+    if (selected) this.selectFood(selected)
   },
 
   selectFood(food: FoodResult, candidateIndexOverride?: number, shouldScroll = true) {
@@ -448,7 +471,9 @@ Page({
   },
 
   async calculate(): Promise<CalculationResult | null> {
-    const items = this.data.confirmedFoods.map((item) => ({ foodId: item.foodId, amount: item.consumedAmount.trim(), unit: 'g' }))
+    // 按名称记录的条目无营养事实，页内预览仅计算标准食品部分；保存后的报告由服务端正确计入分母。
+    const items = this.data.confirmedFoods.filter((item) => !item.unmatched)
+      .map((item) => ({ foodId: item.foodId, amount: item.consumedAmount.trim(), unit: 'g' }))
     if (!items.length || items.some((item) => !/^\d+(?:\.\d{1,6})?$/.test(item.amount) || Number(item.amount) <= 0)) return null
     const calculation = await request<CalculationResult>('/nutrition/calculate', {
       method: 'POST', data: { items, targetScopeVersion: 'core-13-v1' },
@@ -503,10 +528,12 @@ Page({
       const operations: Array<{ scope: string; operationId: unknown }> = []
       for (const food of foods) {
         const scope = `add-meal-item:${mealId}:${food.localId}`
-        const base: Record<string, unknown> = {
-          foodId: food.foodId, observedName: food.observedName, consumedAmount: food.consumedAmount.trim(),
-          source: food.source, status: 'CONFIRMED', weightOrigin: 'USER_ACCEPTED_ESTIMATE',
-        }
+        const base: Record<string, unknown> = food.unmatched
+          ? { observedName: food.observedName, consumedAmount: food.consumedAmount.trim(), source: food.source,
+              status: 'CONFIRMED', weightOrigin: 'USER_ACCEPTED_ESTIMATE', matchStatus: 'UNMATCHED',
+              matchReason: food.matchReason || 'NO_MATCH_NO_NUTRITION' }
+          : { foodId: food.foodId, observedName: food.observedName, consumedAmount: food.consumedAmount.trim(),
+              source: food.source, status: 'CONFIRMED', weightOrigin: 'USER_ACCEPTED_ESTIMATE' }
         if (food.servedAmount.trim()) base.servedAmount = food.servedAmount.trim()
         const payload = getPendingOperation(scope) || operationPayload(scope, base)
         await request(`/meals/${mealId}/items`, { method: 'POST', data: payload })

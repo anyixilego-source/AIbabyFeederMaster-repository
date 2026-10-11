@@ -15,7 +15,7 @@ Page({
     visibleObservations:[] as NonNullable<AssessmentReport['result']['observations']>,allActions:[] as NonNullable<AssessmentReport['result']['actions']>,actions:[] as NonNullable<AssessmentReport['result']['actions']>,
     knowledge:[] as NonNullable<AssessmentReport['result']['knowledge']>['claims'],visibleKnowledge:[] as NonNullable<AssessmentReport['result']['knowledge']>['claims'],
     knowledgeScope:'',limitations:[] as Array<NonNullable<AssessmentReport['result']['limitations']>[number]&{reasonText:string}>,limitCount:0,
-    currentRecordSummary:'',selectedReportId:'',reportId:'',generatedAt:'',evaluationVersion:'',knowledgeVersion:'',supersedesReportId:'',snapshotAvailable:false,legacyReport:false },
+    currentRecordSummary:'',selectedReportId:'',reportId:'',generatedAt:'',evaluationVersion:'',knowledgeVersion:'',supersedesReportId:'',snapshotAvailable:false,legacyReport:false,milkLine:'',milkCount:0 },
   _loadSequence:0,_scroll:0,_loaded:false,_epoch:0,
   onPageScroll(e:{scrollTop:number}){this._scroll=e.scrollTop},
   onLoad(query:Record<string,string>){this._loaded=false;this.setData({selectedReportId:decodeURIComponent(query.reportId || ''),selectedDate:query.date || '',fromRecords:query.fromRecords==='1',fromPeriod:query.fromPeriod==='1'})},
@@ -33,6 +33,16 @@ Page({
       const bundle=await loadReportBundle(active.subjectId,true,this.data.selectedReportId,this.data.selectedDate)
       if(sequence!==this._loadSequence)return
       const result=bundle.report.result,observations=(result.observations || []).map(o=>({...o,text:(nutrientNames[o.nutrientCode] || '营养素')+'：'+o.text})),knowledge=result.knowledge?.claims || []
+      const milk = (result as { milk?: { summary: { feedCount: number; knownVolumeMl: string | null; unknownVolumeEventCount: number; estimatedVolumeRecordCount: number } } }).milk
+      const milkSummary = milk?.summary
+      const milkLine = milkSummary && milkSummary.feedCount > 0
+        ? (milkSummary.knownVolumeMl !== null
+            ? (milkSummary.estimatedVolumeRecordCount > 0 ? '约' : '') + String(milkSummary.knownVolumeMl) + '毫升'
+            : milkSummary.unknownVolumeEventCount + '次未记录奶量')
+          + ' · ' + milkSummary.feedCount + '次'
+          + (milkSummary.unknownVolumeEventCount > 0 && milkSummary.knownVolumeMl !== null ? '（含' + milkSummary.unknownVolumeEventCount + '次未记录）' : '')
+        : ''
+      const milkCount = milkSummary?.feedCount ?? 0
       const legacyReport = !bundle.snapshotAvailable
       const failedMessage = bundle.updateState === 'FAILED' ? '记录已保存，报告暂未更新；正在展示上次结果，尚未包含最新修改。' : ''
       const compatibilityMessage = legacyReport ? this.data.selectedReportId
@@ -44,7 +54,7 @@ Page({
         allActions:result.actions || [],actions:this.data.showActions?(result.actions || []):(result.actions || []).slice(0,2),actionCount:(result.actions || []).length,knowledge:knowledge,knowledgeCount:knowledge.length,...knowledgePanel(knowledge,this.data.showKnowledge,this.data.showKnowledgeSources),knowledgeScope:result.knowledge?.scopeDeclaration || '',
         limitations:(result.limitations || []).map(l=>({...l,text:(nutrientNames[l.nutrientCode] || '营养素')+'：'+explanationSentence(l.text),reasonText:limitationReason(l.reasonCodes)})),limitCount:new Set((result.limitations || []).map(l=>l.nutrientCode)).size,
         reportId:bundle.report.reportId,generatedAt:new Date(bundle.report.generatedAt).toLocaleString('zh-CN'),evaluationVersion:result.assessment.assessmentAlgorithmVersion || '历史版本',
-        knowledgeVersion:result.knowledge?.version || '历史知识未保存',supersedesReportId:bundle.report.supersedesReportId || '',snapshotAvailable:bundle.snapshotAvailable})
+        knowledgeVersion:result.knowledge?.version || '历史知识未保存',supersedesReportId:bundle.report.supersedesReportId || '',snapshotAvailable:bundle.snapshotAvailable,milkLine:milkLine,milkCount:milkCount})
       this._loaded=true;this._epoch=Number(wx.getStorageSync('foodmaster.recordEpoch') || 0)
       if(bundle.updateState==='FAILED'&&!this.data.selectedReportId)void this.loadCurrentRecords(sequence,bundle.date)
       if(bundle.updateState==='CURRENT')wx.removeStorageSync('foodmaster.reportNeedsRefresh')
