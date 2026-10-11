@@ -2,6 +2,7 @@
 <scroll-view class="profile-scroll" scroll-y enhanced show-scrollbar="{{false}}"><view wx:if="{{reviewLabel}}" style="margin:20rpx;padding:18rpx;background:#fff0cc;color:#82600f;border-radius:15rpx;font-size:23rpx">{{reviewLabel}} · 请只录入合成测试数据</view><view class="page-shell profile-page">
   <view wx:if="{{errorMessage}}" class="profile-tip"><text>档案暂时无法加载：{{errorMessage}}</text><button bindtap="load">重新加载</button></view>
   <view class="profile-hero ui-card"><view class="avatar-wrap"><image src="/assets/baby-avatar-v2.jpg" mode="aspectFill"></image></view><view class="profile-main"><view class="name-line"><text>{{name}}</text><text class="girl-tag">{{sexText}}</text></view><view class="birth-line"><text>{{ageText}}</text><text wx:if="{{birthDate}}">{{birthDate}}出生</text></view></view></view>
+  <view wx:if="{{!subjectId && !loading && !errorMessage}}" class="profile-tip ui-card"><text>还没有宝宝档案，先创建一个吧。填写昵称与出生日期后即可开始记录。</text><button bindtap="openCreateProfile">创建宝宝档案</button></view>
   <view class="profile-tip"><view class="bulb"></view><text class="tip-lead">档案说明：</text><text class="tip-body">当前支持昵称、出生日期和性别；尚未接入的健康资料不会伪装为已保存。</text></view>
   <view class="info-card ui-card"><text class="section-title">宝宝信息</text><view class="info-row {{item.editable ? 'editable' : ''}}" wx:for="{{basic}}" wx:key="label" bindtap="editItem" data-label="{{item.label}}" data-editable="{{item.editable}}"><view class="row-badge {{item.tone}}">{{item.badge}}</view><text class="row-label">{{item.label}}</text><text class="row-value">{{item.value}}</text><view wx:if="{{item.editable}}" class="chevron"></view></view></view>
   <view class="info-card ui-card"><text class="section-title">健康信息</text><view class="info-row {{item.editable ? 'editable' : ''}}" wx:for="{{health}}" wx:key="label" bindtap="editItem" data-label="{{item.label}}" data-editable="{{item.editable}}"><view class="row-badge {{item.tone}}">{{item.badge}}</view><text class="row-label">{{item.label}}</text><text class="row-value {{item.good ? 'good' : ''}}">{{item.value}}</text><view wx:if="{{item.editable}}" class="chevron"></view></view></view>
@@ -14,7 +15,7 @@
 </view></scroll-view>
 <app-tabbar id="main-tabbar" active="profile" showCamera="{{true}}"></app-tabbar>
 <view wx:if="{{editing}}" class="edit-mask" bindtap="closeEdit"><view class="edit-sheet" catchtap="stopPropagation">
-  <view class="edit-title"><text>编辑宝宝档案</text><text bindtap="closeEdit">取消</text></view>
+  <view class="edit-title"><text>{{subjectId ? '编辑宝宝档案' : '创建宝宝档案'}}</text><text bindtap="closeEdit">取消</text></view>
   <view class="edit-field"><text>宝宝昵称</text><input maxlength="50" value="{{draftName}}" bindinput="onNameInput" placeholder="请输入昵称"></input></view>
   <picker mode="date" end="{{todayDate}}" value="{{draftBirthDate}}" bindchange="onBirthDateChange"><view class="edit-field"><text>出生日期</text><text class="field-value">{{draftBirthDate || '请选择'}}</text></view></picker>
   <picker range="{{sexOptions}}" range-key="label" value="{{draftSexIndex}}" bindchange="onSexChange"><view class="edit-field"><text>性别</text><text class="field-value">{{sexOptions[draftSexIndex].label}}</text></view></picker>

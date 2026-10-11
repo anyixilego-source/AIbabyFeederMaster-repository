@@ -35,6 +35,7 @@ Page({
   onShow() { if(ensureHomeParent(this))return;void this.load() },
   onHide() { ++this._loadSequence },
 
+  openCreateProfile() { this.setData({ editing: true, draftName: '宝宝', draftBirthDate: '', draftSexIndex: 2 }) },
   clearProfile() {
     this.setData({ subjectId: '', name: '宝宝', sexText: '未设置', birthDate: '', ageText: '', basic: [], health: [], editing: false, draftName: '', draftBirthDate: '', draftSexIndex: 2 })
   },
@@ -49,7 +50,11 @@ Page({
       const active = await (ready || ensureSessionContext())
       if (!isCurrent()) return
       void this.loadFeedbackAccess(sequence, ready)
-      if (!active.subjectId) return
+      if (!active.subjectId) {
+        // 第一批：无宝宝档案时自动弹出创建表单（我的页首动作即建档），并提供可见入口。
+        this.setData({ loading: false, editing: true, draftName: '宝宝', draftBirthDate: '', draftSexIndex: 2 })
+        return
+      }
       const [subject, avoidances] = await Promise.all([
         request<SubjectSummary>(`/subjects/${active.subjectId}`),
         active.householdId ? request<Avoidance[]>(`/households/${active.householdId}/food-avoidances`) : Promise.resolve([]),

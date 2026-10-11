@@ -300,6 +300,7 @@ Page({
     void this.loadMeals()
   },
   retryLoad() { void this.loadMeals() },
+  goCreateProfile() { wx.switchTab({ url: '/pages/profile/profile' }) },
   openMeal(event: WechatMiniprogram.TouchEvent) {
     const mealId = String(event.currentTarget.dataset.mealId)
     this.setData({ selectedMeal: this.data.meals.find((meal) => meal.mealId === mealId) || null })
