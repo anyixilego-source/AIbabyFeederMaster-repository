@@ -122,7 +122,7 @@ function refreshSession(refreshToken: string): Promise<AuthSession> {
 export async function request<T>(path: string, options: RequestOptions = {}, retried = false): Promise<T> {
   try {
     const response = await rawRequest<T>(path, options)
-    if (options.method && options.method !== 'GET' && (/^\/meals\//.test(path) || /^\/subjects\/[^/]+$/.test(path))) wx.setStorageSync('foodmaster.recordEpoch', Number(wx.getStorageSync('foodmaster.recordEpoch') || 0) + 1)
+    if (options.method && options.method !== 'GET') wx.setStorageSync('foodmaster.recordEpoch', Number(wx.getStorageSync('foodmaster.recordEpoch') || 0) + 1)
     return response
   } catch (caught) {
     const error = caught instanceof ApiError ? caught : new ApiError('网络请求失败', 0, caught)
@@ -139,7 +139,7 @@ export async function request<T>(path: string, options: RequestOptions = {}, ret
         throw error
       }
       const current = getAuth()
-      if (!current || current.refreshToken !== auth.refreshToken) throw error
+      if (!current) { error.authExpired = true; throw error }
       setAuth(refreshed)
       return request<T>(path, options, true)
     }

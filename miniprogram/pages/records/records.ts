@@ -100,7 +100,7 @@ Page({
     milkItems: [] as Array<{ milkRecordId: string; time: string; typeLabel: string; volumeLabel: string }>,
     milkExpanded: false,
     milkTypes: milkTypeLabels,
-    milkPanel: { visible: false, mode: 'create', recordId: '', revisionToken: '', recordDate: dateOnly(new Date()), time: '08:00', milkTypeIndex: 0, volume: '', about: false, saving: false, deleting: false },
+    milkPanel: { visible: false, mode: 'create', recordId: '', revisionToken: '', recordDate: dateOnly(new Date()), time: '08:00', milkTypeIndex: 0, volume: '', about: false, saving: false, deleting: false, operationId: '' },
   },
 
   onLoad(query: Record<string, string>) {
@@ -211,7 +211,7 @@ Page({
     const time = this.data.selectedDate === this.data.todayDate
       ? `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
       : '08:00'
-    this.setData({ milkPanel: { visible: true, mode: 'create', recordId: '', revisionToken: '', recordDate: this.data.selectedDate, time, milkTypeIndex: 0, volume: '', about: false, saving: false, deleting: false } })
+    this.setData({ milkPanel: { visible: true, mode: 'create', recordId: '', revisionToken: '', recordDate: this.data.selectedDate, time, milkTypeIndex: 0, volume: '', about: false, saving: false, deleting: false, operationId: operationId() } })
   },
   openMilkEdit(event: WechatMiniprogram.TouchEvent) {
     const recordId = String(event.currentTarget.dataset.id)
@@ -220,7 +220,7 @@ Page({
     const at = new Date(row.occurredAt)
     const time = `${at.getHours().toString().padStart(2, '0')}:${at.getMinutes().toString().padStart(2, '0')}`
     const index = milkTypeLabels.findIndex((item) => item.key === row.milkType)
-    this.setData({ milkPanel: { visible: true, mode: 'edit', recordId, revisionToken: row.revisionToken, recordDate: this.data.selectedDate, time, milkTypeIndex: index < 0 ? 0 : index, volume: row.volumeMl === null ? '' : formatMl(row.volumeMl), about: row.volumeOrigin === 'USER_ACCEPTED_ESTIMATE', saving: false, deleting: false } })
+    this.setData({ milkPanel: { visible: true, mode: 'edit', recordId, revisionToken: row.revisionToken, recordDate: this.data.selectedDate, time, milkTypeIndex: index < 0 ? 0 : index, volume: row.volumeMl === null ? '' : formatMl(row.volumeMl), about: row.volumeOrigin === 'USER_ACCEPTED_ESTIMATE', saving: false, deleting: false, operationId: operationId() } })
   },
   closeMilkPanel() { if (this.data.milkPanel.saving) return; this.setData({ 'milkPanel.visible': false }) },
   setMilkType(event: WechatMiniprogram.TouchEvent) { this.setData({ 'milkPanel.milkTypeIndex': Number(event.currentTarget.dataset.index) }) },
@@ -245,9 +245,9 @@ Page({
     try {
       if (panel.mode === 'create') {
         const active = await context()
-        var response = await request<{ reportUpdate?: { status?: string } }>(`/subjects/${active.subjectId}/milk-records`, { method: 'POST', data: { operationId: operationId(), ...body } })
+        var response = await request<{ reportUpdate?: { status?: string } }>(`/subjects/${active.subjectId}/milk-records`, { method: 'POST', data: { operationId: panel.operationId || operationId(), ...body } })
       } else {
-        var response = await request<{ reportUpdate?: { status?: string } }>(`/milk-records/${panel.recordId}`, { method: 'PATCH', data: { operationId: operationId(), expectedRevision: panel.revisionToken, ...body } })
+        var response = await request<{ reportUpdate?: { status?: string } }>(`/milk-records/${panel.recordId}`, { method: 'PATCH', data: { operationId: panel.operationId || operationId(), expectedRevision: panel.revisionToken, ...body } })
       }
       this.setData({ 'milkPanel.visible': false, saved: true, savedAction: panel.mode === 'create' ? '奶量已记录' : '奶量已修改', reportUpdateState: String(response.reportUpdate?.status || '') })
       await this.loadMilk()
