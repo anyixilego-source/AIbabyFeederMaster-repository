@@ -29,7 +29,8 @@
     "condition": false,
     "compileWorklet": false,
     "disableUseStrict": false,
-    "minifyWXML": true
+    "minifyWXML": true,
+    "urlCheck": false
   },
   "simulatorType": "wechat",
   "simulatorPluginLibVersion": {},
