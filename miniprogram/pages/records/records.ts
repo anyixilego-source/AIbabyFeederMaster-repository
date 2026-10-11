@@ -226,7 +226,7 @@ Page({
   setMilkType(event: WechatMiniprogram.TouchEvent) { this.setData({ 'milkPanel.milkTypeIndex': Number(event.currentTarget.dataset.index) }) },
   milkTimeChange(event: WechatMiniprogram.PickerChange) { this.setData({ 'milkPanel.time': String(event.detail.value) }) },
   milkVolumeInput(event: WechatMiniprogram.Input) { this.setData({ 'milkPanel.volume': event.detail.value }) },
-  milkAboutChange(event: WechatMiniprogram.CheckBoxChange) { this.setData({ 'milkPanel.about': event.detail.value.includes('about') }) },
+  milkAboutChange(event: { detail: { value: string[] } }) { this.setData({ 'milkPanel.about': event.detail.value.includes('about') }) },
   async saveMilkRecord() {
     const panel = this.data.milkPanel
     if (panel.saving) return
