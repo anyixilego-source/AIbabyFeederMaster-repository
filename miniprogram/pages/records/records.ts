@@ -245,11 +245,11 @@ Page({
     try {
       if (panel.mode === 'create') {
         const active = await context()
-        await request(`/subjects/${active.subjectId}/milk-records`, { method: 'POST', data: { operationId: operationId(), ...body } })
+        var response = await request<{ reportUpdate?: { status?: string } }>(`/subjects/${active.subjectId}/milk-records`, { method: 'POST', data: { operationId: operationId(), ...body } })
       } else {
-        await request(`/milk-records/${panel.recordId}`, { method: 'PATCH', data: { operationId: operationId(), expectedRevision: panel.revisionToken, ...body } })
+        var response = await request<{ reportUpdate?: { status?: string } }>(`/milk-records/${panel.recordId}`, { method: 'PATCH', data: { operationId: operationId(), expectedRevision: panel.revisionToken, ...body } })
       }
-      this.setData({ 'milkPanel.visible': false, saved: true, savedAction: panel.mode === 'create' ? '奶量已记录' : '奶量已修改', reportUpdateState: String(wx.getStorageSync('foodmaster.reportUpdateState')) })
+      this.setData({ 'milkPanel.visible': false, saved: true, savedAction: panel.mode === 'create' ? '奶量已记录' : '奶量已修改', reportUpdateState: String(response.reportUpdate?.status || '') })
       await this.loadMilk()
     } catch (caught) {
       const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '奶量保存失败'
@@ -264,8 +264,8 @@ Page({
     if (!confirmed) return
     this.setData({ 'milkPanel.deleting': true })
     try {
-      await request(`/milk-records/${panel.recordId}`, { method: 'DELETE', data: { operationId: operationId(), expectedRevision: panel.revisionToken } })
-      this.setData({ 'milkPanel.visible': false, saved: true, savedAction: '奶量已删除' })
+      const response = await request<{ reportUpdate?: { status?: string } }>(`/milk-records/${panel.recordId}`, { method: 'DELETE', data: { operationId: operationId(), expectedRevision: panel.revisionToken } })
+      this.setData({ 'milkPanel.visible': false, saved: true, savedAction: '奶量已删除', reportUpdateState: String(response.reportUpdate?.status || '') })
       await this.loadMilk()
     } catch (caught) {
       const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '删除失败'
