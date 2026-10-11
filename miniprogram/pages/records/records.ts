@@ -57,12 +57,50 @@ async function context(): Promise<SessionContext> {
   return app.globalData.ready || ensureSessionContext()
 }
 
+// 第一批方案 §7.4/§7.6：紧凑奶量卡片——已知奶量+次数、未知事件另写、不显示 0ml 冒充已知。
+interface MilkRow {
+  milkRecordId: string
+  occurredAt: string
+  milkType: 'FORMULA' | 'LIQUID_MILK' | 'EXPRESSED_BREAST_MILK' | 'DIRECT_BREASTFEEDING'
+  quantityMode: 'KNOWN_VOLUME' | 'EVENT_ONLY'
+  volumeMl: string | null
+  volumeOrigin: string
+  revisionToken: string
+  revision: number
+}
+interface MilkSummary {
+  feedCount: number
+  knownVolumeMl: string | null
+  unknownVolumeEventCount: number
+  estimatedVolumeRecordCount: number
+}
+const milkTypeLabels: Array<{ key: MilkRow['milkType']; label: string }> = [
+  { key: 'FORMULA', label: '配方奶' },
+  { key: 'LIQUID_MILK', label: '液态奶' },
+  { key: 'EXPRESSED_BREAST_MILK', label: '瓶喂母乳' },
+  { key: 'DIRECT_BREASTFEEDING', label: '亲喂母乳' },
+]
+function formatMl(value: string | number | null): string {
+  if (value === null || value === '') return ''
+  const ml = Number(value)
+  if (!Number.isFinite(ml)) return ''
+  return ml % 1 === 0 ? ml.toFixed(0) : ml.toFixed(1)
+}
+function milkTypeLabel(key: string): string {
+  return milkTypeLabels.find((item) => item.key === key)?.label ?? '奶类'
+}
+
 Page({
   data: { reviewLabel:wx.getSystemInfoSync().platform==='devtools'?(wx.getStorageSync('foodmaster.reviewEnvironment')?.label || ''):'',
     recordsScrollTop:0,savedAction:'本餐已保存', deleting:false, editing:false, showCalendar:false, reportUpdateState: '', saved: false, loading: false, errorMessage: '', selectedDate: dateOnly(new Date()), selectedDateLabel: '', todayDate: dateOnly(new Date()),
     dates: datesAround(dateOnly(new Date())),
     meals: [] as DisplayMeal[], selectedMeal: null as DisplayMeal | null,
     confirmedCount: 0, consumedTotal: '0',
+    milkTitle: '今日奶量', milkMain: '奶量未知', milkSub: '', milkHasRecords: false,
+    milkItems: [] as Array<{ milkRecordId: string; time: string; typeLabel: string; volumeLabel: string }>,
+    milkExpanded: false,
+    milkTypes: milkTypeLabels,
+    milkPanel: { visible: false, mode: 'create', recordId: '', revisionToken: '', recordDate: dateOnly(new Date()), time: '08:00', milkTypeIndex: 0, volume: '', about: false, saving: false, deleting: false },
   },
 
   onLoad(query: Record<string, string>) {
@@ -79,6 +117,7 @@ Page({
   _scrollTop:0,
   onRecordsScroll(e:WechatMiniprogram.CustomEvent<{scrollTop:number}>){if(!this.data.loading)this._scrollTop=e.detail.scrollTop},
   _details:new Map<string,SavedMeal>(),_deletePending:null as {mealId:string;operationId:string;expectedRevision:string}|null, _loadSequence:0,
+  _milkSequence:0,_milkRecords:[] as MilkRow[],
   async loadMeals() {
     const sequence=++this._loadSequence,selectedKey=this.data.selectedDate
     this.setData({ loading: true, errorMessage: '' })
@@ -122,6 +161,7 @@ Page({
         confirmedCount: details.length,
         consumedTotal: (hasEstimated?'约':'')+formatGrams(consumedTotal),
       })
+      await this.loadMilk()
     } catch (caught) {
       if(sequence!==this._loadSequence)return
       const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '记录加载失败'
@@ -130,6 +170,109 @@ Page({
     } finally { if(sequence===this._loadSequence)this.setData({ loading: false }) }
   },
 
+  async loadMilk() {
+    const sequence = ++this._milkSequence
+    try {
+      const active = await context()
+      if (!active.subjectId) return
+      const page = await request<{ summary: MilkSummary; items: MilkRow[] }>(`/subjects/${active.subjectId}/milk-records?date=${encodeURIComponent(this.data.selectedDate)}`)
+      if (sequence !== this._milkSequence) return
+      const { summary, items } = page
+      this._milkRecords = items
+      const estimated = summary.estimatedVolumeRecordCount > 0
+      let main = '奶量未知'
+      let sub = ''
+      if (summary.knownVolumeMl !== null) {
+        main = `${estimated ? '约' : ''}${formatMl(summary.knownVolumeMl)}毫升 · ${summary.feedCount}次`
+        if (summary.unknownVolumeEventCount > 0) sub = `含${summary.unknownVolumeEventCount}次未记录奶量`
+      } else if (summary.feedCount > 0) {
+        main = `含${summary.feedCount}次未记录奶量`
+      }
+      this.setData({
+        milkTitle: this.data.selectedDate === this.data.todayDate ? '今日奶量' : '当日奶量',
+        milkMain: main, milkSub: sub, milkHasRecords: summary.feedCount > 0,
+        milkItems: items.map((row) => {
+          const at = new Date(row.occurredAt)
+          const time = `${at.getHours().toString().padStart(2, '0')}:${at.getMinutes().toString().padStart(2, '0')}`
+          const volumeLabel = row.quantityMode === 'EVENT_ONLY' ? '奶量未知' : `${row.volumeOrigin === 'USER_ACCEPTED_ESTIMATE' ? '约' : ''}${formatMl(row.volumeMl)}毫升`
+          return { milkRecordId: row.milkRecordId, time, typeLabel: milkTypeLabel(row.milkType), volumeLabel }
+        }),
+      })
+    } catch (caught) {
+      if (sequence !== this._milkSequence) return
+      const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '奶量读取失败'
+      wx.showToast({ title: message, icon: 'none' })
+    }
+  },
+  toggleMilkExpand() { this.setData({ milkExpanded: !this.data.milkExpanded }) },
+  openMilkCreate() {
+    if (this.data.loading) return
+    const now = new Date()
+    const time = this.data.selectedDate === this.data.todayDate
+      ? `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+      : '08:00'
+    this.setData({ milkPanel: { visible: true, mode: 'create', recordId: '', revisionToken: '', recordDate: this.data.selectedDate, time, milkTypeIndex: 0, volume: '', about: false, saving: false, deleting: false } })
+  },
+  openMilkEdit(event: WechatMiniprogram.TouchEvent) {
+    const recordId = String(event.currentTarget.dataset.id)
+    const row = this._milkRecords.find((item) => item.milkRecordId === recordId)
+    if (!row) return
+    const at = new Date(row.occurredAt)
+    const time = `${at.getHours().toString().padStart(2, '0')}:${at.getMinutes().toString().padStart(2, '0')}`
+    const index = milkTypeLabels.findIndex((item) => item.key === row.milkType)
+    this.setData({ milkPanel: { visible: true, mode: 'edit', recordId, revisionToken: row.revisionToken, recordDate: this.data.selectedDate, time, milkTypeIndex: index < 0 ? 0 : index, volume: row.volumeMl === null ? '' : formatMl(row.volumeMl), about: row.volumeOrigin === 'USER_ACCEPTED_ESTIMATE', saving: false, deleting: false } })
+  },
+  closeMilkPanel() { if (this.data.milkPanel.saving) return; this.setData({ 'milkPanel.visible': false }) },
+  setMilkType(event: WechatMiniprogram.TouchEvent) { this.setData({ 'milkPanel.milkTypeIndex': Number(event.currentTarget.dataset.index) }) },
+  milkTimeChange(event: WechatMiniprogram.PickerChange) { this.setData({ 'milkPanel.time': String(event.detail.value) }) },
+  milkVolumeInput(event: WechatMiniprogram.Input) { this.setData({ 'milkPanel.volume': event.detail.value }) },
+  milkAboutChange(event: WechatMiniprogram.CheckBoxChange) { this.setData({ 'milkPanel.about': event.detail.value.includes('about') }) },
+  async saveMilkRecord() {
+    const panel = this.data.milkPanel
+    if (panel.saving) return
+    const milkType = milkTypeLabels[panel.milkTypeIndex]!.key
+    const volume = panel.volume.trim()
+    const isDirect = milkType === 'DIRECT_BREASTFEEDING'
+    if (!isDirect && !volume) { wx.showToast({ title: '请填写实际喝下的奶量（毫升）', icon: 'none' }); return }
+    if (volume && !/^\d+(\.\d)?$/.test(volume)) { wx.showToast({ title: '奶量只支持整数或1位小数（毫升）', icon: 'none' }); return }
+    if (!/^\d{2}:\d{2}$/.test(panel.time)) { wx.showToast({ title: '请选择时间', icon: 'none' }); return }
+    const occurredAt = `${panel.recordDate}T${panel.time}:00+08:00`
+    const body: Record<string, unknown> = {
+      occurredAt, recordDate: panel.recordDate, milkType,
+      ...(isDirect && volume === '' ? {} : { volumeMl: volume, volumeOrigin: panel.about ? 'USER_ACCEPTED_ESTIMATE' : 'UNKNOWN_METHOD' }),
+    }
+    this.setData({ 'milkPanel.saving': true })
+    try {
+      if (panel.mode === 'create') {
+        const active = await context()
+        await request(`/subjects/${active.subjectId}/milk-records`, { method: 'POST', data: { operationId: operationId(), ...body } })
+      } else {
+        await request(`/milk-records/${panel.recordId}`, { method: 'PATCH', data: { operationId: operationId(), expectedRevision: panel.revisionToken, ...body } })
+      }
+      this.setData({ 'milkPanel.visible': false, saved: true, savedAction: panel.mode === 'create' ? '奶量已记录' : '奶量已修改', reportUpdateState: String(wx.getStorageSync('foodmaster.reportUpdateState')) })
+      await this.loadMilk()
+    } catch (caught) {
+      const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '奶量保存失败'
+      wx.showToast({ title: message, icon: 'none' })
+      if (caught instanceof ApiError && caught.statusCode === 409) { this.setData({ 'milkPanel.visible': false }); await this.loadMilk() }
+    } finally { this.setData({ 'milkPanel.saving': false }) }
+  },
+  async deleteMilkRecord() {
+    const panel = this.data.milkPanel
+    if (panel.mode !== 'edit' || panel.deleting) return
+    const confirmed = await new Promise<boolean>((resolve) => wx.showModal({ title: '删除这条奶量记录', content: '删除后这条记录不再出现在汇总与明细中。', success: (result) => resolve(!!result.confirm), fail: () => resolve(false) }))
+    if (!confirmed) return
+    this.setData({ 'milkPanel.deleting': true })
+    try {
+      await request(`/milk-records/${panel.recordId}`, { method: 'DELETE', data: { operationId: operationId(), expectedRevision: panel.revisionToken } })
+      this.setData({ 'milkPanel.visible': false, saved: true, savedAction: '奶量已删除' })
+      await this.loadMilk()
+    } catch (caught) {
+      const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '删除失败'
+      wx.showToast({ title: message, icon: 'none' })
+      if (caught instanceof ApiError && caught.statusCode === 409) { this.setData({ 'milkPanel.visible': false }); await this.loadMilk() }
+    } finally { this.setData({ 'milkPanel.deleting': false }) }
+  },
   openCalendar(){this.setData({showCalendar:true})},
   closeCalendar(){this.setData({showCalendar:false})},
   goBack() { navigateRoot('/pages/index/index') },

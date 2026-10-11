@@ -46,3 +46,29 @@
 .detail-note { margin-top: 14rpx; padding: 14rpx 16rpx; border-radius: 16rpx; color: #817570; background: #fff3e9; font-size: 18rpx; }
 
 .detail-actions{display:flex;gap:20rpx;margin-top:20rpx}.detail-actions button{flex:1;min-height:88rpx;line-height:1.4;display:flex;align-items:center;justify-content:center;font-size:28rpx;border-radius:22rpx;background:#fff2ee;color:#e76770;margin:0;padding:16rpx}.detail-actions button::after{border:0}.detail-actions button:last-child{background:#fff8f4;color:#aa7772}
+
+/* 第一批：紧凑奶量卡片与录入面板（复用 ui-card/detail 体系，不另立视觉风格） */
+.milk-card { margin-bottom: 18rpx; }
+.milk-main { display: flex; align-items: center; justify-content: space-between; }
+.milk-title { font-size: 25rpx; color: #8a8078; }
+.milk-value-row { display: flex; align-items: baseline; gap: 12rpx; margin-top: 6rpx; }
+.milk-value { font-size: 34rpx; font-weight: 600; color: #2d2623; }
+.milk-sub { font-size: 22rpx; color: #b09a72; }
+.milk-add { margin: 0; padding: 0 22rpx; height: 56rpx; line-height: 56rpx; font-size: 24rpx; background: #f3ede4; color: #5c5347; border-radius: 28rpx; }
+.milk-expand { margin-top: 14rpx; font-size: 23rpx; color: #9a8f82; }
+.milk-list { margin-top: 8rpx; border-top: 1rpx solid #f0e9df; }
+.milk-row { display: flex; align-items: center; gap: 18rpx; padding: 16rpx 0; border-bottom: 1rpx solid #f6f1ea; }
+.milk-row-time { width: 90rpx; color: #6c6257; font-size: 25rpx; }
+.milk-row-type { flex: 1; color: #2d2623; font-size: 26rpx; }
+.milk-row-volume { color: #6c6257; font-size: 25rpx; }
+.milk-form { padding: 8rpx 0 18rpx; }
+.milk-field { display: flex; align-items: center; gap: 20rpx; padding: 16rpx 0; border-bottom: 1rpx solid #f6f1ea; }
+.milk-label { width: 220rpx; color: #8a8078; font-size: 25rpx; }
+.milk-static { color: #2d2623; font-size: 26rpx; }
+.milk-picker { color: #2d2623; font-size: 26rpx; padding: 8rpx 20rpx; background: #f6f1ea; border-radius: 12rpx; }
+.milk-types { display: flex; flex-wrap: wrap; gap: 12rpx; flex: 1; }
+.milk-type { padding: 10rpx 20rpx; border-radius: 24rpx; background: #f6f1ea; color: #6c6257; font-size: 24rpx; }
+.milk-type.active { background: #2d2623; color: #fff; }
+.milk-input { flex: 1; font-size: 26rpx; }
+.milk-about { display: flex; align-items: center; gap: 8rpx; font-size: 25rpx; color: #6c6257; }
+.milk-hint { display: block; margin-top: 14rpx; font-size: 22rpx; color: #b0a596; line-height: 1.5; }

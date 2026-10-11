@@ -128,14 +128,20 @@ export async function request<T>(path: string, options: RequestOptions = {}, ret
     const error = caught instanceof ApiError ? caught : new ApiError('网络请求失败', 0, caught)
     const auth = getAuth()
     if (!retried && error.statusCode === 401 && auth?.refreshToken && options.auth !== false) {
+      // 刷新与业务重试分开：刷新成功但重试业务请求 500/网络失败时不得清登录；
+      // 迟到的刷新结果只在会话仍是发起刷新的那个时才生效（第一批方案 §9）。
+      let refreshed: AuthSession
       try {
-        const refreshed = await refreshSession(auth.refreshToken)
-        setAuth(refreshed)
-        return request<T>(path, options, true)
+        refreshed = await refreshSession(auth.refreshToken)
       } catch {
         clearAuth()
         error.authExpired = true
+        throw error
       }
+      const current = getAuth()
+      if (!current || current.refreshToken !== auth.refreshToken) throw error
+      setAuth(refreshed)
+      return request<T>(path, options, true)
     }
     throw error
   }
