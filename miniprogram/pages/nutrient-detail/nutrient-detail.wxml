@@ -1,4 +1,4 @@
-<navigation-bar title="营养素详情" back="{{true}}" delta="{{0}}" bind:back="goBack" color="#171722" background="transparent"></navigation-bar>
+<navigation-bar title="营养素详情" back="{{true}}" delta="{{0}}" bind:back="goBack" color="#171722" background="transparent"><period-mode-switch id="period-mode" slot="right" active="DAY" disabled="{{loading}}" bindchange="changePeriodMode"/></navigation-bar>
 <view class="page-shell"><view wx:if="{{reviewLabel}}" class="review">{{reviewLabel}}</view>
 
   <view wx:if="{{errorMessage}}" class="error-card">{{errorMessage}}</view>
@@ -20,7 +20,7 @@
       </view>
       <view wx:if="{{foodCards.length}}" id="food-contribution-list" class="source-table">
         <view class="source-table-row source-table-head"><text>食物名称</text><text>记录重量</text><text>贡献占比</text></view>
-        <view wx:for="{{foodCards}}" wx:key="foodId" class="source-table-row {{item.calculable?'':'unavailable'}}">
+        <view wx:for="{{foodCards}}" wx:key="key" class="source-table-row {{item.calculable?'':'unavailable'}}">
           <view class="source-table-name"><text>{{item.name}}</text><text wx:if="{{item.calculable && item.hasMissing}}" class="food-note">部分可计算</text></view>
           <text class="source-table-weight">{{item.recordWeightText}}</text>
           <text class="source-table-percent {{item.percent===null?'unavailable':''}}">{{item.percentText}}</text>

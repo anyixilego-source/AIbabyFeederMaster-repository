@@ -17,7 +17,8 @@
     "pages/feedback/feedback",
     "pages/diet-menu/diet-menu",
     "pages/diet-favorites/diet-favorites",
-    "pages/feedback-management/feedback-management"
+    "pages/feedback-management/feedback-management",
+    "pages/milk-trend/milk-trend"
   ],
   "window": {
     "navigationBarTextStyle": "black",

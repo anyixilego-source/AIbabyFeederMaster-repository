@@ -14,7 +14,7 @@ async function context(): Promise<SessionContext> {
 
 Component({
   options: { pureDataPattern: /^_homeMenu/ },
-  data: { _homeMenuSequence: 0, _homeMenuVisible: false, _homeMenuTimer: 0, _homeMenuLatest: null as MenuLatest | null, reviewLabel:wx.getSystemInfoSync().platform==='devtools'?(wx.getStorageSync('foodmaster.reviewEnvironment')?.label || ''):'',
+  data: { _homeMenuSequence: 0, _homeMenuVisible: false, _homeMenuTimer: 0, _homeMenuLatest: null as MenuLatest | null, reviewLabel:wx.getSystemInfoSync().platform==='devtools'?(wx.getStorageSync('foodmaster.trial.reviewEnvironment')?.label || ''):'',
     homeScrollHeight: 0, homeMenuSubjectId: '', homeMenu: emptyHomeMenu('LOADING', '正在查看饮食搭配…', ''),
     loading: true, babyName: '宝宝', genderText: '', ageText: '', warnings: [] as string[],
     reportTitle: '今天还没有营养报告', reportDescription: '记录并确认实际摄入后生成营养参考',
@@ -111,7 +111,7 @@ Component({
         const todayKey = `${today.getFullYear()}-${`${today.getMonth() + 1}`.padStart(2, '0')}-${`${today.getDate()}`.padStart(2, '0')}`
         const savedReport = reports.find((item) => item.periodStart === todayKey)
         const report = savedReport ? suspendReportComparison(savedReport) : undefined
-        const reportNeedsRefresh = Boolean(wx.getStorageSync('foodmaster.reportNeedsRefresh'))
+        const reportNeedsRefresh = Boolean(wx.getStorageSync('foodmaster.trial.reportNeedsRefresh'))
         const legacyReport = Boolean(report && !report.result.evidence)
         const assessment = report?.result.assessment
         const nutrients = (assessment?.nutrients || []).map(item => { const view=nutrientView(item,[]);return {name:view.name,value:0,state:view.statusText,color:'#817570',warn:false,nutrientCode:item.nutrientCode} })

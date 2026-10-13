@@ -1,4 +1,4 @@
-const IMAGE_RETENTION_KEY = 'foodmaster.image.retention'
+const IMAGE_RETENTION_KEY = 'foodmaster.trial.image.retention'
 // 保留服务端已接受的枚举值；新保存的图片按页面所示天数计算到期时间。
 const daysByChoice = { ONE_MONTH: 30, SIX_MONTHS: 180, ONE_YEAR: 365 } as const
 export type RetentionChoice = keyof typeof daysByChoice

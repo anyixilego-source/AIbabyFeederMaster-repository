@@ -1,7 +1,8 @@
 {
   "usingComponents": {
     "navigation-bar": "/components/navigation-bar/navigation-bar",
-    "date-calendar": "/components/date-calendar/date-calendar"
+    "date-calendar": "/components/date-calendar/date-calendar",
+    "food-selector": "/components/food-selector/food-selector"
   },
   "disableScroll": true
 }

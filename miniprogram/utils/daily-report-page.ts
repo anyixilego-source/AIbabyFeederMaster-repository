@@ -6,6 +6,7 @@ interface MealSummary { status:string;occurredAt:string }
 import { ensureSessionContext } from './session'
 import { knowledgePanel, advanceKnowledgePanel } from './knowledge-panel'
 import { limitationReason, explanationSentence } from './limitation-reasons'
+import {dailyCards} from './nutrient-summary-card'
 
 export function registerReportPage() {
 Page({
@@ -15,11 +16,11 @@ Page({
     visibleObservations:[] as NonNullable<AssessmentReport['result']['observations']>,allActions:[] as NonNullable<AssessmentReport['result']['actions']>,actions:[] as NonNullable<AssessmentReport['result']['actions']>,
     knowledge:[] as NonNullable<AssessmentReport['result']['knowledge']>['claims'],visibleKnowledge:[] as NonNullable<AssessmentReport['result']['knowledge']>['claims'],
     knowledgeScope:'',limitations:[] as Array<NonNullable<AssessmentReport['result']['limitations']>[number]&{reasonText:string}>,limitCount:0,
-    currentRecordSummary:'',selectedReportId:'',reportId:'',generatedAt:'',evaluationVersion:'',knowledgeVersion:'',supersedesReportId:'',snapshotAvailable:false,legacyReport:false,milkLine:'',milkCount:0 },
+    observationCards:[] as ReturnType<typeof dailyCards>,periodId:'',currentRecordSummary:'',selectedReportId:'',reportId:'',generatedAt:'',evaluationVersion:'',knowledgeVersion:'',supersedesReportId:'',snapshotAvailable:false,legacyReport:false,milkLine:'',milkCount:0 },
   _loadSequence:0,_scroll:0,_loaded:false,_epoch:0,
   onPageScroll(e:{scrollTop:number}){this._scroll=e.scrollTop},
-  onLoad(query:Record<string,string>){this._loaded=false;this.setData({selectedReportId:decodeURIComponent(query.reportId || ''),selectedDate:query.date || '',fromRecords:query.fromRecords==='1',fromPeriod:query.fromPeriod==='1'})},
-  onShow() { const app=getApp<IAppOption>();void (app.globalData.ready || ensureSessionContext()).then(async ctx=>{if(this._loaded&&ctx.subjectId===this.data.subjectId){const eligible=this.data.selectedReportId || (this._epoch===Number(wx.getStorageSync('foodmaster.recordEpoch') || 0)&&(this.data.selectedDate || this.data.dateLabel.slice(0,10)===new Date().toLocaleDateString('sv-SE')));if(eligible){await request('/subjects/'+ctx.subjectId);wx.pageScrollTo({scrollTop:this._scroll,duration:0});this.setData({loading:false});return}}if(this.data.subjectId&&ctx.subjectId!==this.data.subjectId)this.clearResult();void this.loadReport()}).catch(()=>{this.clearResult();this.setData({loading:false,errorMessage:'会话暂不可用，请重试'})}) },
+  onLoad(query:Record<string,string>){this._loaded=false;this.setData({periodId:query.periodId||'',selectedReportId:decodeURIComponent(query.reportId || ''),selectedDate:query.date || '',fromRecords:query.fromRecords==='1',fromPeriod:query.fromPeriod==='1'})},
+  onShow() { const app=getApp<IAppOption>();void (app.globalData.ready || ensureSessionContext()).then(async ctx=>{if(this._loaded&&ctx.subjectId===this.data.subjectId){const eligible=Boolean(this.data.selectedReportId);if(eligible){await request('/subjects/'+ctx.subjectId);wx.pageScrollTo({scrollTop:this._scroll,duration:0});this.setData({loading:false});return}}if(this.data.subjectId&&ctx.subjectId!==this.data.subjectId)this.clearResult();void this.loadReport()}).catch(()=>{this.clearResult();this.setData({loading:false,errorMessage:'会话暂不可用，请重试'})}) },
   onHide() { ++this._loadSequence },
   async loadReport() {
     const sequence=++this._loadSequence
@@ -36,11 +37,7 @@ Page({
       const milk = (result as { milk?: { summary: { feedCount: number; knownVolumeMl: string | null; unknownVolumeEventCount: number; estimatedVolumeRecordCount: number } } }).milk
       const milkSummary = milk?.summary
       const milkLine = milkSummary && milkSummary.feedCount > 0
-        ? (milkSummary.knownVolumeMl !== null
-            ? (milkSummary.estimatedVolumeRecordCount > 0 ? '约' : '') + String(milkSummary.knownVolumeMl) + '毫升'
-            : milkSummary.unknownVolumeEventCount + '次未记录奶量')
-          + ' · ' + milkSummary.feedCount + '次'
-          + (milkSummary.unknownVolumeEventCount > 0 && milkSummary.knownVolumeMl !== null ? '（含' + milkSummary.unknownVolumeEventCount + '次未记录）' : '')
+        ? (milkSummary.knownVolumeMl !== null ? String(milkSummary.knownVolumeMl)+'毫升' : '—')
         : ''
       const milkCount = milkSummary?.feedCount ?? 0
       const legacyReport = !bundle.snapshotAvailable
@@ -49,15 +46,15 @@ Page({
         ? '这份历史报告未保存新版记录统计与解读，按原有内容展示。'
         : '当前服务返回旧版报告，尚未支持新版记录统计与解读。已保存餐食不受影响，可在记录页查看。' : ''
       this.setData({currentRecordSummary:'',errorMessage:[failedMessage,compatibilityMessage].filter(Boolean).join(''),legacyReport,hasResult:true,hasRecords:bundle.mealCount>0,babyName:bundle.subject.displayName,ageText:bundle.ageText,dateLabel:bundle.dateLabel,
-        mealCount:bundle.mealCount,foodCount:bundle.foodCount,totalConsumedText:bundle.totalConsumedText,weightLabel:bundle.weightLabel,
-        allNutrients:bundle.nutrients,nutrients:this.data.category==='ALL'?bundle.nutrients:bundle.nutrients.filter(n=>n.category===this.data.category),observations:observations,observationCount:observations.length,visibleObservations:this.data.showObservations?observations:observations.slice(0,3),
+        mealCount:bundle.mealCount,foodCount:bundle.foodCount,totalConsumedText:bundle.totalConsumedText.replace(/^约/,''),weightLabel:'食物重量',
+        allNutrients:bundle.nutrients,nutrients:this.data.category==='ALL'?bundle.nutrients:bundle.nutrients.filter(n=>n.category===this.data.category),observations:observations,observationCount:observations.length,visibleObservations:this.data.showObservations?observations:observations.slice(0,3),observationCards:dailyCards(this.data.showObservations?observations:observations.slice(0,3),bundle.nutrients),
         allActions:result.actions || [],actions:this.data.showActions?(result.actions || []):(result.actions || []).slice(0,2),actionCount:(result.actions || []).length,knowledge:knowledge,knowledgeCount:knowledge.length,...knowledgePanel(knowledge,this.data.showKnowledge,this.data.showKnowledgeSources),knowledgeScope:result.knowledge?.scopeDeclaration || '',
         limitations:(result.limitations || []).map(l=>({...l,text:(nutrientNames[l.nutrientCode] || '营养素')+'：'+explanationSentence(l.text),reasonText:limitationReason(l.reasonCodes)})),limitCount:new Set((result.limitations || []).map(l=>l.nutrientCode)).size,
         reportId:bundle.report.reportId,generatedAt:new Date(bundle.report.generatedAt).toLocaleString('zh-CN'),evaluationVersion:result.assessment.assessmentAlgorithmVersion || '历史版本',
         knowledgeVersion:result.knowledge?.version || '历史知识未保存',supersedesReportId:bundle.report.supersedesReportId || '',snapshotAvailable:bundle.snapshotAvailable,milkLine:milkLine,milkCount:milkCount})
-      this._loaded=true;this._epoch=Number(wx.getStorageSync('foodmaster.recordEpoch') || 0)
+      this._loaded=true;this._epoch=Number(wx.getStorageSync('foodmaster.trial.recordEpoch') || 0)
       if(bundle.updateState==='FAILED'&&!this.data.selectedReportId)void this.loadCurrentRecords(sequence,bundle.date)
-      if(bundle.updateState==='CURRENT')wx.removeStorageSync('foodmaster.reportNeedsRefresh')
+      if(bundle.updateState==='CURRENT')wx.removeStorageSync('foodmaster.trial.reportNeedsRefresh')
     } catch(error) {
       if(sequence!==this._loadSequence)return
       if(error instanceof ApiError && ([401,403].includes(error.statusCode) || /access denied/i.test(error.message)))this.clearResult()
@@ -72,13 +69,13 @@ Page({
   toggleActions(){const expanded=!this.data.showActions;this.setData({showActions:expanded,actions:expanded?this.data.allActions:this.data.allActions.slice(0,2)})},
   scrollToObservations(){wx.createSelectorQuery().selectViewport().scrollOffset().select('#observations-card').boundingClientRect().exec(result=>{if(result[0]&&result[1]){const top=Math.max(0,result[0].scrollTop+result[1].top-(wx.getSystemInfoSync().statusBarHeight || 0)-52);this._scroll=top;wx.pageScrollTo({scrollTop:top,duration:0})}})},
   openAllNutrients(){this.setData({showAll:true,category:'ALL',nutrients:this.data.allNutrients},()=>this.scrollToObservations())},
-  returnToObservations(){this.setData({showAll:false,showObservations:false,visibleObservations:this.data.observations.slice(0,3),category:'ALL',nutrients:this.data.allNutrients},()=>this.scrollToObservations())},
+  returnToObservations(){this.setData({showAll:false,showObservations:false,visibleObservations:this.data.observations.slice(0,3),observationCards:dailyCards(this.data.observations.slice(0,3),this.data.allNutrients),category:'ALL',nutrients:this.data.allNutrients},()=>this.scrollToObservations())},
   toggleAll(){if(this.data.showAll)this.returnToObservations();else this.openAllNutrients()},
-  toggleObservations(){const expanded=!this.data.showObservations;this.setData({showObservations:expanded,visibleObservations:expanded?this.data.observations:this.data.observations.slice(0,3)})},
+  toggleObservations(){const expanded=!this.data.showObservations;this.setData({showObservations:expanded,visibleObservations:expanded?this.data.observations:this.data.observations.slice(0,3),observationCards:dailyCards(expanded?this.data.observations:this.data.observations.slice(0,3),this.data.allNutrients)})},
   toggleKnowledge(){this.setData(advanceKnowledgePanel(this.data.knowledge,this.data.showKnowledge,this.data.showKnowledgeSources))},
   
   toggleVersion(){this.setData({showVersion:!this.data.showVersion})},toggleLimitations(){this.setData({showLimitations:!this.data.showLimitations,showLimitationReasons:false})},advanceLimitations(){if(!this.data.showLimitations)this.setData({showLimitations:true,showLimitationReasons:false});else this.setData({showLimitationReasons:!this.data.showLimitationReasons})},
-  openNutrient(event:WechatMiniprogram.TouchEvent){openPage('/pages/nutrient-detail/nutrient-detail?code='+encodeURIComponent(String(event.currentTarget.dataset.code))+'&reportId='+encodeURIComponent(this.data.reportId))},
+  openNutrient(event:WechatMiniprogram.TouchEvent){openPage('/pages/nutrient-detail/nutrient-detail?code='+encodeURIComponent(String(event.currentTarget.dataset.code))+'&reportId='+encodeURIComponent(this.data.reportId)+(this.data.periodId?'&periodId='+encodeURIComponent(this.data.periodId):''))},
   startMeal(){navigateRoot('/pages/camera/camera')},
   viewRecords(){navigateRoot('/pages/records/records?date='+this.data.dateLabel.slice(0,10))},
   openPrevious(){if(this.data.supersedesReportId){const url='/pages/report-history/report-history?reportId='+encodeURIComponent(this.data.supersedesReportId);if(this.data.selectedReportId)replacePage(url);else openPage(url)}},

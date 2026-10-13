@@ -74,3 +74,10 @@ page { background: #fff9f3; color: #2f1f1d; }
 
 .observation-card .section-heading{gap:12rpx}.observation-card .mode-back{margin:0;flex-shrink:0;font-weight:400}.observation-card .mode-back-bottom{margin-top:24rpx;margin-bottom:0;width:100%}.observation-card .report-actions button{margin:0}
 .knowledge-more-dots{display:block;text-align:center;color:#a3978c;font-size:26rpx;line-height:1.4;letter-spacing:3rpx;margin-top:14rpx}
+
+.summary-grid{grid-template-columns:minmax(0,.8fr) minmax(0,.8fr) minmax(0,1.7fr)}.summary-item{min-width:0}.summary-value{white-space:nowrap;font-size:29rpx}.summary-milk{margin-top:20rpx;padding-top:18rpx;border-top:1rpx solid #f1e5db}.summary-milk-main{display:flex;align-items:baseline;gap:18rpx;margin-bottom:8rpx}.summary-milk-title{flex:none;font-size:25rpx;color:#8a7774}.summary-milk-value{flex:1;min-width:0;font-size:27rpx;color:#765839;line-height:1.5;overflow-wrap:anywhere}
+
+.observation-card>.nutrient-entry+.nutrient-entry{margin-top:14rpx}.interpretation-text{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.5}
+
+
+.summary-grid{grid-template-columns:minmax(0,calc(25% - 8px)) minmax(0,calc(25% - 8px)) minmax(0,calc(25% + 8px)) minmax(0,calc(25% + 8px));column-gap:0;row-gap:0}.summary-item{min-width:0;padding:0 3rpx;gap:7rpx}.summary-item:first-child{border-left:0}.summary-value{display:block;font-size:31rpx;white-space:nowrap;overflow-wrap:normal;text-align:center;line-height:42rpx}.summary-label{font-size:23rpx;white-space:nowrap;line-height:1.4}

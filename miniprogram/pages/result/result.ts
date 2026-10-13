@@ -1,8 +1,9 @@
 import {backTo,navigateRoot} from '../../utils/navigation'
-import { gramUnits, validNewWeight, weightNotice } from '../../utils/meal-edit'
+import { gramUnits, validNewWeight, weightNotice,exactGrams } from '../../utils/meal-edit'
 import { ApiError, request, uploadRecognitionImage } from '../../utils/api'
 import { cleanupExpiredLocalImages, retentionOptions, saveLocalImage } from '../../utils/image-retention'
-import { completeOperation, getPendingOperation, operationPayload } from '../../utils/operation'
+import {pendingRecord,submitRecord} from '../../utils/record-submit'
+import { ensureSessionContext } from '../../utils/session'
 import { abandonCurrentMeal, discardAbandonedMeals } from '../../utils/pending-meal'
 
 interface RecognitionItem {
@@ -14,8 +15,9 @@ interface RecognitionItem {
   uncertainties: string[]
 }
 interface RecognitionResult { mode: 'AI_CANDIDATES' | 'MANUAL_SEARCH'; items?: RecognitionItem[]; reason?: string }
-interface FoodResult { foodId: string; canonicalNameZh: string; foodForm: string | null; processingMethod: string | null }
+interface FoodResult { selectedFoodRevisionId?:string|null;foodId: string; canonicalNameZh: string; foodForm: string | null; processingMethod: string | null }
 interface ConfirmedFoodItem {
+  selectedFoodRevisionId?:string|null
   localId: string
   candidateIndex: number
   observedName: string
@@ -93,9 +95,7 @@ function warningText(warning: string): string {
   if (code === 'INCOMPLETE') return `${nutrientNames[nutrientCode] || nutrientCode}数据不完整`
   return warningNames[warning] || warning
 }
-function gramText(value: number): string {
-  return (Math.round(value * 10) / 10).toString()
-}
+
 function ratioTotal(items: ConfirmedFoodItem[]): number {
   return items.reduce((sum, item) => sum + Number(item.ratioPercent || 0), 0)
 }
@@ -118,12 +118,12 @@ function initialRatios(items: ConfirmedFoodItem[]): ConfirmedFoodItem[] {
   })
 }
 function applyRatioAmounts(items: ConfirmedFoodItem[], totalText: string): ConfirmedFoodItem[] {
-  const total = Number(totalText)
+  const total = Math.round(Number(totalText) * 10)
   if (!Number.isFinite(total) || total <= 0) return items.map((item) => ({ ...item, consumedAmount: '' }))
-  return items.map((item) => ({
-    ...item,
-    consumedAmount: gramText(total * Number(item.ratioPercent || 0) / 100),
-  }))
+  const allocations=items.map((item,index)=>({index,raw:total*Number(item.ratioPercent||0)/100,units:Math.floor(total*Number(item.ratioPercent||0)/100)}))
+  let remainder=total-allocations.reduce((sum,a)=>sum+a.units,0)
+  for(const a of [...allocations].sort((a,b)=>(b.raw-b.units)-(a.raw-a.units)||a.index-b.index)){if(remainder<=0)break;a.units++;remainder--}
+  return items.map((item,index)=>({...item,consumedAmount:String((allocations[index]?.units||0)/10)}))
 }
 function linkedRatioChange(items: ConfirmedFoodItem[], index: number, requestedValue: number, adjustedOrder: number): {
   items: ConfirmedFoodItem[]
@@ -178,7 +178,7 @@ function confirmedFoodSelection(
     localId: current?.localId || `${Date.now().toString(36)}-${candidateIndex}-${food.foodId || 'by-name'}`,
     candidateIndex,
     observedName: unmatched ? food.canonicalNameZh : (candidate?.observedName || food.canonicalNameZh),
-    foodId: unmatched ? null : food.foodId,
+    foodId: unmatched ? null : food.foodId,selectedFoodRevisionId:unmatched?null:food.selectedFoodRevisionId,
     canonicalNameZh: food.canonicalNameZh,
     badge: food.canonicalNameZh.slice(0, 1),
     servedAmount: current?.servedAmount || '',
@@ -192,8 +192,8 @@ function confirmedFoodSelection(
 }
 
 Page({
-  data: { reviewLabel:wx.getSystemInfoSync().platform==='devtools'?(wx.getStorageSync('foodmaster.reviewEnvironment')?.label || ''):'',
-    manualEntry: false, searchMessage:'', searchExample:'构造样例食品',
+  data: { reviewLabel:wx.getSystemInfoSync().platform==='devtools'?(wx.getStorageSync('foodmaster.trial.reviewEnvironment')?.label || ''):'',
+    showFoodSelector:false, manualEntry: false, searchMessage:'', searchExample:'构造样例食品',
     photo: '/assets/camera-food-guide-v5.jpg', samplePhoto: true, busy: false, saving: false, abandoned: false,
     accepted: false, retentionIndex: 0, retentionOptions,
     result: null as RecognitionResult | null,
@@ -208,9 +208,9 @@ Page({
   },
 
   onLoad() {
-    this.setData({ abandoned: false, saving: false,manualEntry:Boolean(wx.getStorageSync('foodmaster.manualEntry')) })
+    this.setData({ abandoned: false, saving: false,manualEntry:Boolean(wx.getStorageSync('foodmaster.trial.manualEntry')) })
     cleanupExpiredLocalImages()
-    const photo = wx.getStorageSync('mealPhoto') as string | undefined
+    const photo = wx.getStorageSync('foodmaster.trial.mealPhoto') as string | undefined
     if (photo && !photo.startsWith('/assets/')) this.setData({ photo, samplePhoto: false })
   },
   onShow() {
@@ -233,7 +233,7 @@ Page({
   },
   async leaveRecognition(confirmDiscard: boolean) {
     if (this.data.saving) { wx.showToast({ title: '正在保存，请稍候', icon: 'none' }); return }
-    if (confirmDiscard && wx.getStorageSync('foodmaster.currentMealId')) {
+    if (confirmDiscard && wx.getStorageSync('foodmaster.trial.currentMealId')) {
       const confirmed = await new Promise<boolean>((resolve) => wx.showModal({
         title: '退出本次识别？',
         content: '未保存的内容会放弃，下次需要重新选择图片并识别。',
@@ -358,7 +358,7 @@ Page({
       wx.showToast({ title: message, icon: 'none' })
     } finally {
       this.setData({ busy: false, saving: false })
-      if (this.data.abandoned && wx.getStorageSync('foodmaster.currentMealId')) {
+      if (this.data.abandoned && wx.getStorageSync('foodmaster.trial.currentMealId')) {
         abandonCurrentMeal()
         void discardAbandonedMeals()
         backTo('/pages/camera/camera',this)
@@ -373,11 +373,16 @@ Page({
   },
 
   startManualSearch() {
-    this.setData({ pendingCandidateIndex: -1, scrollIntoView: 'confirm-section', manualFocus: true })
+    this.setData({showFoodSelector:true,pendingCandidateIndex:-1,query:''})
   },
 
   searchSample() { this.setData({query:this.data.searchExample,pendingCandidateIndex:-1});void this.searchFood() },
+  closeFoodSelector(){this.setData({showFoodSelector:false})},
+  onFoodSelection(e:WechatMiniprogram.CustomEvent<{food:FoodResult;unmatched:boolean;matchReason?:string}>){const candidateIndex=this.data.pendingCandidateIndex;this.selectFood(e.detail.food);if(e.detail.unmatched&&e.detail.matchReason){const index=candidateIndex>=0?this.data.confirmedFoods.findIndex(i=>i.candidateIndex===candidateIndex):this.data.confirmedFoods.length-1;this.setData({confirmedFoods:this.data.confirmedFoods.map((item,i)=>i===index?{...item,matchReason:e.detail.matchReason}:item)})}this.setData({showFoodSelector:false})},
   async searchFood(): Promise<void> {
+    this.setData({showFoodSelector:true});return
+  },
+  async legacySearchFood(): Promise<void> {
     const query = this.data.query.trim()
     if (!query) { wx.showToast({ title: '请输入食品名称', icon: 'none' }); return }
     this.setData({ busy: true, searchCursor: '', searchHasMore: false })
@@ -412,26 +417,18 @@ Page({
   },
 
   async autoMapCandidates(items: RecognitionItem[]): Promise<void> {
-    const matches = await Promise.all(items.map(async (candidate) => {
-      try {
-        const response = await request<{ items: FoodResult[] }>(`/foods/search?q=${encodeURIComponent(candidate.observedName)}&limit=1`)
-        return response.items?.[0] || null
-      } catch (_) {
-        return null
-      }
-    }))
-    let foods = this.data.foods
-    let confirmedFoods = matches.flatMap((food, candidateIndex) => {
-      if (!food) return []
-      foods = foods.map((item) => item.index === candidateIndex ? { ...item, mappedName: food.canonicalNameZh } : item)
-      return [confirmedFoodSelection(food, items[candidateIndex], candidateIndex)]
+    type Match={localId:string|null;autoSelectable:boolean;unmatchedReason:string|null;candidates:Array<{foodId:string;canonicalNameZh:string;processingMethod:string|null}>}
+    let results:Match[]=[]
+    try{const response=await request<{results:Match[]}>('/foods/match-candidates',{method:'POST',data:{items:items.map((candidate,index)=>({localId:String(index),name:candidate.observedName}))}});results=response.results}catch{results=[]}
+    if(this.data.abandoned)return
+    const confirmedFoods=items.map((candidate,index)=>{
+      const match=results.find(r=>r.localId===String(index)),selected=match?.autoSelectable?match.candidates[0]:undefined
+      const food:FoodResult=selected?{...selected,foodForm:null}:{foodId:'',canonicalNameZh:candidate.observedName,foodForm:null,processingMethod:null}
+      return {...confirmedFoodSelection(food,candidate,index),source:'AI_CANDIDATE' as const,matchReason:selected?undefined:match?.unmatchedReason||'REQUEST_FAILED'}
     })
-    if (!confirmedFoods.length) return
-    confirmedFoods = applyRatioAmounts(initialRatios(confirmedFoods), this.data.mealTotalAmount || '200')
-    this.setData({
-      confirmedFoods, foods, pendingCandidateIndex: -1, scrollIntoView: 'confirm-section',
-      ratioTotal: ratioTotal(confirmedFoods),
-    })
+    const foods=this.data.foods.map((row,index)=>({...row,mappedName:confirmedFoods[index]?.foodId?'建议匹配：'+confirmedFoods[index].canonicalNameZh:'待选择；可按名称记录'}))
+    const allocated=applyRatioAmounts(initialRatios(confirmedFoods),this.data.mealTotalAmount||'200')
+    this.setData({confirmedFoods:allocated,foods,pendingCandidateIndex:-1,scrollIntoView:'confirm-section',ratioTotal:ratioTotal(allocated)})
   },
 
   onSearchResultTap(event: WechatMiniprogram.TouchEvent): void {
@@ -472,11 +469,11 @@ Page({
 
   async calculate(): Promise<CalculationResult | null> {
     // 按名称记录的条目无营养事实，页内预览仅计算标准食品部分；保存后的报告由服务端正确计入分母。
-    const items = this.data.confirmedFoods.filter((item) => !item.unmatched)
-      .map((item) => ({ foodId: item.foodId, amount: item.consumedAmount.trim(), unit: 'g' }))
+    const items = this.data.confirmedFoods
+      .map((item) => ({...(item.foodId?{foodId:item.foodId}:{}),observedName:item.observedName,matchStatus:item.unmatched?'UNMATCHED':'MATCHED',amount:item.consumedAmount.trim(),unit:'g'}))
     if (!items.length || items.some((item) => !/^\d+(?:\.\d{1,6})?$/.test(item.amount) || Number(item.amount) <= 0)) return null
     const calculation = await request<CalculationResult>('/nutrition/calculate', {
-      method: 'POST', data: { items, targetScopeVersion: 'core-13-v1' },
+      method: 'POST', data: { mode:'RECORDED_ITEMS_V2',items, targetScopeVersion: 'core-13-v1' },
     })
     const nutrients = calculation.nutrients.filter((item) => item.knownValue !== null).slice(0, 6).map((item) => ({
       name: nutrientNames[item.nutrientCode] || item.nutrientCode,
@@ -491,7 +488,7 @@ Page({
 
   async save(): Promise<void> {
     if (this.data.busy || this.data.saving) return
-    const mealId = wx.getStorageSync('foodmaster.currentMealId') as string | undefined
+    const mealId = wx.getStorageSync('foodmaster.trial.currentMealId') as string | undefined
     const foods = this.data.confirmedFoods
     if (!mealId) { wx.showToast({ title: '请从新增记录进入', icon: 'none' }); return }
     if (!foods.length) { wx.showToast({ title: '请至少确认一种标准食品', icon: 'none' }); return }
@@ -513,46 +510,37 @@ Page({
     }
     const actualTotal=foods.reduce((sum,food)=>sum+(gramUnits(food.consumedAmount.trim()) || 0),0)
     if(!Number.isSafeInteger(actualTotal)){wx.showToast({title:'合计超出数字精度范围，请核对克数',icon:'none'});return}
-    if (actualTotal > 300000000) {
-      const confirmed = await new Promise<boolean>((resolve) => wx.showModal({
-        title: '核对本餐总量',
-        content: weightNotice(String(actualTotal/1000000))+'确认记录这个重量吗？',
-        confirmText: '确认记录',
-        success: ({ confirm }) => resolve(confirm),
-        fail: () => resolve(false),
-      }))
-      if (!confirmed) return
-    }
-    this.setData({ busy: true, saving: true })
+    this.setData({busy:true,saving:true})
     try {
-      const operations: Array<{ scope: string; operationId: unknown }> = []
-      for (const food of foods) {
-        const scope = `add-meal-item:${mealId}:${food.localId}`
-        const base: Record<string, unknown> = food.unmatched
-          ? { observedName: food.observedName, consumedAmount: food.consumedAmount.trim(), source: food.source,
-              status: 'CONFIRMED', weightOrigin: 'USER_ACCEPTED_ESTIMATE', matchStatus: 'UNMATCHED',
-              matchReason: food.matchReason || 'NO_MATCH_NO_NUTRITION' }
-          : { foodId: food.foodId, observedName: food.observedName, consumedAmount: food.consumedAmount.trim(),
-              source: food.source, status: 'CONFIRMED', weightOrigin: 'USER_ACCEPTED_ESTIMATE' }
-        if (food.servedAmount.trim()) base.servedAmount = food.servedAmount.trim()
-        const payload = getPendingOperation(scope) || operationPayload(scope, base)
-        await request(`/meals/${mealId}/items`, { method: 'POST', data: payload })
-        operations.push({ scope, operationId: payload.operationId })
+      const draft=await request<{subjectId:string;occurredAt:string;mealType:string;notes:string|null}>('/meals/'+mealId)
+      const active=await(getApp<IAppOption>().globalData.ready||ensureSessionContext())
+      if(active.subjectId!==draft.subjectId)throw Error('当前宝宝已切换，请返回记录页重新进入')
+      const scope='meal-create:'+draft.subjectId,total=exactGrams(actualTotal)
+      const body:Record<string,unknown>={mealType:draft.mealType,occurredAt:draft.occurredAt,notes:draft.notes,items:foods.map(food=>({observedName:food.observedName,consumedAmount:food.consumedAmount.trim(),source:food.source,weightOrigin:'USER_ACCEPTED_ESTIMATE',...(food.unmatched?{matchStatus:'UNMATCHED',matchReason:food.matchReason||'NO_MATCH_NO_NUTRITION'}:{matchStatus:'MATCHED',foodId:food.foodId,...(food.selectedFoodRevisionId?{selectedFoodRevisionId:food.selectedFoodRevisionId}:{})})}))}
+      const previous=pendingRecord(scope)
+      if(previous){
+        const {operationId:_operationId,weightReview:_review,...oldBody}=previous.payload
+        if(JSON.stringify(oldBody)!==JSON.stringify(body)){
+          const accepted=await new Promise<boolean>(resolve=>wx.showModal({title:'先核对上次保存结果',content:'上次提交结果尚未确认。先核对原提交，当前填写的内容不会另存一餐。',confirmText:'核对上次',success:r=>resolve(r.confirm),fail:()=>resolve(false)}));if(!accepted)return
+        }
+      }else if(actualTotal>300000000){
+        const accepted=await new Promise<boolean>(resolve=>wx.showModal({title:'核对本餐总量',content:weightNotice(total)+'确认记录这个重量吗？',confirmText:'确认记录',success:r=>resolve(r.confirm),fail:()=>resolve(false)}));if(!accepted)return
+        body.weightReview={policyVersion:'MEAL_WEIGHT_REVIEW_V2',acknowledged:true,reviewedTotalGrams:total}
       }
-      const saved = await request<{ reportUpdate?: { status: string } }>(`/meals/${mealId}/confirm`, { method: 'POST' })
-      wx.setStorageSync('foodmaster.reportUpdateState', saved.reportUpdate?.status || 'UNKNOWN')
-      operations.forEach((operation) => completeOperation(operation.scope, operation.operationId))
-      wx.setStorageSync('mealSaved', true)
-      wx.setStorageSync('foodmaster.mealSavedAction', '本餐已保存')
-      wx.setStorageSync('foodmaster.reportNeedsRefresh', true)
-      wx.removeStorageSync('foodmaster.currentMealId')
+      const saved=await submitRecord<{mealId:string;reportUpdate?:{status:string}}>(scope,'/subjects/'+draft.subjectId+'/meals/confirmed','POST','CREATE_CONFIRMED_MEAL',body)
+      wx.setStorageSync('foodmaster.trial.reportUpdateState',saved.reportUpdate?.status||'UNKNOWN')
+      abandonCurrentMeal();void discardAbandonedMeals()
+      wx.setStorageSync('foodmaster.trial.mealSaved', true)
+      wx.setStorageSync('foodmaster.trial.mealSavedAction', '本餐已保存')
+      wx.setStorageSync('foodmaster.trial.reportNeedsRefresh', true)
+      wx.removeStorageSync('foodmaster.trial.currentMealId')
       navigateRoot('/pages/records/records?saved=1')
     } catch (caught) {
       const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '保存失败'
-      wx.showModal({ title: '保存失败', content: message, showCancel: false })
+      wx.showModal({ title: caught instanceof ApiError&&(caught.statusCode===0||caught.statusCode>=500)?'保存结果尚未确认':'保存失败',content:message+(caught instanceof ApiError&&(caught.statusCode===0||caught.statusCode>=500)?'。再次保存会核对原提交，不会重复新增。':''),showCancel:false })
     } finally {
       this.setData({ busy: false, saving: false })
-      if (this.data.abandoned && wx.getStorageSync('foodmaster.currentMealId')) {
+      if (this.data.abandoned && wx.getStorageSync('foodmaster.trial.currentMealId')) {
         abandonCurrentMeal()
         void discardAbandonedMeals()
       }

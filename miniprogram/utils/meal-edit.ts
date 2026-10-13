@@ -10,6 +10,7 @@ export function gramUnits(value:string):number|null {
   const [whole,fraction='']=value.split('.');const units=Number(whole)*1000000+Number(fraction.padEnd(6,'0'))
   return Number.isSafeInteger(units)?units:null
 }
+export function exactGrams(units:number):string{if(!Number.isSafeInteger(units)||units<0)throw Error('克重超出精度范围');const whole=Math.floor(units/1000000),fraction=String(units%1000000).padStart(6,'0').replace(/0+$/,'');return String(whole)+(fraction?'.'+fraction:'')}
 export function formatGrams(value:string){const u=gramUnits(value);if(u===null)return value;const tenths=Math.round(u/100000);return tenths===0&&u>0?value:String(tenths/10)}
 export function equalGrams(a:string,b:string){const x=gramUnits(a),y=gramUnits(b);return x!==null&&y!==null&&x===y}
 export function validNewWeight(value:string){const units=gramUnits(value);return /^\d+(?:\.\d)?$/.test(value)&&units!==null&&units>0}
@@ -25,7 +26,7 @@ export function changedItems(items:EditItem[]){return items.some(i=>i.original?i
 export function itemPayload(items:EditItem[]){return items.filter(i=>!i.removed).map(i=>{const base={...(i.original?{mealItemId:i.original.mealItemId}:{}),observedName:i.name,consumedAmount:i.raw};if(!i.foodId){return {...base,matchStatus:'UNMATCHED',matchReason:i.matchReason||'NO_MATCH_NO_NUTRITION',source:'MANUAL',status:'CONFIRMED'}}return {...base,foodId:i.foodId,selectedFoodRevisionId:i.selectedFoodRevisionId}})}
 export function operationId(){return 'meal-edit-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,12)}
 export interface SavedResult {reportUpdate?:{status:string}}
-export function recordSaved(result:SavedResult,action:string){wx.setStorageSync('foodmaster.reportUpdateState',result.reportUpdate?.status||'FAILED');wx.setStorageSync('mealSaved',true);wx.setStorageSync('foodmaster.mealSavedAction',action);wx.setStorageSync('foodmaster.reportNeedsRefresh',true)}
+export function recordSaved(result:SavedResult,action:string){wx.setStorageSync('foodmaster.trial.reportUpdateState',result.reportUpdate?.status||'FAILED');wx.setStorageSync('foodmaster.trial.mealSaved',true);wx.setStorageSync('foodmaster.trial.mealSavedAction',action);wx.setStorageSync('foodmaster.trial.reportNeedsRefresh',true)}
 export async function deleteSavedMeal(meal:SavedMeal,pending:{operationId:string;expectedRevision:string;editToken?:string},alreadyConfirmed=false){
   const d=new Date(meal.occurredAt),label=localDate(d)+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')
   const confirmed=alreadyConfirmed||await new Promise<boolean>(resolve=>wx.showModal({title:'删除这餐？',content:label+' · '+(meal.notes||mealTypes.find(t=>t.key===meal.mealType)?.label||'饮食记录')+'。删除后不再计入当前报告，历史版本保留。',confirmText:'删除这餐',confirmColor:'#d64d53',success:r=>resolve(r.confirm),fail:()=>resolve(false)}))

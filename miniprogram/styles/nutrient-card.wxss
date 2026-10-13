@@ -1,0 +1,55 @@
+
+.row-chevron { color: #9b8580; font-size: 52rpx; font-weight: 300; }
+
+.nutrient-row { min-height: 142rpx; padding: 20rpx 10rpx 20rpx 14rpx; display: flex; align-items: center; box-sizing: border-box; border: 1rpx solid #f1e4dd; border-radius: 24rpx; background: #fff; }
+
+.nutrient-badge { flex: 0 0 auto; width: 84rpx; height: 84rpx; border-radius: 42rpx; display: flex; align-items: center; justify-content: center; background: #fff2ec; }
+
+.nutrient-badge.warn { color: #f18a21; background: #fff1dc; }
+
+.nutrient-badge.danger { color: #eb5e64; background: #ffe9ea; }
+
+.nutrient-badge.good { color: #1ca56f; background: #e5f8ef; }
+
+.nutrient-main { min-width: 0; flex: 1; margin-left: 20rpx; }
+
+.nutrient-line { display: flex; justify-content: space-between; align-items: baseline; gap: 12rpx; }
+
+.nutrient-name { font-size: 30rpx; font-weight: 800; }
+
+.nutrient-amount { display: flex; align-items: baseline; gap: 5rpx; white-space: nowrap; }
+
+.amount-value { font-size: 30rpx; font-weight: 800; }
+
+.amount-unit { color: #5c4d4a; font-size: 22rpx; }
+
+.source-text { display: block; margin-top: 8rpx; color: #84726f; font-size: 22rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.nutrient-progress { margin-top: 9rpx; display: flex; align-items: center; gap: 12rpx; color: #93817e; font-size: 18rpx; }
+
+.nutrient-progress-track { flex: 1; height: 10rpx; overflow: hidden; border-radius: 5rpx; background: #f5ebe5; }
+
+.nutrient-progress-fill { height: 100%; border-radius: 5rpx; background: linear-gradient(90deg, #ff767a, #ff5a67); }
+
+.nutrient-progress-fill.green { background: linear-gradient(90deg, #ffc15a, #f4a934); }
+
+.nutrient-progress-fill.yellow { background: linear-gradient(90deg, #ffd064, #f4b83f); }
+
+.nutrient-progress-fill.purple { background: #8b73eb; }
+
+.nutrient-progress-fill.cyan { background: linear-gradient(90deg, #ff9a82, #ff746f); }
+
+.nutrient-progress > text { flex: 0 0 auto; }
+
+.data-note { display: inline-flex; margin-top: 9rpx; padding: 5rpx 12rpx; color: #ef7a22; background: #fff1df; border-radius: 14rpx; font-size: 20rpx; }
+
+.row-chevron { margin-left: 8rpx; }
+
+.report-icon { width: 70rpx; height: 70rpx; }
+
+.summary-icon .report-icon { width: 82rpx; height: 82rpx; }
+.nutrient-row{min-width:0}.nutrient-progress{flex-wrap:wrap}.nutrient-progress-track{min-width:120rpx}.nutrient-main{min-width:0}.nutrient-amount{flex:none}
+
+.observation-card>.nutrient-entry+.nutrient-entry{margin-top:14rpx}.interpretation-text{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.5}
+
+.nutrient-entry+.nutrient-entry{margin-top:14rpx}

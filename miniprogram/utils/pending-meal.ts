@@ -1,7 +1,7 @@
 import { ApiError, request } from './api'
 
-const currentMealKey = 'foodmaster.currentMealId'
-const discardQueueKey = 'foodmaster.pendingMealDiscards'
+const currentMealKey = 'foodmaster.trial.currentMealId'
+const discardQueueKey = 'foodmaster.trial.pendingMealDiscards'
 let discardInProgress = false
 
 function queuedIds(): string[] {

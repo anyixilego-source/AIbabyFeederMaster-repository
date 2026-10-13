@@ -1,5 +1,5 @@
 import { foodCards } from '../../utils/nutrient-detail-view'
-import { backPage } from '../../utils/navigation'
+import { backPage,replacePage } from '../../utils/navigation'
 import { ApiError, reviewEnvironment } from '../../utils/api'
 import { formatNumber, loadReportBundle } from '../../utils/nutrition-report'
 import type { NutrientView } from '../../utils/nutrition-report'
@@ -61,7 +61,7 @@ Page({
   data: {
     reviewLabel:reviewEnvironment()?.label || '',foodCards:[] as ReturnType<typeof foodCards>,missingSources:[] as Array<{foodId:string;name:string;weight:string}>,loading: true,
     errorMessage: '',
-    nutrientCode: '', reportId: '', dateLabel: '', referenceSource: '',
+    periodId:'',nutrientCode: '', reportId: '', dateLabel: '', referenceSource: '',
     name: '营养素',
     badge: '营',
     amountText: '—',
@@ -92,7 +92,7 @@ Page({
   onHide(){++this._sequence},
   onShow(){if(this.data.loading)void this.loadDetail()},
   onLoad(query: Record<string, string>) {
-    this.setData({ nutrientCode: decodeURIComponent(query.code || ''), reportId: decodeURIComponent(query.reportId || '') })
+    this.setData({ periodId:query.periodId||'',nutrientCode: decodeURIComponent(query.code || ''), reportId: decodeURIComponent(query.reportId || '') })
     void this.loadDetail()
   },
 
@@ -118,7 +118,7 @@ Page({
         sourceCount: nutrient.sources.length,sourceSnapshotAvailable:bundle.snapshotAvailable,hasValue:nutrient.numericValue!==null,
         sources: nutrient.sources,foodCards:foodCards(nutrient,bundle.report.result.evidence),
         missingSources: (bundle.report.result.evidence?.records || []).filter(r=>(bundle.report.result.evidence?.facts || []).some(f=>f.mealItemId===r.mealItemId&&f.nutrientCode===nutrient.nutrientCode&&f.contribution===null)).map(r=>({foodId:r.mealItemId,name:r.name,weight:(r.weightOrigin==='USER_ACCEPTED_ESTIMATE'?'约':'')+formatNumber(Number(r.consumedGrams))})),
-        dateLabel: bundle.date, referenceSource: nutrient.referenceSource,
+        reportId:bundle.report.reportId,dateLabel: bundle.date, referenceSource: nutrient.referenceSource,
         referenceText: reference.referenceText,
         referenceAvailable: reference.referenceAvailable,
         hasRange: reference.hasRange,rangeLowerText:reference.rangeLowerText,rangeUpperText:reference.rangeUpperText,
@@ -146,6 +146,8 @@ Page({
     }
   },
 
+  changePeriodMode(e:WechatMiniprogram.CustomEvent<{mode:string}>){if(e.detail.mode==='TREND')this.switchToTrend()},
+  switchToTrend(){if(this.data.loading)return;replacePage('/pages/nutrient-trend/nutrient-trend?code='+encodeURIComponent(this.data.nutrientCode)+'&endDate='+this.data.dateLabel+'&dayReportId='+encodeURIComponent(this.data.reportId)+(this.data.periodId?'&periodId='+encodeURIComponent(this.data.periodId):''))},
   toggleConclusion() { if (this.data.expandableConclusion) this.setData({ conclusionExpanded: !this.data.conclusionExpanded }) },
   toggleAbout() { this.setData({ aboutExpanded: !this.data.aboutExpanded }) },
   goBack() { backPage('/pages/report/report',this) },

@@ -1,4 +1,5 @@
-const OPERATION_KEY_PREFIX = 'foodmaster.operation.'
+import {getAuth} from './api'
+const OPERATION_KEY_PREFIX = 'foodmaster.trial.operation.'
 
 interface PendingOperation {
   fingerprint?: string
@@ -11,7 +12,7 @@ function fingerprint(payload: Record<string, unknown>): string {
 }
 
 export function operationPayload(scope: string, payload: Record<string, unknown>): Record<string, unknown> {
-  const storageKey = `${OPERATION_KEY_PREFIX}${scope}`
+  const storageKey = `${OPERATION_KEY_PREFIX}${getAuth()?.accountId||getAuth()?.clientSessionId||'anonymous'}:${scope}`
   const pending = wx.getStorageSync(storageKey) as PendingOperation | undefined
   const currentFingerprint = fingerprint(payload)
   if (pending?.fingerprint === currentFingerprint && pending.operationId && pending.payload) return pending.payload
@@ -23,13 +24,13 @@ export function operationPayload(scope: string, payload: Record<string, unknown>
 }
 
 export function getPendingOperation(scope: string): Record<string, unknown> | undefined {
-  const pending = wx.getStorageSync(`${OPERATION_KEY_PREFIX}${scope}`) as PendingOperation | undefined
+  const pending = wx.getStorageSync(`${OPERATION_KEY_PREFIX}${getAuth()?.clientSessionId||'anonymous'}:${scope}`) as PendingOperation | undefined
   return pending?.operationId && pending.payload ? pending.payload : undefined
 }
 
 export function completeOperation(scope: string, operationId: unknown): void {
   if (typeof operationId !== 'string') return
-  const storageKey = `${OPERATION_KEY_PREFIX}${scope}`
+  const storageKey = `${OPERATION_KEY_PREFIX}${getAuth()?.clientSessionId||'anonymous'}:${scope}`
   const pending = wx.getStorageSync(storageKey) as { operationId?: string } | undefined
   if (pending?.operationId === operationId) wx.removeStorageSync(storageKey)
 }

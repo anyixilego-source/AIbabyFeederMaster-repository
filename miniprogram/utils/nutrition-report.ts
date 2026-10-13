@@ -41,7 +41,7 @@ export interface AssessmentReport {
   }
 }
 
-interface ReportRecord { mealId: string; mealItemId: string; foodId: string; name: string; consumedGrams: string; weightOrigin: string }
+interface ReportRecord { mealId: string; mealItemId: string; foodId: string | null; name: string; consumedGrams: string; weightOrigin: string }
 interface ReportFact { mealItemId: string; foodId: string; nutrientCode: string; contribution: string | null; nutrientFactId?: string; sourceReleaseId?: string; sourceVersion: string }
 
 export interface NutrientSource {
@@ -135,7 +135,7 @@ const statusLabels: Record<string, string> = {
 }
 
 const warningLabels: Record<string, string> = {
-  NO_CONFIRMED_INTAKE: '今天没有已确认的实际摄入记录。',
+  NO_CONFIRMED_INTAKE: '本报告没有已确认的餐食记录；奶量如有记录会另行展示。',
   NO_NUTRIENT_DATA: '今天暂无可用于计算的营养数据。',
   NO_INTAKE_DATA: '没有已确认的摄入数据，无法进行参考值比较。',
   INSUFFICIENT_COVERAGE_NO_COMPARISON: '部分营养数据不完整，当前数值仅代表已知部分。',
@@ -219,8 +219,22 @@ export function warningLabel(warning: string): string {
 }
 
 export function loadReportBundle(subjectId: string, force = false, reportId = '', selectedDate = ''): Promise<ReportBundle> {
-  const key = subjectId + ':' + (reportId || selectedDate || dateOnly(new Date())) + ':' + (getAuth()?.accessToken || '')
-  if (!force && bundleCache && bundleCacheKey === key) return bundleCache
+  const key = subjectId + ':' + (reportId || selectedDate || dateOnly(new Date())) + ':' + (getAuth()?.accessToken || '') + ':' + Number(wx.getStorageSync('foodmaster.trial.recordEpoch') || 0)
+  if (!force && bundleCache && bundleCacheKey === key) {
+    if (reportId) return bundleCache
+    const cached = bundleCache
+    return cached.then(async bundle => {
+      try {
+        const day = new Date(bundle.date + 'T12:00:00')
+        const current = await request<{reportId:string|null;isCurrent:boolean;effectiveInputVersion:string}>('/subjects/'+subjectId+'/assessment-reports/current?date='+bundle.date+'&timezoneOffsetMinutes='+(-day.getTimezoneOffset()))
+        if (current.isCurrent && current.reportId === bundle.report.reportId && current.effectiveInputVersion === bundle.report.inputFingerprint) return bundle
+      } catch (error) {
+        if (error instanceof ApiError && [401,403].includes(error.statusCode)) throw error
+        return {...bundle,updateState:'FAILED' as const}
+      }
+      return loadReportBundle(subjectId,true,reportId,selectedDate)
+    })
+  }
   bundleCacheKey = key
   const sequence = ++bundleSequence
   const promise = createReportBundle(subjectId, reportId, sequence, selectedDate).catch((error: unknown) => {
@@ -238,6 +252,11 @@ async function createReportBundle(subjectId: string, reportId: string, sequence:
   let updateState: 'CURRENT' | 'FAILED' | 'LEGACY' = 'CURRENT'
   if (reportId) report = await request<AssessmentReport>('/assessment-reports/' + reportId)
   else {
+    type Current={subjectId:string;reportId:string|null;isCurrent:boolean;effectiveInputVersion:string;basedOnInputVersion:string|null}
+    const currentPath='/subjects/'+subjectId+'/assessment-reports/current?date='+dateOnly(now)+'&timezoneOffsetMinutes='+(-now.getTimezoneOffset())
+    const current=await request<Current>(currentPath)
+    if(current.subjectId!==subjectId)throw Error('报告所属宝宝不一致')
+    if(current.isCurrent&&current.reportId){report=await request<AssessmentReport>('/assessment-reports/'+current.reportId)}else {
     const scope = 'assessment:' + subjectId + ':' + dateOnly(now) + ':' + sequence
     const payload = operationPayload(scope, {periodStart:dateOnly(now),periodEndExclusive:tomorrow(now),timezoneOffsetMinutes:-now.getTimezoneOffset()})
     // Two attempts share the operation id. The server independently reuses effective inputs.
@@ -255,6 +274,8 @@ async function createReportBundle(subjectId: string, reportId: string, sequence:
       if (!fallback) throw error
       report = fallback; updateState='FAILED'
     }
+    }
+    if(updateState==='CURRENT'){const checked=await request<Current>(currentPath);if(!checked.isCurrent||checked.reportId!==report.reportId||checked.effectiveInputVersion!==report.inputFingerprint)updateState='FAILED'}
   }
   if(report.subjectId && report.subjectId !== subjectId)throw new Error('请先切换到该报告所属宝宝')
   report = suspendReportComparison(report)
@@ -269,7 +290,7 @@ async function createReportBundle(subjectId: string, reportId: string, sequence:
   return { subject,report,reports:[report],date:report.periodStart,
     dateLabel:report.periodStart + ' 周' + '日一二三四五六'[date.getDay()],
     ageText:report.result.evidence ? ageDisplayFromMonths(report.result.evidence.ageMonths) : ageDisplay(subject.birthDate,date),
-    mealCount:new Set(records.map(r=>r.mealId)).size,foodCount:new Set(records.map(r=>r.foodId)).size,
+    mealCount:new Set(records.map(r=>r.mealId)).size,foodCount:new Set(records.map(r=>r.foodId||r.mealItemId)).size,
     totalConsumedText:(records.some(r=>r.weightOrigin==='USER_ACCEPTED_ESTIMATE')?'约':'')+formatNumber(records.reduce((sum,r)=>sum+Number(r.consumedGrams),0)),nutrients,
     warnings:[...new Set(report.warnings.map(warningLabel))],foodRecords:buildFoodRecords(records),snapshotAvailable,updateState,
     weightLabel:records.some(r=>r.weightOrigin==='USER_ACCEPTED_ESTIMATE') ? '记录重量（含估算）' : '记录重量' }
@@ -326,7 +347,7 @@ function nutrientProgressTone(code: string): string {
   return 'cyan'
 }
 
-function nutrientIcon(code: string): string {
+export function nutrientIcon(code: string): string {
   if (code === 'ENERGY' || code === 'ENERGY_KCAL') return '/assets/report-icon-energy-v1.png'
   if (code === 'PROTEIN') return '/assets/report-icon-protein-v1.png'
   if (code === 'FAT_TOTAL') return '/assets/report-icon-fat-v1.png'
@@ -385,9 +406,9 @@ function buildSources(records: ReportRecord[], facts: ReportFact[]): Map<string,
   }))
 }
 function buildFoodRecords(records: ReportRecord[]): FoodRecord[] {
-  const foods=new Map<string,{foodId:string;name:string;amount:number;estimated:boolean}>()
-  for (const r of records) { const p=foods.get(r.foodId);foods.set(r.foodId,{foodId:r.foodId,name:r.name,amount:(p?.amount||0)+Number(r.consumedGrams),estimated:Boolean(p?.estimated)||r.weightOrigin==='USER_ACCEPTED_ESTIMATE'}) }
-  return [...foods.values()].map((r,i)=>({key:r.foodId,foodId:r.foodId,name:r.name,amount:r.amount,
+  const foods=new Map<string,{key:string;foodId:string|null;name:string;amount:number;estimated:boolean}>()
+  for (const r of records) { const key=r.foodId||r.mealItemId;const p=foods.get(key);foods.set(key,{key,foodId:r.foodId,name:r.name,amount:(p?.amount||0)+Number(r.consumedGrams),estimated:Boolean(p?.estimated)||r.weightOrigin==='USER_ACCEPTED_ESTIMATE'}) }
+  return [...foods.values()].map((r,i)=>({key:r.key,foodId:r.foodId,name:r.name,amount:r.amount,
     amountText:(r.estimated?'约':'')+formatNumber(r.amount)+' 克',badge:r.name.slice(0,1),tone:tones[i%tones.length]!}))
 }
 

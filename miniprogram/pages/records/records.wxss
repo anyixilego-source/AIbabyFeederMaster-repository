@@ -48,14 +48,14 @@
 .detail-actions{display:flex;gap:20rpx;margin-top:20rpx}.detail-actions button{flex:1;min-height:88rpx;line-height:1.4;display:flex;align-items:center;justify-content:center;font-size:28rpx;border-radius:22rpx;background:#fff2ee;color:#e76770;margin:0;padding:16rpx}.detail-actions button::after{border:0}.detail-actions button:last-child{background:#fff8f4;color:#aa7772}
 
 /* 第一批：奶量卡片与录入面板——按已确认线稿的节奏（暖渐变卡底/标题行/数值基线行/细分隔线/行式明细） */
-.milk-card { margin-bottom: 18rpx; padding: 30rpx 30rpx 26rpx; background: linear-gradient(140deg,#fff9ed,#fffdf8); border-color: #f0e3cd; }
+.milk-card { margin-bottom: 18rpx; padding: 20rpx 26rpx; background: linear-gradient(140deg,#fff9ed,#fffdf8); border-color: #f0e3cd; }
 .milk-main { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; min-width: 0; }
 .milk-title { display: block; font-size: 27rpx; color: #8c8075; }
-.milk-value-row { display: flex; align-items: baseline; gap: 12rpx; margin-top: 14rpx; min-width: 0; }
-.milk-value { font-size: 36rpx; font-weight: 700; color: #765839; line-height: 1.3; overflow-wrap: anywhere; }
+.milk-value-row { display: flex; align-items: baseline; gap: 12rpx; margin-top: 8rpx; min-width: 0; flex-wrap: wrap; }
+.milk-value { flex-shrink: 0; max-width: 100%; font-size: 32rpx; font-weight: 700; color: #765839; line-height: 1.3; overflow-wrap: anywhere; }
 .milk-sub { font-size: 24rpx; color: #8c8075; }
-.milk-add { flex-shrink: 0; margin: 0; height: 64rpx; line-height: 64rpx; padding: 0 26rpx; font-size: 25rpx; background: #fff0e7; color: #ab6645; border-radius: 999rpx; }
-.milk-expand { margin-top: 18rpx; padding: 6rpx 0; font-size: 26rpx; color: #b57a30; }
+.milk-add { width: auto; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; margin: 0; height: 64rpx; line-height: 64rpx; padding: 0 26rpx; font-size: 25rpx; background: #fff0e7; color: #ab6645; border-radius: 999rpx; }
+.milk-expand { margin-top: 8rpx; padding: 6rpx 0; font-size: 26rpx; color: #b57a30; }
 .milk-list { margin-top: 4rpx; }
 .milk-row { display: flex; align-items: center; gap: 22rpx; padding: 26rpx 2rpx; border-top: 1rpx solid #efe5d6; }
 .milk-row-time { min-width: 88rpx; font-size: 24rpx; color: #8c8075; }
@@ -72,3 +72,7 @@
 .milk-input { flex: 1; font-size: 40rpx; color: #352e29; min-width: 0; }
 .milk-about { display: flex; align-items: center; gap: 10rpx; font-size: 25rpx; color: #8c8075; }
 .milk-hint { display: block; margin-top: 18rpx; font-size: 23rpx; color: #947655; line-height: 1.7; }
+
+.milk-main{width:100%}.milk-title{flex:1;min-width:0}.milk-main .milk-add{flex:none;width:auto;min-width:188rpx;margin:0 0 0 auto;white-space:nowrap}.milk-expand{display:flex;align-items:center;justify-content:space-between;min-height:64rpx}.milk-collapse-x{display:flex;align-items:center;justify-content:center;width:64rpx;height:64rpx;font-size:28rpx}.milk-collapse-bottom{display:flex;justify-content:center;align-items:center;width:100%;height:76rpx;margin:14rpx 0 0;border-radius:20rpx;background:#fff0e7;color:#ab6645;font-size:25rpx}.category-grid{display:block;margin-top:12rpx}.category-grid .weight-inline{display:flex;flex-direction:row;align-items:baseline;justify-content:flex-start;gap:8rpx;white-space:nowrap}.weight-inline .category-number{white-space:nowrap;line-height:1.3}.weight-unit{flex:none}
+
+.score-summary,.category-summary{display:flex;flex-direction:column;gap:9rpx;color:#3a9c3e;font-size:23rpx;font-weight:700}.summary-title{display:block;line-height:1.35;font-size:23rpx;font-weight:700;color:#3a9c3e}.summary-amount{display:flex;align-items:baseline;gap:6rpx;white-space:nowrap;line-height:1.2}.summary-amount .summary-score{margin:0;font-size:54rpx;font-weight:700;line-height:1.2;color:#3a9c3e;white-space:nowrap}.summary-unit{font-size:23rpx;font-weight:700;color:#3a9c3e;flex:none}

@@ -22,18 +22,18 @@ Page({
     try {
       const active = await context()
       if (!active.subjectId) throw new Error('请先建立宝宝档案')
-      let mealId = wx.getStorageSync('foodmaster.currentMealId') as string | undefined
+      let mealId = wx.getStorageSync('foodmaster.trial.currentMealId') as string | undefined
       const existingMealId = mealId
       if (existingMealId) {
         try {
           const meal = await request<{ status: string }>(`/meals/${existingMealId}`)
           if (meal.status !== 'DRAFT') {
-            wx.removeStorageSync('foodmaster.currentMealId')
+            wx.removeStorageSync('foodmaster.trial.currentMealId')
             mealId = undefined
           }
         } catch (caught) {
           if (!(caught instanceof ApiError) || caught.statusCode === 0) throw caught
-          wx.removeStorageSync('foodmaster.currentMealId')
+          wx.removeStorageSync('foodmaster.trial.currentMealId')
           mealId = undefined
         }
       }
@@ -45,10 +45,10 @@ Page({
         const meal = await request<{ mealId: string }>(`/subjects/${active.subjectId}/meals`, { method: 'POST', data: payload })
         completeOperation(scope, payload.operationId)
         mealId = meal.mealId
-        wx.setStorageSync('foodmaster.currentMealId', mealId)
+        wx.setStorageSync('foodmaster.trial.currentMealId', mealId)
       }
-      if(photoPath)wx.setStorageSync('mealPhoto', photoPath);else wx.removeStorageSync('mealPhoto')
-      wx.setStorageSync('foodmaster.manualEntry', !photoPath)
+      if(photoPath)wx.setStorageSync('foodmaster.trial.mealPhoto', photoPath);else wx.removeStorageSync('foodmaster.trial.mealPhoto')
+      wx.setStorageSync('foodmaster.trial.manualEntry', !photoPath)
       this.setData({ pendingPhoto: '' })
       openPage('/pages/result/result',{
         fail: (error) => {
