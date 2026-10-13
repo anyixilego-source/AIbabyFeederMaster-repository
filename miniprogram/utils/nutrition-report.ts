@@ -219,7 +219,7 @@ export function warningLabel(warning: string): string {
 }
 
 export function loadReportBundle(subjectId: string, force = false, reportId = '', selectedDate = ''): Promise<ReportBundle> {
-  const key = subjectId + ':' + (reportId || selectedDate || dateOnly(new Date())) + ':' + (getAuth()?.accessToken || '') + ':' + Number(wx.getStorageSync('foodmaster.trial.recordEpoch') || 0)
+  const key = subjectId + ':' + (reportId || selectedDate || dateOnly(new Date())) + ':' + (getAuth()?.accessToken || '') + ':' + Number(wx.getStorageSync('foodmaster.recordEpoch') || 0)
   if (!force && bundleCache && bundleCacheKey === key) {
     if (reportId) return bundleCache
     const cached = bundleCache

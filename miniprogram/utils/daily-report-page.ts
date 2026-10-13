@@ -52,9 +52,9 @@ Page({
         limitations:(result.limitations || []).map(l=>({...l,text:(nutrientNames[l.nutrientCode] || '营养素')+'：'+explanationSentence(l.text),reasonText:limitationReason(l.reasonCodes)})),limitCount:new Set((result.limitations || []).map(l=>l.nutrientCode)).size,
         reportId:bundle.report.reportId,generatedAt:new Date(bundle.report.generatedAt).toLocaleString('zh-CN'),evaluationVersion:result.assessment.assessmentAlgorithmVersion || '历史版本',
         knowledgeVersion:result.knowledge?.version || '历史知识未保存',supersedesReportId:bundle.report.supersedesReportId || '',snapshotAvailable:bundle.snapshotAvailable,milkLine:milkLine,milkCount:milkCount})
-      this._loaded=true;this._epoch=Number(wx.getStorageSync('foodmaster.trial.recordEpoch') || 0)
+      this._loaded=true;this._epoch=Number(wx.getStorageSync('foodmaster.recordEpoch') || 0)
       if(bundle.updateState==='FAILED'&&!this.data.selectedReportId)void this.loadCurrentRecords(sequence,bundle.date)
-      if(bundle.updateState==='CURRENT')wx.removeStorageSync('foodmaster.trial.reportNeedsRefresh')
+      if(bundle.updateState==='CURRENT')wx.removeStorageSync('foodmaster.reportNeedsRefresh')
     } catch(error) {
       if(sequence!==this._loadSequence)return
       if(error instanceof ApiError && ([401,403].includes(error.statusCode) || /access denied/i.test(error.message)))this.clearResult()

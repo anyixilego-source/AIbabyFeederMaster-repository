@@ -1,5 +1,5 @@
 import {getAuth} from './api'
-const OPERATION_KEY_PREFIX = 'foodmaster.trial.operation.'
+const OPERATION_KEY_PREFIX = 'foodmaster.operation.'
 
 interface PendingOperation {
   fingerprint?: string

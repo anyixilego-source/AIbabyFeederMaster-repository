@@ -192,7 +192,7 @@ function confirmedFoodSelection(
 }
 
 Page({
-  data: { reviewLabel:wx.getSystemInfoSync().platform==='devtools'?(wx.getStorageSync('foodmaster.trial.reviewEnvironment')?.label || ''):'',
+  data: { reviewLabel:wx.getSystemInfoSync().platform==='devtools'?(wx.getStorageSync('foodmaster.reviewEnvironment')?.label || ''):'',
     showFoodSelector:false, manualEntry: false, searchMessage:'', searchExample:'构造样例食品',
     photo: '/assets/camera-food-guide-v5.jpg', samplePhoto: true, busy: false, saving: false, abandoned: false,
     accepted: false, retentionIndex: 0, retentionOptions,
@@ -208,9 +208,9 @@ Page({
   },
 
   onLoad() {
-    this.setData({ abandoned: false, saving: false,manualEntry:Boolean(wx.getStorageSync('foodmaster.trial.manualEntry')) })
+    this.setData({ abandoned: false, saving: false,manualEntry:Boolean(wx.getStorageSync('foodmaster.manualEntry')) })
     cleanupExpiredLocalImages()
-    const photo = wx.getStorageSync('foodmaster.trial.mealPhoto') as string | undefined
+    const photo = wx.getStorageSync('mealPhoto') as string | undefined
     if (photo && !photo.startsWith('/assets/')) this.setData({ photo, samplePhoto: false })
   },
   onShow() {
@@ -233,7 +233,7 @@ Page({
   },
   async leaveRecognition(confirmDiscard: boolean) {
     if (this.data.saving) { wx.showToast({ title: '正在保存，请稍候', icon: 'none' }); return }
-    if (confirmDiscard && wx.getStorageSync('foodmaster.trial.currentMealId')) {
+    if (confirmDiscard && wx.getStorageSync('foodmaster.currentMealId')) {
       const confirmed = await new Promise<boolean>((resolve) => wx.showModal({
         title: '退出本次识别？',
         content: '未保存的内容会放弃，下次需要重新选择图片并识别。',
@@ -358,7 +358,7 @@ Page({
       wx.showToast({ title: message, icon: 'none' })
     } finally {
       this.setData({ busy: false, saving: false })
-      if (this.data.abandoned && wx.getStorageSync('foodmaster.trial.currentMealId')) {
+      if (this.data.abandoned && wx.getStorageSync('foodmaster.currentMealId')) {
         abandonCurrentMeal()
         void discardAbandonedMeals()
         backTo('/pages/camera/camera',this)
@@ -488,7 +488,7 @@ Page({
 
   async save(): Promise<void> {
     if (this.data.busy || this.data.saving) return
-    const mealId = wx.getStorageSync('foodmaster.trial.currentMealId') as string | undefined
+    const mealId = wx.getStorageSync('foodmaster.currentMealId') as string | undefined
     const foods = this.data.confirmedFoods
     if (!mealId) { wx.showToast({ title: '请从新增记录进入', icon: 'none' }); return }
     if (!foods.length) { wx.showToast({ title: '请至少确认一种标准食品', icon: 'none' }); return }
@@ -528,19 +528,19 @@ Page({
         body.weightReview={policyVersion:'MEAL_WEIGHT_REVIEW_V2',acknowledged:true,reviewedTotalGrams:total}
       }
       const saved=await submitRecord<{mealId:string;reportUpdate?:{status:string}}>(scope,'/subjects/'+draft.subjectId+'/meals/confirmed','POST','CREATE_CONFIRMED_MEAL',body)
-      wx.setStorageSync('foodmaster.trial.reportUpdateState',saved.reportUpdate?.status||'UNKNOWN')
+      wx.setStorageSync('foodmaster.reportUpdateState',saved.reportUpdate?.status||'UNKNOWN')
       abandonCurrentMeal();void discardAbandonedMeals()
-      wx.setStorageSync('foodmaster.trial.mealSaved', true)
-      wx.setStorageSync('foodmaster.trial.mealSavedAction', '本餐已保存')
-      wx.setStorageSync('foodmaster.trial.reportNeedsRefresh', true)
-      wx.removeStorageSync('foodmaster.trial.currentMealId')
+      wx.setStorageSync('foodmaster.mealSaved', true)
+      wx.setStorageSync('foodmaster.mealSavedAction', '本餐已保存')
+      wx.setStorageSync('foodmaster.reportNeedsRefresh', true)
+      wx.removeStorageSync('foodmaster.currentMealId')
       navigateRoot('/pages/records/records?saved=1')
     } catch (caught) {
       const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '保存失败'
       wx.showModal({ title: caught instanceof ApiError&&(caught.statusCode===0||caught.statusCode>=500)?'保存结果尚未确认':'保存失败',content:message+(caught instanceof ApiError&&(caught.statusCode===0||caught.statusCode>=500)?'。再次保存会核对原提交，不会重复新增。':''),showCancel:false })
     } finally {
       this.setData({ busy: false, saving: false })
-      if (this.data.abandoned && wx.getStorageSync('foodmaster.trial.currentMealId')) {
+      if (this.data.abandoned && wx.getStorageSync('foodmaster.currentMealId')) {
         abandonCurrentMeal()
         void discardAbandonedMeals()
       }

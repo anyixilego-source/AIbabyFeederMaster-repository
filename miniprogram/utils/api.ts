@@ -1,13 +1,13 @@
 import { apiBaseUrl } from '../config'
 
 export function reviewEnvironment(): { baseUrl: string; label: string; householdId?: string; subjectId?: string } | null {
-  const env = wx.getStorageSync('foodmaster.trial.reviewEnvironment') as { baseUrl?: string; label?: string; householdId?: string; subjectId?: string } | undefined
+  const env = wx.getStorageSync('foodmaster.reviewEnvironment') as { baseUrl?: string; label?: string; householdId?: string; subjectId?: string } | undefined
   if (wx.getSystemInfoSync().platform !== 'devtools' || !env || !/^http:\/\/127\.0\.0\.1:\d+\/api\/v1$/.test(env.baseUrl || '')) return null
   return { baseUrl: env.baseUrl!, label: env.label || '隔离验证 · 合成数据', householdId: env.householdId, subjectId: env.subjectId }
 }
 function runtimeBaseUrl(): string { return reviewEnvironment()?.baseUrl || apiBaseUrl }
 
-const AUTH_KEY = 'foodmaster.trial.auth'
+const AUTH_KEY = 'foodmaster.auth'
 
 export interface AuthSession {
   accountId?: string
@@ -132,7 +132,7 @@ export async function request<T>(path: string, options: RequestOptions = {}, ret
   try {
     const response = await rawRequest<T>(path, options)
     if (options.auth !== false && original && !unchangedSession(original)) throw changedSession()
-    if (affectsRecords(path) && options.method && options.method !== 'GET') wx.setStorageSync('foodmaster.trial.recordEpoch', Number(wx.getStorageSync('foodmaster.trial.recordEpoch') || 0) + 1)
+    if (affectsRecords(path) && options.method && options.method !== 'GET') wx.setStorageSync('foodmaster.recordEpoch', Number(wx.getStorageSync('foodmaster.recordEpoch') || 0) + 1)
     return response
   } catch (caught) {
     const error = caught instanceof ApiError ? caught : new ApiError('网络请求失败', 0, caught)
@@ -170,7 +170,7 @@ export function cachedPrivateCollectionImage(route: string): string {
  if(!getAuth() || !/^\/subjects\/[a-f0-9-]{36}\/diet-collections\/[a-f0-9]{64}\/images\/[a-f0-9-]{36}$/.test(route)) return ''
  const id=route.split('/').pop(),manager=wx.getFileSystemManager()
  for(const extension of ['png','jpg','webp']) {
-  const file=wx.env.USER_DATA_PATH+'/foodmaster-trial-recipe-'+id+'.'+extension
+  const file=wx.env.USER_DATA_PATH+'/foodmaster-recipe-'+id+'.'+extension
   try { manager.accessSync(file); return file } catch { /* An evicted local file is downloaded again. */ }
  }
  return ''
@@ -185,7 +185,7 @@ export async function downloadPrivateRecipeImage(route: string, retried = false)
  if (response.statusCode !== 200) throw new ApiError('示意图暂时无法读取',response.statusCode,null)
  if (!(response.data instanceof ArrayBuffer) || response.data.byteLength > 5*1024*1024) throw new Error('示意图内容无效')
  const bytes=new Uint8Array(response.data);const extension=bytes[0]===137&&bytes[1]===80?'png':bytes[0]===255&&bytes[1]===216?'jpg':bytes[0]===82&&bytes[1]===73&&bytes[8]===87&&bytes[9]===69?'webp':'';if(!extension)throw new Error('示意图格式无效')
- const filePath = wx.env.USER_DATA_PATH + '/foodmaster-trial-recipe-' + route.split('/').pop() + '.' + extension
+ const filePath = wx.env.USER_DATA_PATH + '/foodmaster-recipe-' + route.split('/').pop() + '.' + extension
  await new Promise<void>((resolve, reject) => wx.getFileSystemManager().writeFile({filePath,data:response.data,success:()=>resolve(),fail:reject}))
  return filePath
 }

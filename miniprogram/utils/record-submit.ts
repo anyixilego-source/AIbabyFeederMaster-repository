@@ -6,7 +6,7 @@ export interface PendingRecord {
     payload: Record<string, unknown>;
 }
 function key(scope: string) { const auth = getAuth(); if (!auth?.clientSessionId)
-    throw Error('请重新登录后再保存'); return 'foodmaster.trial.pending-record.' + (auth.accountId||auth.clientSessionId) + ':' + scope; }
+    throw Error('请重新登录后再保存'); return 'foodmaster.pending-record.' + (auth.accountId||auth.clientSessionId) + ':' + scope; }
 export function pendingRecord(scope: string): PendingRecord | undefined { return wx.getStorageSync(key(scope)) as PendingRecord | undefined; }
 export async function submitRecord<T>(scope: string, path: string, method: PendingRecord['method'], kind: string, body: Record<string, unknown>): Promise<T> {
     const storageKey = key(scope), auth = getAuth();
@@ -19,7 +19,7 @@ export async function submitRecord<T>(scope: string, path: string, method: Pendi
             }>('/record-operations/' + pending.payload.operationId + '?kind=' + pending.kind);
             if (receipt.status === 'COMPLETED' && receipt.response) {
                 wx.removeStorageSync(storageKey);
-                wx.setStorageSync('foodmaster.trial.recordEpoch', Number(wx.getStorageSync('foodmaster.trial.recordEpoch') || 0) + 1);
+                wx.setStorageSync('foodmaster.recordEpoch', Number(wx.getStorageSync('foodmaster.recordEpoch') || 0) + 1);
                 return receipt.response;
             }
         }
