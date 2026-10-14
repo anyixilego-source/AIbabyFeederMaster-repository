@@ -1,0 +1,9 @@
+.report-identity{display:flex;align-items:center;gap:18rpx;min-height:118rpx;padding:0 6rpx;box-sizing:border-box}
+.report-baby-avatar{width:76rpx;height:76rpx;flex:none;border:7rpx solid #fff;border-radius:52rpx;box-shadow:0 10rpx 24rpx rgba(236,147,121,.16)}
+.report-baby-copy{display:flex;flex:1;min-width:0;flex-direction:column;gap:8rpx}
+.report-baby-name{font-size:29rpx;font-weight:800;line-height:1.35;overflow-wrap:break-word}
+.report-baby-age{font-size:23rpx;color:#8a7774;line-height:1.5;overflow-wrap:break-word}
+.report-switch-slot{flex:none}
+.detail-mode-row{display:flex;align-items:center;justify-content:space-between;gap:18rpx;min-height:84rpx}
+.detail-mode-row>text{flex:1;min-width:0;overflow-wrap:break-word}
+.detail-mode-row period-mode-switch{flex:none}

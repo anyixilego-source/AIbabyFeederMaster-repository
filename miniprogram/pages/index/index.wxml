@@ -11,7 +11,7 @@
       <view class="hero-cta"><view class="camera-icon"></view><text>拍照记录饮食</text><view class="chevron"></view></view>
     </view>
     <view class="nutrition-card ui-card" bindtap="openReport" aria-role="button" aria-label="查看今日营养报告">
-      <view class="card-heading"><view class="heading-with-info"><text class="section-title">今日营养报告</text></view><view class="detail-link"><text>查看报告</text><view class="chevron"></view></view></view>
+      <view class="card-heading"><view class="heading-with-info"><text class="section-title">今日营养报告</text></view></view>
       <view class="report-summary">
         <view class="report-summary-icon">报</view>
         <view class="report-summary-copy"><text class="report-summary-title">{{reportTitle}}</text><text class="report-summary-desc">{{reportDescription}}</text></view>

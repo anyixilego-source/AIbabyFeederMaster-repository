@@ -1,9 +1,9 @@
-<navigation-bar title="营养素详情" back="{{true}}" delta="{{0}}" bind:back="goBack" color="#171722" background="transparent"><period-mode-switch id="period-mode" slot="right" active="DAY" disabled="{{loading}}" bindchange="changePeriodMode"/></navigation-bar>
-<view class="page-shell"><view wx:if="{{reviewLabel}}" class="review">{{reviewLabel}}</view>
+<navigation-bar title="营养素详情" back="{{true}}" delta="{{0}}" bind:back="goBack" color="#171722" background="transparent"></navigation-bar>
+<view class="page-shell"><view wx:if="{{reviewLabel}}" class="review">{{reviewLabel}}</view><view class="detail-mode-row"><text class="scope-note">{{dateLabel}}</text><period-mode-switch id="period-mode" active="DAY" disabled="{{loading}}" bindchange="changePeriodMode"/></view>
 
   <view wx:if="{{errorMessage}}" class="error-card">{{errorMessage}}</view>
   <view wx:elif="{{loading}}" class="loading-card">正在整理营养素详情…</view>
-  <block wx:else><text class="scope-note">{{dateLabel}} · 仅分析已保存并确认的饮食记录，未记录食物不计入。</text>
+  <block wx:else>
     <view class="summary-card">
       <view class="summary-top">
         <view class="nutrient-badge">{{badge}}</view>

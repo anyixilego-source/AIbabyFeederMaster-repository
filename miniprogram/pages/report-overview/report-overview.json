@@ -3,6 +3,8 @@
     "navigation-bar": "/components/navigation-bar/navigation-bar",
     "app-tabbar": "/components/app-tabbar/app-tabbar",
     "date-calendar": "/components/date-calendar/date-calendar",
-    "diet-recommendation": "/components/diet-recommendation/diet-recommendation"
+    "diet-recommendation": "/components/diet-recommendation/diet-recommendation",
+    "period-mode-switch": "/components/period-mode-switch/period-mode-switch",
+    "knowledge-carousel": "/components/knowledge-carousel/knowledge-carousel"
   }
 }

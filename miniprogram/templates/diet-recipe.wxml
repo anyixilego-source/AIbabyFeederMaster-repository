@@ -24,4 +24,5 @@
   <view class="recipe-card">
     <view class="recipe-section-heading"><view class="recipe-ui-icon icon-chef" aria-hidden="true"/><text class="recipe-section-title">做法</text></view>
     <view id="recipe-steps"><view wx:for="{{recipe.steps}}" wx:key="*this" class="recipe-step"><text class="recipe-step-number">{{index+1}}.</text><text class="recipe-step-copy">{{item}}</text></view><text wx:if="{{recipe.textureAdvice}}" class="recipe-supplement">{{recipe.textureAdvice}}</text><text wx:if="{{recipe.replacement}}" class="recipe-supplement">替代说明：{{recipe.replacement}}</text></view>
+    <recipe-search id="recipe-search" recipe-name="{{recipe.name}}"/>
   </view>

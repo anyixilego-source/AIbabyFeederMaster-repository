@@ -1,3 +1,4 @@
+@import "../../styles/report-page-header.wxss";
 page { background: #fff9f3; color: #2f1f1d; }
 .page-shell { min-height: 100vh; padding: 12rpx 28rpx 0; box-sizing: border-box; background: linear-gradient(180deg, #fff9f3 0%, #fffdfb 60%, #fff 100%); }
 .summary-card, .reference-card, .about-card, .error-card, .loading-card { margin-top: 18rpx; padding: 28rpx; border: 1rpx solid #f3e2d9; border-radius: 30rpx; background: rgba(255,255,255,.97); box-shadow: 0 12rpx 30rpx rgba(128,79,54,.055); }

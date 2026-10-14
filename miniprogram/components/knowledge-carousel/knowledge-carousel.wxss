@@ -1,0 +1,5 @@
+.knowledge-swiper{width:100%;transition:height 250ms ease-in-out}
+.knowledge-slide-content{box-sizing:border-box;padding:12rpx 4rpx 8rpx;overflow-wrap:break-word}
+.knowledge-slide-title{display:block;margin-bottom:10rpx;color:#3e3730;font-size:27rpx;font-weight:600;line-height:1.6}
+.knowledge-slide-text{display:block;color:#332724;font-size:27rpx;line-height:1.65;white-space:pre-wrap}
+.knowledge-slide-source{display:block;margin-top:12rpx;color:#a18b7a;font-size:22rpx;line-height:1.6}

@@ -1,0 +1,9 @@
+<swiper wx:if="{{items.length}}" id="knowledge-swiper" class="knowledge-swiper" style="height:{{slideHeight}}px" current="{{current}}" circular="{{items.length>1}}" autoplay="{{visible && !touching && items.length>1}}" interval="5000" duration="450" indicator-dots="{{items.length>1}}" indicator-color="#ead7c8" indicator-active-color="#c98b64" bindchange="slideChanged" bindtouchstart="touchStarted" bindtouchend="touchEnded" bindtouchcancel="touchEnded">
+  <swiper-item wx:for="{{items}}" wx:key="id">
+    <view class="knowledge-slide-content">
+      <text class="knowledge-slide-title">{{item.title}}</text>
+      <text class="knowledge-slide-text">{{item.text}}</text>
+      <text class="knowledge-slide-source" wx:for="{{item.evidence}}" wx:for-item="source" wx:key="id">来源：中国居民膳食指南（2022）{{source.bookPages?'，书内'+source.bookPages+'页':''}}</text>
+    </view>
+  </swiper-item>
+</swiper>

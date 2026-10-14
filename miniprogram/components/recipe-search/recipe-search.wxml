@@ -1,0 +1,6 @@
+<view wx:if="{{searchTerm}}" class="search-section">
+  <text class="search-caption">搜索更多做法</text>
+  <view id="recipe-search-copy" class="search-touch" catchtap="copySearchTerm" role="button" aria-label="复制{{searchTerm}}搜索词">
+    <text id="recipe-search-keyword" class="search-keyword">{{searchTerm}}</text>
+  </view>
+</view>
