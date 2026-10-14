@@ -3,6 +3,7 @@ import { MEAL_EDIT_OCCUPANCY_ENABLED,reserveMealEdit,releaseMealEdit,editReason 
 import { SavedMeal,deleteSavedMeal,operationId } from '../../utils/meal-edit'
 import {pendingRecord,submitRecord} from '../../utils/record-submit'
 import { ApiError, request } from '../../utils/api'
+import {mealPhotoPath} from '../../utils/meal-photo'
 import { ensureSessionContext, SessionContext } from '../../utils/session'
 
 interface MealSummary {
@@ -17,7 +18,7 @@ interface MealDetail extends MealSummary {
 }
 interface DisplayMeal {
   mealId: string; type: string; time: string; dateLabel: string; title: string; name: string
-  ingredients: string; foodCount: number; consumedTotal: string; tone: string
+  ingredients: string; foodCount: number; consumedTotal: string; tone: string; photoPath: string
   items: Array<{ mealItemId: string; name: string; served: string | null; consumed: string; unit: string }>
 }
 
@@ -142,7 +143,7 @@ Page({
         const time = `${occurredAt.getHours().toString().padStart(2, '0')}:${occurredAt.getMinutes().toString().padStart(2, '0')}`
         const name = meal.notes || `${mealLabels[meal.mealType]}记录`
         return {
-          mealId: meal.mealId, type: mealLabels[meal.mealType],
+          mealId: meal.mealId, photoPath:mealPhotoPath(meal.mealId), type: mealLabels[meal.mealType],
           time, dateLabel: `${occurredAt.getFullYear()}年${occurredAt.getMonth() + 1}月${occurredAt.getDate()}日`,
           title: `${time} · ${name}`, name,
           ingredients: confirmed.map((item) => item.observedName || '已确认食品').join('、') || '暂无已确认食物',
@@ -289,6 +290,7 @@ Page({
       if (caught instanceof ApiError && caught.statusCode === 409) { this.setData({ 'milkPanel.visible': false }); await this.loadMilk() }
     } finally { this.setData({ 'milkPanel.deleting': false }) }
   },
+  hideMealPhoto(e:WechatMiniprogram.CustomEvent){const mealId=String(e.currentTarget.dataset.mealId);this.setData({meals:this.data.meals.map(meal=>meal.mealId===mealId?{...meal,photoPath:''}:meal)})},
   openCalendar(){this.setData({showCalendar:true})},
   closeCalendar(){this.setData({showCalendar:false})},
   goBack() { navigateRoot('/pages/index/index') },

@@ -24,6 +24,11 @@ export function cleanupExpiredLocalImages(now = Date.now()): void {
   wx.setStorageSync(IMAGE_RETENTION_KEY, active)
 }
 
+export function retainedImageExpiry(filePath: string): number | null {
+  const record = records().find(record=>record.filePath===filePath)
+  return record && Number.isFinite(record.expiresAt) && record.expiresAt>Date.now() ? record.expiresAt : null
+}
+
 export function saveLocalImage(tempFilePath: string, retention: RetentionChoice): Promise<string> {
   const remember = (filePath: string) => {
     const expiresAt = Date.now() + daysByChoice[retention] * 24 * 60 * 60 * 1000
@@ -32,7 +37,8 @@ export function saveLocalImage(tempFilePath: string, retention: RetentionChoice)
     wx.setStorageSync(IMAGE_RETENTION_KEY, next)
     return filePath
   }
-  if (tempFilePath.includes(wx.env.USER_DATA_PATH)) return Promise.resolve(remember(tempFilePath))
+  // Devtools saveFile returns http://store; a retained file must not be saved twice.
+  if (tempFilePath.includes(wx.env.USER_DATA_PATH) || records().some(record=>record.filePath===tempFilePath)) return Promise.resolve(remember(tempFilePath))
   return new Promise((resolve, reject) => {
     wx.saveFile({
       tempFilePath,

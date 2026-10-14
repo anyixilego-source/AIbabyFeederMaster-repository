@@ -14,6 +14,13 @@ export function ageDisplayFromMonths(months: number): string {
   return `${safeMonths}个月（${yearText}）`
 }
 
+export function ageStageFromMonths(months: number | undefined): string {
+  if (months === undefined || !Number.isInteger(months) || months < 0) return ''
+  if (months < 12) return months + '月龄'
+  const years = Math.floor(months / 12), remainder = months % 12
+  return years + '岁' + (remainder ? remainder + '个月' : '')
+}
+
 export function ageDisplay(birthDate: string, today = new Date()): string {
   return ageDisplayFromMonths(ageMonths(birthDate, today))
 }

@@ -1,4 +1,4 @@
-import {openPage,backPage} from '../../utils/navigation'
+import {openPage,backPage,resumePendingPrimary} from '../../utils/navigation'
 import { ApiError, request } from '../../utils/api'
 import { completeOperation, getPendingOperation, operationPayload } from '../../utils/operation'
 import { ensureSessionContext, SessionContext } from '../../utils/session'
@@ -14,6 +14,7 @@ Page({
     cameraEnabled: false, cameraError: false, tipVisible: true, preparing: false, preparationError: '', pendingPhoto: '',
     flash: 'off' as 'auto'|'on'|'off', position: 'back' as 'back'|'front',
   },
+  onShow() { resumePendingPrimary(this) },
   onLoad() { void this.discardPendingMeal() },
   onUnload() { void this.discardPendingMeal() },
   async continueWithPhoto(photoPath: string) {

@@ -332,6 +332,7 @@ Page({
     try {
       const retention = this.data.retentionOptions[this.data.retentionIndex]
       const localPath = await saveLocalImage(this.data.photo, retention.value)
+      this.setData({photo:localPath})
       const result = await uploadRecognitionImage<RecognitionResult>(localPath, {
         policyVersion: 'food-image-consent-v1', localRetention: retention.value,
       })
@@ -527,7 +528,7 @@ Page({
         const accepted=await new Promise<boolean>(resolve=>wx.showModal({title:'核对本餐总量',content:weightNotice(total)+'确认记录这个重量吗？',confirmText:'确认记录',success:r=>resolve(r.confirm),fail:()=>resolve(false)}));if(!accepted)return
         body.weightReview={policyVersion:'MEAL_WEIGHT_REVIEW_V2',acknowledged:true,reviewedTotalGrams:total}
       }
-      const saved=await submitRecord<{mealId:string;reportUpdate?:{status:string}}>(scope,'/subjects/'+draft.subjectId+'/meals/confirmed','POST','CREATE_CONFIRMED_MEAL',body)
+      const saved=await submitRecord<{mealId:string;reportUpdate?:{status:string}}>(scope,'/subjects/'+draft.subjectId+'/meals/confirmed','POST','CREATE_CONFIRMED_MEAL',body,!this.data.manualEntry&&!this.data.samplePhoto?{filePath:this.data.photo,retention:this.data.retentionOptions[this.data.retentionIndex].value}:undefined)
       wx.setStorageSync('foodmaster.reportUpdateState',saved.reportUpdate?.status||'UNKNOWN')
       abandonCurrentMeal();void discardAbandonedMeals()
       wx.setStorageSync('foodmaster.mealSaved', true)

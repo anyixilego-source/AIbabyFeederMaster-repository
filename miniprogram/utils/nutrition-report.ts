@@ -34,10 +34,11 @@ export interface AssessmentReport {
   result: {
     assessment: { status: string; nutrients: AssessmentNutrient[]; boundaryStatement: string; assessmentAlgorithmVersion?: string }
     evidence?: { ageMonths: number; date: string; subject: { birthDate: string }; records: ReportRecord[]; facts: ReportFact[] }
+    interpretationSummary?: { version:string; text:string; allMet:boolean; recordedCodes:string[]; focusCodes:string[] }
     observations?: Array<{ id: string; nutrientCode: string; text: string }>
     limitations?: Array<{ nutrientCode: string; text: string; reasonCodes: string[] }>
     actions?: Array<{ id: string; text: string }>
-    knowledge?: { version: string; scopeDeclaration: string; claims: Array<{ id: string; title: string; text: string; evidence: Array<{ id: string; source: string; bookPages: string }> }> }
+    knowledge?: { version: string; scopeDeclaration: string; ageMonths?: number; claims: Array<{ id: string; title: string; text: string; evidence: Array<{ id: string; source: string; bookPages: string }> }> }
   }
 }
 

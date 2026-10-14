@@ -7,15 +7,16 @@ import { ensureSessionContext } from './session'
 import { knowledgePanel, advanceKnowledgePanel } from './knowledge-panel'
 import { limitationReason, explanationSentence } from './limitation-reasons'
 import {dailyCards} from './nutrient-summary-card'
+import {ageStageFromMonths} from './age'
 
 export function registerReportPage() {
 Page({
   data: { loading:true,errorMessage:'',hasResult:false,hasRecords:false,showAll:false,showObservations:false,showKnowledge:false,showVersion:false,showLimitations:false,showLimitationReasons:false,showKnowledgeSources:false,showActions:false,observationCount:0,knowledgeCount:0,actionCount:0,
-    reviewLabel:reviewEnvironment()?.label || '',selectedDate:'',fromRecords:false,fromPeriod:false,category:'ALL',categories:[{key:'ALL',name:'全部'},{key:'MACRO',name:'能量与宏量'},{key:'MINERAL',name:'矿物质'},{key:'VITAMIN',name:'维生素'}],subjectId:'',babyName:'宝宝',ageText:'',dateLabel:'',mealCount:0,foodCount:0,totalConsumedText:'',weightLabel:'记录重量',
+    interpretationText:'',foodRecommendationText:'',foodPreparationText:'',foodSuggestionNote:'',reviewLabel:reviewEnvironment()?.label || '',selectedDate:'',fromRecords:false,fromPeriod:false,category:'ALL',categories:[{key:'ALL',name:'全部'},{key:'MACRO',name:'能量与宏量'},{key:'MINERAL',name:'矿物质'},{key:'VITAMIN',name:'维生素'}],subjectId:'',babyName:'宝宝',ageText:'',dateLabel:'',mealCount:0,foodCount:0,totalConsumedText:'',weightLabel:'记录重量',
     allNutrients:[] as NutrientView[],nutrients:[] as NutrientView[],observations:[] as NonNullable<AssessmentReport['result']['observations']>,
     visibleObservations:[] as NonNullable<AssessmentReport['result']['observations']>,allActions:[] as NonNullable<AssessmentReport['result']['actions']>,actions:[] as NonNullable<AssessmentReport['result']['actions']>,
     knowledge:[] as NonNullable<AssessmentReport['result']['knowledge']>['claims'],visibleKnowledge:[] as NonNullable<AssessmentReport['result']['knowledge']>['claims'],
-    knowledgeScope:'',limitations:[] as Array<NonNullable<AssessmentReport['result']['limitations']>[number]&{reasonText:string}>,limitCount:0,
+    knowledgeScope:'',knowledgeAgeText:'',limitations:[] as Array<NonNullable<AssessmentReport['result']['limitations']>[number]&{reasonText:string}>,limitCount:0,
     observationCards:[] as ReturnType<typeof dailyCards>,periodId:'',currentRecordSummary:'',selectedReportId:'',reportId:'',generatedAt:'',evaluationVersion:'',knowledgeVersion:'',supersedesReportId:'',snapshotAvailable:false,legacyReport:false,milkLine:'',milkCount:0 },
   _loadSequence:0,_scroll:0,_loaded:false,_epoch:0,
   onPageScroll(e:{scrollTop:number}){this._scroll=e.scrollTop},
@@ -45,14 +46,15 @@ Page({
       const compatibilityMessage = legacyReport ? this.data.selectedReportId
         ? '这份历史报告未保存新版记录统计与解读，按原有内容展示。'
         : '当前服务返回旧版报告，尚未支持新版记录统计与解读。已保存餐食不受影响，可在记录页查看。' : ''
-      this.setData({currentRecordSummary:'',errorMessage:[failedMessage,compatibilityMessage].filter(Boolean).join(''),legacyReport,hasResult:true,hasRecords:bundle.mealCount>0,babyName:bundle.subject.displayName,ageText:bundle.ageText,dateLabel:bundle.dateLabel,
+      this.setData({interpretationText:result.interpretationSummary?.text || '',foodRecommendationText:'',foodPreparationText:'',foodSuggestionNote:'',currentRecordSummary:'',errorMessage:[failedMessage,compatibilityMessage].filter(Boolean).join(''),legacyReport,hasResult:true,hasRecords:bundle.mealCount>0,babyName:bundle.subject.displayName,ageText:bundle.ageText,dateLabel:bundle.dateLabel,
         mealCount:bundle.mealCount,foodCount:bundle.foodCount,totalConsumedText:bundle.totalConsumedText.replace(/^约/,''),weightLabel:'食物重量',
         allNutrients:bundle.nutrients,nutrients:this.data.category==='ALL'?bundle.nutrients:bundle.nutrients.filter(n=>n.category===this.data.category),observations:observations,observationCount:observations.length,visibleObservations:this.data.showObservations?observations:observations.slice(0,3),observationCards:dailyCards(this.data.showObservations?observations:observations.slice(0,3),bundle.nutrients),
-        allActions:result.actions || [],actions:this.data.showActions?(result.actions || []):(result.actions || []).slice(0,2),actionCount:(result.actions || []).length,knowledge:knowledge,knowledgeCount:knowledge.length,...knowledgePanel(knowledge,this.data.showKnowledge,this.data.showKnowledgeSources),knowledgeScope:result.knowledge?.scopeDeclaration || '',
+        allActions:result.actions || [],actions:this.data.showActions?(result.actions || []):(result.actions || []).slice(0,2),actionCount:(result.actions || []).length,knowledge:knowledge,knowledgeCount:knowledge.length,...knowledgePanel(knowledge,this.data.showKnowledge,this.data.showKnowledgeSources),knowledgeScope:result.knowledge?.scopeDeclaration || '',knowledgeAgeText:ageStageFromMonths(result.knowledge?.ageMonths ?? result.evidence?.ageMonths),
         limitations:(result.limitations || []).map(l=>({...l,text:(nutrientNames[l.nutrientCode] || '营养素')+'：'+explanationSentence(l.text),reasonText:limitationReason(l.reasonCodes)})),limitCount:new Set((result.limitations || []).map(l=>l.nutrientCode)).size,
         reportId:bundle.report.reportId,generatedAt:new Date(bundle.report.generatedAt).toLocaleString('zh-CN'),evaluationVersion:result.assessment.assessmentAlgorithmVersion || '历史版本',
         knowledgeVersion:result.knowledge?.version || '历史知识未保存',supersedesReportId:bundle.report.supersedesReportId || '',snapshotAvailable:bundle.snapshotAvailable,milkLine:milkLine,milkCount:milkCount})
       this._loaded=true;this._epoch=Number(wx.getStorageSync('foodmaster.recordEpoch') || 0)
+      if(bundle.mealCount>0)void this.loadFoodSuggestions(sequence,bundle.report.reportId,bundle.updateState==='CURRENT'&&!this.data.selectedReportId)
       if(bundle.updateState==='FAILED'&&!this.data.selectedReportId)void this.loadCurrentRecords(sequence,bundle.date)
       if(bundle.updateState==='CURRENT')wx.removeStorageSync('foodmaster.reportNeedsRefresh')
     } catch(error) {
@@ -62,8 +64,17 @@ Page({
       this.setData({errorMessage:error instanceof Error && ['请先建立宝宝档案','请先切换到该报告所属宝宝'].includes(error.message)?error.message:this.data.hasResult?'报告暂未更新；正在展示上次结果，尚未包含最新修改。可稍后重试或继续记录。':'首次报告尚无结果。可稍后重试或查看已保存记录。'})
     } finally { if(sequence===this._loadSequence)this.setData({loading:false}) }
   },
+  async loadFoodSuggestions(sequence:number,reportId:string,generate:boolean,attempt=0){
+    if(generate&&attempt===0&&sequence===this._loadSequence&&this.data.reportId===reportId)this.setData({foodSuggestionNote:'正在生成餐食搭配参考…'});
+    try{const result=await request<{status:string;reason?:string;foods:Array<{name:string;preparation:string}>}>('/assessment-reports/'+encodeURIComponent(reportId)+'/food-suggestions',{method:'POST',data:{generate}});
+      if(sequence!==this._loadSequence||this.data.reportId!==reportId)return;
+      if(result.status==='PENDING'&&generate&&attempt<3){setTimeout(()=>{if(sequence===this._loadSequence&&this.data.reportId===reportId)void this.loadFoodSuggestions(sequence,reportId,generate,attempt+1)},[3000,5000,10000][attempt]);return;}
+      if(result.status!=='READY'||!result.foods.length){this.setData({foodRecommendationText:'',foodSuggestionNote:generate?(result.reason==='FEEDING_CONDITIONS_NOT_CONFIRMED'?'确认饮食推荐中的喂养条件后，可生成餐食搭配参考。':'餐食搭配参考暂未生成，请稍后重试。'):''});return;}
+      this.setData({foodRecommendationText:'餐食搭配可考虑：'+result.foods.map(f=>f.name).join('、')+'。',foodSuggestionNote:'',foodPreparationText:result.foods.map(f=>f.name+'：'+f.preparation).join(' ')});
+    }catch{if(sequence===this._loadSequence&&this.data.reportId===reportId)this.setData({foodRecommendationText:'',foodSuggestionNote:generate?'餐食搭配参考暂未生成，请稍后重试。':''});}
+  },
   async loadCurrentRecords(sequence:number,date:string){try{const meals=await request<MealSummary[]>('/subjects/'+this.data.subjectId+'/meals');if(sequence!==this._loadSequence)return;const current=meals.filter(m=>m.status==='CONFIRMED'&&new Date(m.occurredAt).toLocaleDateString('sv-SE')===date);this.setData({currentRecordSummary:current.length+'餐已保存。以下报告仍为上次修订；本餐明细可在记录页核看。'})}catch{}},
-  clearResult(){this._loaded=false;this.setData({hasResult:false,hasRecords:false,showLimitations:false,showLimitationReasons:false,showAll:false,showObservations:false,category:'ALL',subjectId:'',babyName:'宝宝',ageText:'',dateLabel:'',reportId:'',mealCount:0,foodCount:0,totalConsumedText:'',weightLabel:'',generatedAt:'',evaluationVersion:'',knowledgeVersion:'',knowledgeScope:'',supersedesReportId:'',snapshotAvailable:false,legacyReport:false,allNutrients:[],nutrients:[],observations:[],visibleObservations:[],allActions:[],actions:[],knowledge:[],visibleKnowledge:[],showKnowledge:false,showKnowledgeSources:false,limitations:[],observationCount:0,knowledgeCount:0,actionCount:0,limitCount:0})},
+  clearResult(){this._loaded=false;this.setData({hasResult:false,hasRecords:false,interpretationText:'',foodRecommendationText:'',foodPreparationText:'',foodSuggestionNote:'',showLimitations:false,showLimitationReasons:false,showAll:false,showObservations:false,category:'ALL',subjectId:'',babyName:'宝宝',ageText:'',dateLabel:'',reportId:'',mealCount:0,foodCount:0,totalConsumedText:'',weightLabel:'',generatedAt:'',evaluationVersion:'',knowledgeVersion:'',knowledgeScope:'',knowledgeAgeText:'',supersedesReportId:'',snapshotAvailable:false,legacyReport:false,observationCards:[],allNutrients:[],nutrients:[],observations:[],visibleObservations:[],allActions:[],actions:[],knowledge:[],visibleKnowledge:[],showKnowledge:false,showKnowledgeSources:false,limitations:[],observationCount:0,knowledgeCount:0,actionCount:0,limitCount:0})},
   selectCategory(e:WechatMiniprogram.TouchEvent){const key=String(e.currentTarget.dataset.key);this.setData({category:key,nutrients:key==='ALL'?this.data.allNutrients:this.data.allNutrients.filter(n=>n.category===key)})},
   openOverview(){navigateRoot('/pages/report-overview/report-overview?endDate='+this.data.dateLabel.slice(0,10))},
   toggleActions(){const expanded=!this.data.showActions;this.setData({showActions:expanded,actions:expanded?this.data.allActions:this.data.allActions.slice(0,2)})},

@@ -77,15 +77,18 @@ export function navigateRoot(url: string) {
     if (pages.length > 1) run(c => wx.navigateBack({ delta: pages.length - 1, ...c }))
   } else run(c => wx.reLaunch({ url, ...c }))
 }
-export function ensureHomeParent(owner: object) {
+// The camera may survive a saved-result page just as a primary module does.
+// Resume from the surviving page instead of the unloaded result page.
+export function resumePendingPrimary(owner: object) {
   const shared = navigationState()
   const pages = getCurrentPages(), page = pages[pages.length - 1]
-  if (!page || page !== owner || !PRIMARY_ROUTES.has(page.route)) return false
+  if (!page || page !== owner) return false
   if (shared.pendingPrimary) {
     const url = shared.pendingPrimary
     const resume = () => {
       const current = getCurrentPages()
-      if (current[current.length - 1] !== owner || shared.pendingPrimary !== url) return
+      if (shared.pendingPrimary !== url) return
+      if (current[current.length - 1] !== owner) { shared.pendingPrimary = ""; return }
       // onShow may precede the native back completion callback. Wait for that callback.
       if (shared.navigating) { setTimeout(resume, 16); return }
       navigateRoot(url)
@@ -93,6 +96,12 @@ export function ensureHomeParent(owner: object) {
     setTimeout(resume, 300)
     return true
   }
+  return false
+}
+export function ensureHomeParent(owner: object) {
+  if (resumePendingPrimary(owner)) return true
+  const pages = getCurrentPages(), page = pages[pages.length - 1]
+  if (!page || page !== owner || !PRIMARY_ROUTES.has(page.route)) return false
   if (same(pages[0], HOME)) return false
   const query = Object.entries(page.options).filter(([, v]) => v !== undefined).map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(String(v))).join('&')
   const url = '/' + page.route + (query ? '?' + query : '')
