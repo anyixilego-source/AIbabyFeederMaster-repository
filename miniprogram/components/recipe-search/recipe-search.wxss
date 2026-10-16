@@ -1,4 +1,4 @@
-.search-section{margin-top:20rpx;padding-top:16rpx;border-top:1rpx solid #f2e7dc}
-.search-caption{display:block;font-size:26rpx;font-weight:400;line-height:1.5;color:#80766d}
-.search-touch{display:flex;align-items:center;min-height:88rpx;max-width:100%}
-.search-keyword{display:block;box-sizing:border-box;max-width:100%;padding:8rpx 14rpx;border-radius:24rpx;background:#fff5e9;color:#806f60;font-size:23rpx;font-weight:400;line-height:1.5;overflow-wrap:break-word;word-break:break-all}
+.search-section{margin-top:26rpx;padding-top:26rpx;border-top:2rpx solid #f1e8e0}
+.search-caption{display:block;font-size:21rpx;font-weight:400;line-height:1.6;color:#b4a391}
+.search-touch{display:flex;align-items:flex-start;min-height:84rpx;max-width:100%;padding-top:16rpx;box-sizing:border-box}
+.search-keyword{display:block;box-sizing:border-box;max-width:100%;padding:12rpx 20rpx;border-radius:35rpx;background:#fff5e8;color:#b69063;font-size:19rpx;font-weight:400;line-height:1.5;overflow-wrap:anywhere;word-break:break-word}

@@ -40,10 +40,24 @@ export function homeMenuPreview(latest: MenuLatest, now = Date.now()): HomeMenuP
   }
   if (generating) return { ...emptyHomeMenu('RUNNING', '菜单正在生成，完成后可查看搭配', '查看菜单'), generating: true }
   const expired = latest.plan && latest.plan.endDate < dates.today
-  return emptyHomeMenu('EMPTY', expired ? '现有菜单已结束，可规划接下来7天的搭配' : '为宝宝规划接下来7天的搭配', '规划菜单')
+  return emptyHomeMenu('EMPTY', expired ? '现有菜单已结束，点击生成菜单' : '今天和明天暂无菜单，点击生成菜单', '生成菜单')
 }
 
 export function homeMenuDayIndex(task: MenuTask | null, date: string): number {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !menuDayPreview(task, date).length) return -1
   return task!.plan!.days.findIndex(day => day.date === date)
+}
+
+export interface HomeMenuFeatured {recipeKey:string;name:string;slotLabel:string;texture:string;description:string;minutes:number|null}
+// A single preview follows the existing day's meal and recipe order; no new recommendation policy.
+export function homeMenuFeatured(latest:MenuLatest,preview:HomeMenuPreview):HomeMenuFeatured|null {
+  const task=latest.plan,plan=task?.plan;
+  if(preview.state!=='READY'||!plan||task?.taskId!==preview.taskId)return null;
+  const day=plan.days.find(d=>d.date===preview.date);if(!day)return null;
+  for(const meal of preview.meals){
+    const keys=day.meals.find(m=>m.slot===meal.slot)?.recipeKeys||[];
+    const recipe=keys.map(key=>plan.recipes.find(r=>r.key===key)).find(r=>Boolean(r?.name.trim()));
+    if(recipe)return {recipeKey:recipe.key,name:recipe.name,slotLabel:meal.label+(meal.optional?'（按需）':''),texture:({PUREE:'细泥',MASHED:'压碎',SOFT:'软小块'} as Record<string,string>)[recipe.texture]||'',description:recipe.description||'',minutes:Number.isFinite(recipe.preparationMinutes)&&recipe.preparationMinutes>0?recipe.preparationMinutes:null};
+  }
+  return null;
 }

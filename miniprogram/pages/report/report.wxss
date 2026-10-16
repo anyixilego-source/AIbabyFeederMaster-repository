@@ -1,3 +1,4 @@
+@import "../../styles/record-empty.wxss";
 @import "../../styles/report-page-header.wxss";
 @import "../../styles/report-controls.wxss";
 page { background: #fff9f3; color: #2f1f1d; }
@@ -85,3 +86,60 @@ page { background: #fff9f3; color: #2f1f1d; }
 .nav-title{white-space:nowrap}
 
 .page-shell .daily-back-today{flex:none;width:auto;min-width:0;margin:0;padding:8rpx 14rpx;min-height:64rpx;line-height:1.5;font-size:23rpx;font-weight:400;background:transparent;color:#c57952;border:0}.daily-back-today::after{border:0}
+
+/* 11-daily: scoped to the four approved cards; the full nutrient view keeps its contents and uses matching controls. */
+#daily-record-summary,.daily-observations,.daily-all-nutrients,.daily-knowledge,.daily-limitations{padding:34rpx;border:2rpx solid #f2eae3;border-radius:42rpx;background:#fffefd;box-shadow:0 10rpx 46rpx rgba(136,91,57,.045);color:#3d302a}
+#daily-record-summary .section-heading,.daily-observations .section-heading,.daily-all-nutrients .section-heading,.daily-knowledge .section-heading{font-size:31rpx;font-weight:600;line-height:1.4}
+#daily-record-summary .summary-grid{grid-template-columns:.88fr .88fr 1.12fr 1.12fr;gap:9rpx;margin-top:26rpx;padding-top:15rpx}
+#daily-record-summary .summary-item{padding:0;gap:17rpx;border:0}
+#daily-record-summary .summary-value{max-width:100%;font-family:Arial,sans-serif;font-size:36rpx;font-weight:600;letter-spacing:-.7rpx;line-height:1.3;white-space:normal;overflow-wrap:anywhere}
+#daily-record-summary .summary-unit{font-size:19rpx;font-weight:400;margin-left:4rpx;letter-spacing:0;white-space:nowrap}
+#daily-record-summary .summary-label{font-size:19rpx;color:#92847a;font-weight:400;line-height:1.5}
+.daily-observations{margin-top:24rpx}
+.daily-observations #daily-interpretation-summary{padding:0;margin:23rpx 0 32rpx;font-size:23rpx;line-height:1.85;color:#978477}
+.daily-nutrient-entry{padding:27rpx 0;border-top:2rpx solid #f1e8e0}
+.daily-nutrient-top{display:flex;align-items:center;gap:18rpx;min-height:62rpx}
+.daily-nutrient-icon{flex:none;width:62rpx;height:62rpx}
+.daily-nutrient-name{flex:1;min-width:0;font-size:27rpx;font-weight:600;line-height:1.5;overflow-wrap:anywhere}
+.daily-nutrient-amount{display:flex;align-items:baseline;flex-wrap:wrap;justify-content:flex-end;gap:5rpx;max-width:45%;font:400 27rpx/1.3 Arial,sans-serif;overflow-wrap:anywhere}
+.daily-nutrient-unit{font-size:20rpx;font-weight:400;white-space:nowrap}
+.daily-nutrient-chevron{flex:none;color:#c2ac98;font-size:36rpx;line-height:1}
+.daily-nutrient-source,.daily-nutrient-note{display:block;margin-top:12rpx;font-size:21rpx;color:#92847a;line-height:1.65;overflow-wrap:anywhere;white-space:normal}
+.daily-nutrient-source{font-size:20rpx;color:#a08c7b}
+.daily-nutrient-note{color:#ac8553;font-size:20rpx}
+.daily-nutrient-progress{margin-top:19rpx}
+.daily-progress-track{height:13rpx;border-radius:13rpx;overflow:hidden;background:#f4f0e9}
+.daily-progress-fill{height:100%;border-radius:13rpx;background:#d4c9bc}
+.daily-progress-fill.yellow{background:linear-gradient(90deg,#ffe3a6,#efbc65)}
+.daily-progress-fill.red{background:linear-gradient(90deg,#f2aaa4,#e67b78)}
+.daily-progress-fill.green{background:linear-gradient(90deg,#bfd89b,#8ebf6f)}
+.daily-progress-caption{display:flex;justify-content:space-between;align-items:flex-start;gap:14rpx;margin-top:11rpx;color:#b0a18f;font-size:19rpx;line-height:1.6}
+.daily-progress-caption>text:first-child{flex:1;min-width:0;overflow-wrap:anywhere}
+.daily-progress-value{flex:none;color:#978576}
+.daily-observations .observation-controls{gap:16rpx;margin-top:8rpx;flex-wrap:nowrap}
+.daily-observations .observation-controls button{flex:1 1 0;min-width:0;min-height:84rpx;padding:12rpx 3rpx;font-size:23rpx;font-weight:400;line-height:1.6;background:transparent;color:#b69d89;border:0;border-radius:16rpx;white-space:normal}
+.daily-observations .observation-controls button::after{border:0}
+.daily-knowledge{background:linear-gradient(130deg,#fff8e9,#fffdf6)}
+.daily-knowledge .section-heading{gap:14rpx;margin-bottom:26rpx;align-items:center}
+.daily-knowledge-title{display:flex;align-items:center;gap:12rpx;flex:1;min-width:0}
+.daily-knowledge-icon{flex:none;width:35rpx;height:35rpx;background:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjYmM5ODc3IiBzdHJva2Utd2lkdGg9IjEuNyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNOCAxNmE3IDcgMCAxIDEgOCAwbC0xIDNIOXogTTkgMjJoNiBNMTIgNHYyIi8+PC9zdmc+") center/contain no-repeat}
+.daily-knowledge-age{flex:none;color:#92847a;font-size:21rpx;font-weight:400;line-height:1.5;max-width:38%;text-align:right}
+.daily-limitations{padding-top:24rpx;padding-bottom:24rpx}
+.daily-limitations .section-heading{font-size:25rpx;font-weight:600;gap:16rpx;line-height:1.6}
+.daily-limitations #toggle-nutrient-limitations{flex:none;display:flex;align-items:center;justify-content:flex-end;min-width:80rpx;min-height:84rpx;color:#bb8d56;font-size:21rpx;font-weight:400}
+.daily-limitations .scope-note{padding:0;font-size:23rpx;line-height:1.75;color:#92847a;margin:12rpx 0 0}
+
+/* Matching text controls inside the existing thirteen-nutrient view. */
+.daily-all-nutrients .mode-back,.daily-all-nutrients .mode-back-bottom{min-height:84rpx;padding:12rpx 3rpx;font-size:23rpx;font-weight:400;line-height:1.6;background:transparent;color:#b69d89;border:0;border-radius:16rpx;white-space:normal}
+.daily-all-nutrients .mode-back::after,.daily-all-nutrients .mode-back-bottom::after{border:0}
+.daily-all-nutrients .categories{gap:10rpx;margin:12rpx 0;align-items:center}
+.daily-all-nutrients .category-pill{display:flex;align-items:center;justify-content:center;min-height:84rpx;box-sizing:border-box;padding:12rpx 9rpx;font-size:23rpx;font-weight:400;line-height:1.6;color:#b69d89;background:transparent;border-radius:0;border-bottom:2rpx solid transparent}
+.daily-all-nutrients .category-pill.active{color:#946e51;font-weight:600;background:transparent;border-bottom-color:#d3ab77}
+
+.daily-all-nutrients .nutrient-list{margin-top:12rpx;gap:0}
+
+.daily-nutrient-amount.has-reference{font-size:35rpx;font-weight:600}
+
+.daily-empty-guide{margin-top:24rpx}
+
+.summary-card.empty-summary-card .record-empty-card{border:0;box-shadow:none;background:transparent;margin:0;padding:40rpx 16rpx 60rpx}.empty-summary-card .daily-empty-guide{margin-top:0}

@@ -1,12 +1,13 @@
+import {aiFailureView,notifyAiFailure,type AiDiagnostic,type AiFailureView} from '../../utils/ai-failure'
 import {request,reviewEnvironment,downloadPrivateRecipeImage,cachedPrivateCollectionImage} from '../../utils/api'
 import {ensureSessionContext} from '../../utils/session'
 import {backPage,openPage,backTo} from '../../utils/navigation'
 import {operationId,menuRisk,type MenuRecipe} from '../../utils/diet-plan'
-interface CollectionItem {dishFingerprint:string;name:string;recipe:MenuRecipe;imageId:string|null;imageUrl:string|null;imagePath:string;imageLoading:boolean;imageRepairing:boolean;imageFailed:boolean;imageMessage:string}
-interface PictureState {status:string;imageId:string|null;imageUrl:string|null;message:string}
+interface CollectionItem {dishFingerprint:string;name:string;recipe:MenuRecipe;imageId:string|null;imageUrl:string|null;imagePath:string;imageLoading:boolean;imageRepairing:boolean;imageFailed:boolean;imageMessage:string;imageFailure?:AiFailureView|null}
+interface PictureState {status:string;imageId:string|null;imageUrl:string|null;message:string;diagnostic?:AiDiagnostic|null}
 Page({
- data:{loading:true,errorMessage:'',subjectId:'',babyName:'宝宝',items:[] as CollectionItem[],busy:'',confirming:'',mode:'LIST',detailKey:'',recipe:null as MenuRecipe|null,recipeCollectionView:true,showRecipeInfo:false,risk:menuRisk,imagePath:'',imageMessage:'',imageGenerating:false,imageStatus:'',detailLoading:false,consentVersion:'',reviewLabel:reviewEnvironment()?.label||''},
- _sequence:0,_detailEpoch:0,_entrySubject:'',_operations:{} as Record<string,string>,
+ data:{loading:true,errorMessage:'',subjectId:'',babyName:'宝宝',items:[] as CollectionItem[],busy:'',confirming:'',mode:'LIST',detailKey:'',recipe:null as MenuRecipe|null,recipeCollectionView:true,showRecipeInfo:false,risk:menuRisk,imageFailure:null as AiFailureView|null,imagePath:'',imageMessage:'',imageGenerating:false,imageStatus:'',detailLoading:false,consentVersion:'',reviewLabel:reviewEnvironment()?.label||''},
+ _userImageRetry:'',_sequence:0,_detailEpoch:0,_entrySubject:'',_operations:{} as Record<string,string>,
  onLoad(options:Record<string,string>){if(options.recipe){this._entrySubject=options.subjectId||'';this.setData({mode:'RECIPE',detailKey:options.recipe})}},
  onShow(){void this.load()},onHide(){++this._sequence;++this._detailEpoch;this.setData({confirming:'',busy:''})},onUnload(){++this._sequence;++this._detailEpoch},
  async load(){
@@ -31,7 +32,7 @@ Page({
  },
  async loadImage(key:string,seq:number){
   let item=this.data.items.find(i=>i.dishFingerprint===key);if(!item||seq!==this._sequence)return;
-  this.patchImage(key,{imageLoading:true,imageRepairing:!item.imageUrl,imageFailed:false,imageMessage:''});
+  this.patchImage(key,{imageLoading:true,imageRepairing:!item.imageUrl,imageFailed:false,imageMessage:'',imageFailure:null});
   try{
    let file='';
    if(item.imageUrl&&item.imageId){try{file=cachedPrivateCollectionImage(item.imageUrl)||await downloadPrivateRecipeImage(item.imageUrl)}catch{/* Server checks whether the recorded picture is still available. */}}
@@ -47,6 +48,7 @@ Page({
      state=await request<PictureState>(url);
     }
     if(seq!==this._sequence)return;
+    if(state.status==='FAILED'&&state.diagnostic){const failure=aiFailureView(state.diagnostic,'菜品图片','文字食谱可正常查看。');this.patchImage(key,{imageFailure:failure});if(this._userImageRetry===key){this._userImageRetry='';notifyAiFailure(failure)}}
     if(state.status!=='READY'||!state.imageUrl||!state.imageId){delete this._operations[key];throw Error(['QUEUED','RUNNING'].includes(state.status)?'补图仍在排队，点击图片继续查看':state.message||'暂未补好图片，点击图片重试')}
     this.patchImage(key,{imageId:state.imageId,imageUrl:state.imageUrl,imageRepairing:false,imageMessage:''});
     file=cachedPrivateCollectionImage(state.imageUrl)||await downloadPrivateRecipeImage(state.imageUrl);delete this._operations[key];
@@ -56,7 +58,7 @@ Page({
   }catch(e){if(seq===this._sequence)this.patchImage(key,{imageLoading:false,imageRepairing:false,imageFailed:true,imageMessage:e instanceof Error?e.message:'暂未补好图片，点击图片重试'})}
  },
  patchImage(key:string,patch:Partial<CollectionItem>){const index=this.data.items.findIndex(i=>i.dishFingerprint===key);if(index>=0){const item={...this.data.items[index],...patch};this.setData({['items['+index+']']:item});if(this.data.mode==='RECIPE'&&this.data.detailKey===key)this.displayImage(item)}},
- displayImage(item:CollectionItem){this.setData({imagePath:item.imagePath,imageGenerating:item.imageRepairing&&item.imageLoading,imageStatus:item.imageFailed?'FAILED':item.imageLoading?'LOADING':'READY',imageMessage:item.imageMessage||(item.imageLoading?(item.imageRepairing?'补图中…':'图片加载中…'):'')})},
+ displayImage(item:CollectionItem){this.setData({imageFailure:item.imageFailure||null,imagePath:item.imagePath,imageGenerating:item.imageRepairing&&item.imageLoading,imageStatus:item.imageFailed?'FAILED':item.imageLoading?'LOADING':'READY',imageMessage:item.imageMessage||(item.imageLoading?(item.imageRepairing?'补图中…':'图片加载中…'):'')})},
  openRecipe(e:WechatMiniprogram.TouchEvent){const key=String(e.currentTarget.dataset.key);this.dismissConfirmation();if(this.data.loading||this.data.errorMessage||this.data.busy===key||!this.data.items.some(i=>i.dishFingerprint===key))return;openPage('/pages/diet-favorites/diet-favorites?subjectId='+encodeURIComponent(this.data.subjectId)+'&recipe='+encodeURIComponent(key))},
  async loadDetail(key:string,seq:number){const epoch=++this._detailEpoch,subject=this.data.subjectId;this.setData({detailLoading:true,recipe:null});try{
   const value=await request<CollectionItem&{consentVersion:string}>('/subjects/'+subject+'/diet-collections/'+key);
@@ -69,7 +71,7 @@ Page({
  }catch(e){if(seq===this._sequence&&epoch===this._detailEpoch&&this.data.mode==='RECIPE')this.setData({recipe:null,errorMessage:e instanceof Error?e.message:'菜品暂未加载'})}finally{if(seq===this._sequence&&epoch===this._detailEpoch)this.setData({detailLoading:false})}},
  retryDetail(){void this.loadDetail(this.data.detailKey,this._sequence)},
  openImageViewer(){this.dismissConfirmation();void this.viewImage({currentTarget:{dataset:{key:this.data.detailKey}}} as unknown as WechatMiniprogram.TouchEvent)},
- retryImage(){void this.loadImage(this.data.detailKey,this._sequence)},
+ retryImage(){this._userImageRetry=this.data.detailKey;void this.loadImage(this.data.detailKey,this._sequence)},
  toggleRecipeInfo(){this.setData({showRecipeInfo:!this.data.showRecipeInfo})},
  dismissConfirmation(){if(this.data.confirming)this.setData({confirming:''})},
  requestRemove(e:WechatMiniprogram.TouchEvent){const key=String(e.currentTarget.dataset.key);if(!this.data.busy&&this.data.items.some(i=>i.dishFingerprint===key))this.setData({confirming:key})},

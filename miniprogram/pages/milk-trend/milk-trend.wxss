@@ -1,4 +1,48 @@
-@import "../nutrient-trend/nutrient-trend.wxss";
-.milk-stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14rpx;margin:22rpx 0}.milk-stat-grid>view{background:#fff5e9;border-radius:18rpx;padding:14rpx 18rpx}.stat{display:block;font-size:34rpx;font-weight:600;color:#765839}.unit{font-size:24rpx;color:#8a7774}.grid-line{position:absolute;left:0;right:0;border-top:1rpx solid #efe5dc;pointer-events:none}.grid-line:before{content:"";position:absolute;left:-8rpx;width:8rpx;border-top:1rpx solid #c8b7a6}.bar.estimated{background:repeating-linear-gradient(135deg,#daa57b,#daa57b 7rpx,#f8dfca 7rpx,#f8dfca 14rpx)}.bar.selected{box-shadow:0 0 0 2rpx #b47e54}.active-date{color:#b47742;font-weight:600}.feed-row{display:flex;align-items:center;justify-content:space-between;gap:20rpx;padding:20rpx 18rpx;margin-top:14rpx;border:1rpx solid #f1e2d5;border-radius:20rpx;background:#fffaf5}.feed-copy{min-width:0}.feed-type{font-size:28rpx;font-weight:600}.feed-time{color:#b47e54;font-size:26rpx;flex:none}.chart-legend{margin-bottom:16rpx}
-
-.page-shell{padding-bottom:calc(36rpx + env(safe-area-inset-bottom))}
+page{background:linear-gradient(160deg,#fff8f2 0,#fffcf9 58%,#fffaf6 100%);color:#3d302a}
+.milk-trend-page{padding:24rpx 33rpx calc(54rpx + env(safe-area-inset-bottom));box-sizing:border-box}
+.milk-nav-back{width:74rpx;height:74rpx;min-width:40px;min-height:40px;border-radius:50%;background:#fffefd;display:flex;align-items:center;justify-content:center;box-shadow:0 10rpx 38rpx rgba(136,91,57,.045)}
+.milk-nav-back>view{width:23rpx;height:23rpx;border-left:5rpx solid #3d302a;border-bottom:5rpx solid #3d302a;transform:rotate(45deg);margin-left:8rpx}
+.milk-range-row{display:flex;align-items:center;justify-content:space-between;gap:16rpx;margin-bottom:25rpx;font-size:23rpx;line-height:1.7;color:#92847a;min-height:76rpx}
+.milk-range-row>text{min-width:0;flex:1;overflow-wrap:break-word}.milk-range-row picker{flex:none}
+.milk-date-picker{display:flex;align-items:center;justify-content:flex-end;gap:7rpx;min-height:44px;color:#bb8d56;font-size:21rpx;white-space:nowrap}
+.milk-date-chevron{width:10rpx;height:10rpx;border-right:2rpx solid currentColor;border-bottom:2rpx solid currentColor;transform:rotate(45deg);margin-top:-5rpx}
+.milk-card{background:#fffefd;border:2rpx solid #f2eae3;border-radius:42rpx;padding:35rpx;margin-bottom:25rpx;box-shadow:0 14rpx 46rpx rgba(80,48,22,.06);box-sizing:border-box}
+.milk-heading{display:flex;align-items:center;gap:15rpx;font-size:31rpx;font-weight:600;line-height:1.5}
+.milk-heading-icon,.milk-feed-icon{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjYzRhMDZhIiBzdHJva2Utd2lkdGg9IjEuNyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNOSAyaDZ2NEg5eiBNOCA2aDhsMiA1djEwSDZWMTF6IE02IDEzaDUgTTYgMTdoNSIvPjwvc3ZnPg==");background-position:center;background-repeat:no-repeat;flex:none}
+.milk-heading-icon{width:35rpx;height:40rpx;background-size:35rpx}
+.milk-stats{display:flex;gap:46rpx;margin:25rpx 0 4rpx}
+.milk-stat{min-width:0;max-width:calc((100% - 46rpx)/2)}.milk-stat-value{display:flex;align-items:baseline;gap:7rpx;min-width:0;flex-wrap:wrap}
+.milk-stat-number{font-family:Arial,sans-serif;font-size:46rpx;font-weight:600;line-height:1.1;letter-spacing:-1rpx;color:#514039;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.milk-stat-number.long{font-size:36rpx}.milk-unit{font-size:21rpx;font-weight:400;line-height:1.5;white-space:nowrap}
+.milk-stat-label{display:block;margin-top:14rpx;font-size:21rpx;line-height:1.6;color:#92847a}
+.milk-chart{height:396rpx;position:relative;padding:19rpx 5rpx 46rpx 69rpx;margin-top:29rpx;box-sizing:border-box}
+.milk-axis{position:absolute;left:0;top:19rpx;bottom:46rpx;width:58rpx;color:#b4a797;font-family:Arial,sans-serif;font-size:17rpx}
+.milk-axis-label{position:absolute;right:0;transform:translateY(50%);display:flex;align-items:center;gap:5rpx;line-height:1.2;white-space:nowrap}
+.milk-axis-label>view{width:12rpx;border-top:2rpx solid #b4a797;flex:none}
+.milk-plot{height:100%;position:relative;border-bottom:2rpx solid #e9dfd3;box-sizing:border-box}
+.milk-grid-line{position:absolute;left:0;right:0;border-top:2rpx solid #eee7de;pointer-events:none}
+.milk-grid-top{border-top:0}.milk-columns{position:relative;display:flex;align-items:flex-end;height:100%;z-index:1}
+.milk-chart-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#b4a797;font-size:23rpx;pointer-events:none}
+.milk-chart.wide-axis{padding-left:110rpx}.milk-chart.wide-axis .milk-axis{width:99rpx}
+.milk-column{flex:1;min-width:0;height:100%;position:relative;display:flex;align-items:flex-end;justify-content:center}
+.milk-bar{width:35rpx;max-width:80%;background:linear-gradient(#a9ca88,#d7e6bf);border-radius:12rpx 12rpx 0 0;min-height:0}
+.milk-column.selected .milk-bar{background:linear-gradient(#ffb496,#ffd9be)}
+.milk-no-value{position:absolute;bottom:0;font-size:21rpx;line-height:1.5;color:#b4a797}
+.milk-date-label{position:absolute;bottom:-40rpx;left:50%;transform:translateX(-50%);font-family:Arial,sans-serif;font-size:17rpx;line-height:1.5;color:#ae9c88;white-space:nowrap;padding:10rpx 0 0}
+.milk-column.selected .milk-date-label{color:#b78463}
+.milk-records-heading{display:flex;align-items:center;justify-content:space-between;gap:12rpx;font-size:31rpx;font-weight:600;line-height:1.5;margin-bottom:25rpx}
+.milk-feed-count{flex:none;color:#92847a;font-size:21rpx;font-weight:400;white-space:nowrap}
+.milk-feed-row{display:flex;align-items:center;gap:23rpx;background:#fcf9f3;border:2rpx solid #f2e9dc;border-radius:31rpx;padding:23rpx 25rpx;margin:17rpx 0;min-height:118rpx;box-sizing:border-box}
+.milk-feed-icon{width:71rpx;height:71rpx;border-radius:25rpx;background-color:#fff4e0;background-size:40rpx}
+.milk-feed-copy{flex:1;min-width:0}.milk-feed-type{display:block;font-size:27rpx;font-weight:600;line-height:1.5;overflow-wrap:break-word}
+.milk-feed-volume{display:block;font-size:21rpx;line-height:1.6;color:#92847a;margin-top:3rpx;overflow-wrap:anywhere}
+.milk-feed-time{flex:none;font-family:Arial,sans-serif;font-size:25rpx;font-weight:500;color:#a88f72;font-variant-numeric:tabular-nums;white-space:nowrap}
+.milk-feed-chevron{flex:none;width:10rpx;height:10rpx;border-right:3rpx solid #c6b39f;border-top:3rpx solid #c6b39f;transform:rotate(45deg)}
+.milk-disclosure{border-bottom:2rpx solid #f1e8e0;margin:10rpx 0;padding:0 6rpx}
+.milk-disclosure-heading{display:flex;align-items:center;justify-content:space-between;gap:16rpx;min-height:44px;color:#b29268;font-size:21rpx}
+.milk-disclosure-heading>text:last-child{font-size:29rpx}
+.milk-disclosure-body{padding-bottom:27rpx;font-size:19rpx;line-height:1.9;color:#a09385}
+.milk-disclosure-body>text{display:block;margin-top:10rpx}
+.milk-state,.milk-empty{font-size:23rpx;line-height:1.8;color:#92847a}.milk-empty{display:block;padding:12rpx 0}
+.milk-error{color:#b46a61}.milk-retry{margin:20rpx 0 0;padding:12rpx 20rpx;min-height:44px;border:0;border-radius:20rpx;background:#fff0eb;color:#bd8264;font-size:25rpx;line-height:1.5}
+.milk-retry:after{border:0}.milk-review{font-size:23rpx;line-height:1.6;background:#fff0cc;color:#82600f;border-radius:14rpx;padding:14rpx 20rpx;margin-bottom:18rpx}

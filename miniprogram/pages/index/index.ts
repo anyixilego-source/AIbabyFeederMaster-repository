@@ -1,7 +1,7 @@
-import { emptyHomeMenu, homeMenuPreview, chinaMenuDates } from '../../utils/home-menu'
+import { emptyHomeMenu, homeMenuPreview, homeMenuFeatured, chinaMenuDates } from '../../utils/home-menu'
 import type { MenuLatest } from '../../utils/diet-plan'
 import { openPage, navigateRoot } from '../../utils/navigation'
-import { ApiError, request } from '../../utils/api'
+import { ApiError, request, getAuth, downloadPrivateRecipeImage } from '../../utils/api'
 import { ageDisplay } from '../../utils/age'
 import { ensureSessionContext, SessionContext, SubjectSummary } from '../../utils/session'
 
@@ -15,6 +15,7 @@ async function context(): Promise<SessionContext> {
 Component({
   options: { pureDataPattern: /^_homeMenu/ },
   data: { _homeMenuSequence: 0, _homeMenuVisible: false, _homeMenuTimer: 0, _homeMenuLatest: null as MenuLatest | null, reviewLabel:wx.getSystemInfoSync().platform==='devtools'?(wx.getStorageSync('foodmaster.reviewEnvironment')?.label || ''):'',
+    homeMenuDateLabel:'',homeMenuTitle:'饮食推荐',homeMenuFeatured:null as ReturnType<typeof homeMenuFeatured>,homeMenuImage:'/assets/camera-food-guide-v5.jpg',_homeMenuImageKey:'',_homeMenuImageSession:'',_homeMenuImageFiles:{} as Record<string,string>,
     homeScrollHeight: 0, homeMenuSubjectId: '', homeMenu: emptyHomeMenu('LOADING', '正在查看饮食搭配…', ''),
     loading: true, babyName: '宝宝', genderText: '', ageText: '', warnings: [] as string[],
     reportTitle: '今天还没有营养报告', reportDescription: '记录并确认实际摄入后生成营养参考',
@@ -55,10 +56,10 @@ Component({
       const cached = this.data._homeMenuLatest
       const sameBaby = this.data.homeMenuSubjectId === getApp<IAppOption>().globalData.subjectId
       if (cached && sameBaby && this.data.homeMenu.state === 'READY') {
-        this.setData({ homeMenu: homeMenuPreview(cached) })
+        this.presentHomeMenu(cached,seq,false)
       } else {
         this.setData({ _homeMenuLatest: null })
-        this.setData({ homeMenuSubjectId: '', homeMenu: emptyHomeMenu('LOADING', '正在查看饮食搭配…', '') })
+        this.setData({ homeMenuSubjectId: '', homeMenu: emptyHomeMenu('LOADING', '正在查看饮食搭配…', ''),homeMenuTitle:'饮食推荐',homeMenuFeatured:null,homeMenuImage:'/assets/camera-food-guide-v5.jpg',_homeMenuImageKey:'' })
       }
       let subjectId = ''
       try {
@@ -66,7 +67,7 @@ Component({
         if (seq !== this.data._homeMenuSequence || !this.data._homeMenuVisible) return
         subjectId = app.globalData.subjectId || active.subjectId || ''
         if (!subjectId) {
-          this.setData({ homeMenu: emptyHomeMenu('PROFILE', '先建立宝宝档案，再规划饮食搭配', '建立档案') })
+          this.setData({ homeMenu: emptyHomeMenu('PROFILE', '先建立宝宝档案，再规划饮食搭配', '建立档案'),homeMenuFeatured:null,homeMenuImage:'/assets/camera-food-guide-v5.jpg',_homeMenuImageKey:'' })
           return
         }
         if (!active.subjects.some(s => s.subjectId === subjectId)) throw new Error('宝宝会话已变更')
@@ -76,16 +77,38 @@ Component({
         if (getApp<IAppOption>().globalData.subjectId !== subjectId) { void this.loadHomeMenu(); return }
         this.setData({ _homeMenuLatest: latest })
         const homeMenu = homeMenuPreview(latest)
-        this.setData({ homeMenu })
+        this.presentHomeMenu(latest,seq)
         const delay = homeMenu.generating ? Math.min(5000, chinaMenuDates().refreshIn) : chinaMenuDates().refreshIn
         this.setData({ _homeMenuTimer: setTimeout(() => { if (this.data._homeMenuVisible) void this.loadHomeMenu() }, delay) as unknown as number })
       } catch {
         if (seq !== this.data._homeMenuSequence || !this.data._homeMenuVisible) return
         if (subjectId && getApp<IAppOption>().globalData.subjectId !== subjectId) { void this.loadHomeMenu(); return }
-        this.setData({ homeMenu: emptyHomeMenu('ERROR', '搭配暂时未能加载', '重新加载') })
+        this.setData({ homeMenu: emptyHomeMenu('ERROR', '搭配暂时未能加载', '重新加载'),homeMenuFeatured:null,homeMenuImage:'/assets/camera-food-guide-v5.jpg',_homeMenuImageKey:'' })
       }
     },
-    openHomeMenu() {
+    presentHomeMenu(latest:MenuLatest,seq:number,readImage=true) {
+      const preview=homeMenuPreview(latest),featured=homeMenuFeatured(latest,preview),session=getAuth()?.clientSessionId||'';
+      const key=featured?[session,preview.taskId,preview.date,featured.recipeKey].join(':'):'';
+      const same=key===this.data._homeMenuImageKey&&session===this.data._homeMenuImageSession;
+      this.setData({homeMenu:preview,homeMenuDateLabel:preview.dateLabel.replace(/^今日/,'今天').replace(/^明日/,'明天'),homeMenuTitle:preview.state==='READY'?preview.dateLabel.slice(0,2)+'饮食推荐':'饮食推荐',homeMenuFeatured:featured,homeMenuImage:same?this.data.homeMenuImage:'/assets/camera-food-guide-v5.jpg',_homeMenuImageKey:key,_homeMenuImageSession:session,...(session!==this.data._homeMenuImageSession?{_homeMenuImageFiles:{}}:{})});
+      if(readImage&&featured)void this.loadHomeMenuImage(preview,featured,seq,key,session);
+    },
+    async loadHomeMenuImage(preview:ReturnType<typeof homeMenuPreview>,featured:NonNullable<ReturnType<typeof homeMenuFeatured>>,seq:number,key:string,session:string) {
+      const subject=this.data.homeMenuSubjectId;
+      const current=()=>seq===this.data._homeMenuSequence&&this.data._homeMenuVisible&&key===this.data._homeMenuImageKey&&subject===getApp<IAppOption>().globalData.subjectId&&session===(getAuth()?.clientSessionId||'');
+      try {
+        // Read existing status only. Opening home must never dispatch image generation.
+        const image=await request<{url:string|null}>('/diet-plan-tasks/'+encodeURIComponent(preview.taskId)+'/recipes/'+encodeURIComponent(featured.recipeKey)+'/image');
+        if(!current())return;
+        if(!image.url){this.setData({homeMenuImage:'/assets/camera-food-guide-v5.jpg'});return}
+        const cached=this.data._homeMenuImageFiles[image.url],file=cached||await downloadPrivateRecipeImage(image.url);
+        if(!current())return;
+        this.setData({homeMenuImage:file,_homeMenuImageFiles:{...this.data._homeMenuImageFiles,[image.url]:file}});
+      } catch {if(current())this.setData({homeMenuImage:'/assets/camera-food-guide-v5.jpg'})}
+    },
+    onHomeMenuImageError(e:WechatMiniprogram.CustomEvent) {if(e.currentTarget.dataset.src===this.data.homeMenuImage&&this.data.homeMenuImage!=='/assets/camera-food-guide-v5.jpg')this.setData({homeMenuImage:'/assets/camera-food-guide-v5.jpg',_homeMenuImageFiles:{}})},
+    openHomeMenuWeek() {this.openHomeMenu(true)},
+    openHomeMenu(overview?:unknown) {
       if (this.data.homeMenu.state === 'LOADING') return
       if (this.data.homeMenu.state === 'ERROR') { void this.loadHomeMenu(); return }
       if (this.data.homeMenu.state === 'PROFILE') { this.openProfile(); return }
@@ -94,7 +117,7 @@ Component({
       const preview = this.data.homeMenu
       const dates = chinaMenuDates()
       if (preview.state === 'READY' && preview.date !== dates.today && preview.date !== dates.tomorrow) { void this.loadHomeMenu(); return }
-      const target = preview.state === 'READY' ? `&date=${encodeURIComponent(preview.date)}&planId=${encodeURIComponent(preview.taskId)}` : ''
+      const target = preview.state === 'READY' && overview!==true ? `&date=${encodeURIComponent(preview.date)}&planId=${encodeURIComponent(preview.taskId)}` : ''
       openPage(`/pages/diet-menu/diet-menu?subjectId=${encodeURIComponent(subjectId)}${target}`)
     },
 
@@ -120,7 +143,7 @@ Component({
           babyName: subject.displayName, genderText: subject.sex === 'FEMALE' ? '女' : subject.sex === 'MALE' ? '男' : '',
           ageText: ageDisplay(subject.birthDate),
           reportTitle: legacyReport ? '今日报告暂不支持新版解读' : reportNeedsRefresh ? '今日营养报告待更新' : report ? '今日营养报告已生成' : '今天还没有营养报告',
-          reportDescription: legacyReport ? '已保存餐食不受影响，可在记录页查看；报告页将说明当前兼容限制' : reportNeedsRefresh ? '新记录已保存，打开报告生成最新营养参考' : report ? '查看已记录摄入、主要来源和参考信息' : '记录并确认实际摄入后生成营养参考',
+          reportDescription: legacyReport ? '已保存餐食不受影响，可在记录页查看；报告页将说明当前兼容限制' : reportNeedsRefresh ? '新记录已保存，打开报告生成最新营养参考' : report ? '看看食物带来了哪些营养' : '记录并确认实际摄入后生成营养参考',
           warnings: reportNeedsRefresh || legacyReport ? [] : (report?.warnings || []).map(warningLabel),
           nutrients: reportNeedsRefresh || legacyReport ? [] : nutrients,
           advice: advice.length ? advice : [{

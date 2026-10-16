@@ -3,3 +3,12 @@
 .knowledge-slide-title{display:block;margin-bottom:10rpx;color:#3e3730;font-size:27rpx;font-weight:600;line-height:1.6}
 .knowledge-slide-text{display:block;color:#332724;font-size:27rpx;line-height:1.65;white-space:pre-wrap}
 .knowledge-slide-source{display:block;margin-top:12rpx;color:#a18b7a;font-size:22rpx;line-height:1.6}
+
+.knowledge-carousel{position:relative}
+.daily .knowledge-slide-content{padding:0 0 8rpx}
+.daily .knowledge-slide-title{font-size:27rpx;color:#99774d;line-height:1.5;margin-bottom:17rpx;font-weight:600}
+.daily .knowledge-slide-text{font-size:23rpx;color:#8c7e6b;line-height:1.85}
+.daily .knowledge-slide-source{font-size:18rpx;color:#b5a58d;line-height:1.6;margin-top:25rpx}
+.knowledge-dots{position:absolute;bottom:6rpx;left:0;right:0;display:flex;align-items:center;justify-content:center;gap:10rpx;pointer-events:none}
+.knowledge-dot{width:8rpx;height:8rpx;border-radius:6rpx;background:#ead9c0;transition:width 250ms ease,background-color 250ms ease}
+.knowledge-dot.active{width:27rpx;background:#d3ab77}

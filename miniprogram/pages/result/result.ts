@@ -1,3 +1,5 @@
+import {aiFailureView,notifyAiFailure,type AiDiagnostic,type AiFailureView} from '../../utils/ai-failure'
+import { recognizedMealName, confirmedMealNotes } from '../../utils/meal-presentation'
 import {backTo,navigateRoot} from '../../utils/navigation'
 import { gramUnits, validNewWeight, weightNotice,exactGrams } from '../../utils/meal-edit'
 import { ApiError, request, uploadRecognitionImage } from '../../utils/api'
@@ -14,7 +16,7 @@ interface RecognitionItem {
   confidence: number
   uncertainties: string[]
 }
-interface RecognitionResult { mode: 'AI_CANDIDATES' | 'MANUAL_SEARCH'; items?: RecognitionItem[]; reason?: string }
+interface RecognitionResult { mealName?: string | null; mode: 'AI_CANDIDATES' | 'MANUAL_SEARCH'; items?: RecognitionItem[]; reason?: string; diagnostic?:AiDiagnostic }
 interface FoodResult { selectedFoodRevisionId?:string|null;foodId: string; canonicalNameZh: string; foodForm: string | null; processingMethod: string | null }
 interface ConfirmedFoodItem {
   selectedFoodRevisionId?:string|null
@@ -196,7 +198,7 @@ Page({
     showFoodSelector:false, manualEntry: false, searchMessage:'', searchExample:'构造样例食品',
     photo: '/assets/camera-food-guide-v5.jpg', samplePhoto: true, busy: false, saving: false, abandoned: false,
     accepted: false, retentionIndex: 0, retentionOptions,
-    result: null as RecognitionResult | null,
+    recognizedMealName: '', result: null as RecognitionResult | null,
     foods: [] as Array<{ badge: string; name: string; details: string; uncertainty: string; tone: string; index: number; mappedName: string }>,
     query: '', searchResults: [] as FoodResult[], pendingCandidateIndex: -1, searchCursor: '', searchHasMore: false, searchingMore: false,
     confirmedFoods: [] as ConfirmedFoodItem[],
@@ -204,7 +206,7 @@ Page({
     ratioTotal: 0, ratioAdjustmentSequence: 0,
     nutrition: [] as Array<{ name: string; badge: string; value: string; tone: string }>,
     coverageText: '', warnings: [] as string[],
-    errorMessage: '', scrollIntoView: '', manualFocus: false,
+    recognitionFailure:null as AiFailureView|null, errorMessage: '', scrollIntoView: '', manualFocus: false,
   },
 
   onLoad() {
@@ -328,7 +330,7 @@ Page({
     if (this.data.busy) return
     if (this.data.samplePhoto) { wx.showToast({ title: '请先拍照或选择图片', icon: 'none' }); return }
     if (!this.data.accepted) { wx.showToast({ title: '请先同意图片处理授权', icon: 'none' }); return }
-    this.setData({ busy: true, saving: true })
+    this.setData({ busy: true, saving: true, recognizedMealName: '', recognitionFailure:null, errorMessage:'' })
     try {
       const retention = this.data.retentionOptions[this.data.retentionIndex]
       const localPath = await saveLocalImage(this.data.photo, retention.value)
@@ -338,7 +340,7 @@ Page({
       })
       const items = result.items || []
       this.setData({
-        result,
+        result, recognizedMealName: recognizedMealName(result),
         errorMessage: '',
         confirmedFoods: [], nutrition: [], coverageText: '', warnings: [],
         mealTotalAmount: '200', ...weightPresentation('200'), weightBubbleVisible: false, ratioTotal: 0, ratioAdjustmentSequence: 0,
@@ -349,14 +351,14 @@ Page({
         })),
       })
       if (result.mode === 'MANUAL_SEARCH') {
-        wx.showToast({ title: '识别失败，请手工搜索', icon: 'none' })
+        const failure=aiFailureView(result.diagnostic,'图片识别');this.setData({recognitionFailure:failure,errorMessage:failure.meaning});if(!this.data.abandoned)notifyAiFailure(failure)
       } else if (items.length) {
         await this.autoMapCandidates(items)
       }
     } catch (caught) {
       const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '识别失败，请手工搜索'
       this.setData({ errorMessage: message })
-      wx.showToast({ title: message, icon: 'none' })
+      void wx.showModal({title:'图片识别未完成',content:message,showCancel:false,confirmText:'我知道了'})
     } finally {
       this.setData({ busy: false, saving: false })
       if (this.data.abandoned && wx.getStorageSync('foodmaster.currentMealId')) {
@@ -418,12 +420,18 @@ Page({
   },
 
   async autoMapCandidates(items: RecognitionItem[]): Promise<void> {
-    type Match={localId:string|null;autoSelectable:boolean;unmatchedReason:string|null;candidates:Array<{foodId:string;canonicalNameZh:string;processingMethod:string|null}>}
+    type Match={localId:string|null;autoSelectable:boolean;unmatchedReason:string|null;processingMethodHint?:string|null;candidates:Array<{foodId:string;canonicalNameZh:string;processingMethod:string|null;score?:number;conflicts?:string[]}>}
     let results:Match[]=[]
     try{const response=await request<{results:Match[]}>('/foods/match-candidates',{method:'POST',data:{items:items.map((candidate,index)=>({localId:String(index),name:candidate.observedName}))}});results=response.results}catch{results=[]}
     if(this.data.abandoned)return
     const confirmedFoods=items.map((candidate,index)=>{
-      const match=results.find(r=>r.localId===String(index)),selected=match?.autoSelectable?match.candidates[0]:undefined
+      const match=results.find(r=>r.localId===String(index))
+      // 默认使用有名称匹配依据的首个候选；一次保存统一确认，点击仍可修改。
+      // 不把默认选择说成唯一身份，也不越过已知生熟冲突。
+      const selected=match?.candidates.find(food=>
+        Boolean(food.foodId) && (match.autoSelectable || (food.score ?? 0)>0)
+        && !food.conflicts?.length
+        && (!match.processingMethodHint || food.processingMethod===match.processingMethodHint))
       const food:FoodResult=selected?{...selected,foodForm:null}:{foodId:'',canonicalNameZh:candidate.observedName,foodForm:null,processingMethod:null}
       return {...confirmedFoodSelection(food,candidate,index),source:'AI_CANDIDATE' as const,matchReason:selected?undefined:match?.unmatchedReason||'REQUEST_FAILED'}
     })
@@ -517,7 +525,7 @@ Page({
       const active=await(getApp<IAppOption>().globalData.ready||ensureSessionContext())
       if(active.subjectId!==draft.subjectId)throw Error('当前宝宝已切换，请返回记录页重新进入')
       const scope='meal-create:'+draft.subjectId,total=exactGrams(actualTotal)
-      const body:Record<string,unknown>={mealType:draft.mealType,occurredAt:draft.occurredAt,notes:draft.notes,items:foods.map(food=>({observedName:food.observedName,consumedAmount:food.consumedAmount.trim(),source:food.source,weightOrigin:'USER_ACCEPTED_ESTIMATE',...(food.unmatched?{matchStatus:'UNMATCHED',matchReason:food.matchReason||'NO_MATCH_NO_NUTRITION'}:{matchStatus:'MATCHED',foodId:food.foodId,...(food.selectedFoodRevisionId?{selectedFoodRevisionId:food.selectedFoodRevisionId}:{})})}))}
+      const body:Record<string,unknown>={mealType:draft.mealType,occurredAt:draft.occurredAt,notes:confirmedMealNotes(draft.notes,!this.data.manualEntry&&!this.data.samplePhoto,this.data.recognizedMealName),items:foods.map(food=>({observedName:food.observedName,consumedAmount:food.consumedAmount.trim(),source:food.source,weightOrigin:'USER_ACCEPTED_ESTIMATE',...(food.unmatched?{matchStatus:'UNMATCHED',matchReason:food.matchReason||'NO_MATCH_NO_NUTRITION'}:{matchStatus:'MATCHED',foodId:food.foodId,...(food.selectedFoodRevisionId?{selectedFoodRevisionId:food.selectedFoodRevisionId}:{})})}))}
       const previous=pendingRecord(scope)
       if(previous){
         const {operationId:_operationId,weightReview:_review,...oldBody}=previous.payload

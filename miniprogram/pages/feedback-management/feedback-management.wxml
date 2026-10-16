@@ -1,4 +1,4 @@
-<navigation-bar title="{{mode === 'DETAIL' ? '反馈详情' : '反馈管理'}}" back="{{false}}" color="#2d2623" background="transparent"><view slot="left" class="nav-circle" bindtap="goBack"><view class="back-icon"></view></view></navigation-bar>
+<navigation-bar title="{{mode === 'DETAIL' ? '反馈详情' : '反馈管理'}}" back="{{false}}" color="#3d302a" background="transparent"><view slot="left" class="my-nav" bindtap="goBack"><view></view></view></navigation-bar>
 <scroll-view class="management-scroll" scroll-y enhanced show-scrollbar="{{false}}" bindscrolltolower="more" refresher-enabled="{{mode === 'LIST' && authorized}}" refresher-triggered="{{refreshing}}" bindrefresherrefresh="refresh">
   <view class="management-shell">
     <view wx:if="{{reviewLabel}}" class="review-label">{{reviewLabel}} · 请只录入合成测试数据</view>
@@ -14,8 +14,7 @@
         <view wx:if="{{loading}}" class="status">正在加载反馈…</view>
         <view wx:elif="{{!items.length && !errorMessage}}" id="management-empty" class="status">当前筛选下暂无反馈</view>
         <view wx:for="{{items}}" wx:key="feedbackId" class="feedback-row ui-card" data-id="{{item.feedbackId}}" bindtap="openDetail">
-          <view class="row-heading"><text class="time">{{item.time}}</text><text class="image-count">{{item.imageCount}}张图片</text></view>
-          <view class="location">{{item.location}}</view><view class="excerpt">{{item.description}}</view>
+          <view class="row-heading"><text class="list-location">{{item.location}}</text><text class="image-count">{{item.imageCount}}张图片</text></view><view class="excerpt">{{item.description}}</view><view class="list-footer"><text class="time">{{item.time}}</text><text class="detail-link">查看详情 ›</text></view>
         </view>
         <button wx:if="{{nextCursor}}" id="management-more" class="load-more" disabled="{{loadingMore}}" bindtap="more">{{loadingMore ? '正在加载…' : '加载更多'}}</button>
         <view wx:elif="{{items.length && !loading}}" class="status end">已显示当前筛选下的全部反馈</view>

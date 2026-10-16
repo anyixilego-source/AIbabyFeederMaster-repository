@@ -1,6 +1,7 @@
 {
   "usingComponents": {
     "navigation-bar": "/components/navigation-bar/navigation-bar",
-    "recipe-search": "/components/recipe-search/recipe-search"
+    "recipe-search": "/components/recipe-search/recipe-search",
+    "ai-error-card": "/components/ai-error-card/ai-error-card"
   }
 }

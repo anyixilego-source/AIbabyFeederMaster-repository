@@ -1,6 +1,7 @@
 {
   "usingComponents": {
     "navigation-bar": "/components/navigation-bar/navigation-bar",
-    "food-selector": "/components/food-selector/food-selector"
+    "food-selector": "/components/food-selector/food-selector",
+    "ai-error-card": "/components/ai-error-card/ai-error-card"
   }
 }

@@ -11,7 +11,7 @@ function operationId(): string {
 function message(error: unknown): string { return error instanceof ApiError ? (error.statusCode === 401 ? '请先登录后提交反馈' : error.message) : '操作未完成，请重试' }
 
 Page({
-  data: { showModulePicker:false,moduleCode:'',moduleLabel:'',modules:[] as FeedbackModule[],moduleOptions:[] as FeedbackModule[],moduleTrail:[] as FeedbackModule[],moduleError:'', description: '', contact: '', count: 0, pictures: [] as Picture[], remaining: -1, saving: false, selecting: false, uncertain: false, errorMessage: '', receipt: '', feedbackId: '' },
+  data: { showPrivacyInfo:false,showSuccessInfo:false,showModulePicker:false,moduleCode:'',moduleLabel:'',modules:[] as FeedbackModule[],moduleOptions:[] as FeedbackModule[],moduleTrail:[] as FeedbackModule[],moduleError:'', description: '', contact: '', count: 0, pictures: [] as Picture[], remaining: -1, saving: false, selecting: false, uncertain: false, errorMessage: '', receipt: '', feedbackId: '' },
   _pending: null as Payload | null,
   _alive: true,
   onLoad() { this._alive = true; void this.loadQuota();void this.loadModules() },
@@ -100,6 +100,8 @@ Page({
     } finally { if (this._alive) this.setData({ saving: false }) }
   },
   async loadQuotaAfterError() { try { const q = await request<{ remaining: number }>('/feedback/quota'); if (this._alive) this.setData({ remaining: q.remaining }) } catch { /* Preserve the actionable submission/upload error. */ } },
+  togglePrivacyInfo(){this.setData({showPrivacyInfo:!this.data.showPrivacyInfo})},
+  toggleSuccessInfo(){this.setData({showSuccessInfo:!this.data.showSuccessInfo})},
   again() { this.setData({ receipt: '', feedbackId: '', errorMessage: '' }) },
-  goBack() { if (!this.data.saving && !this.data.selecting) backPage('/pages/profile/profile',this) },
+  goBack() { if(this.data.showModulePicker){this.closeModulePicker();return}if (!this.data.saving && !this.data.selecting) backPage('/pages/profile/profile',this) },
 })

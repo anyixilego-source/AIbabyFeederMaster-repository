@@ -1,6 +1,5 @@
 <navigation-bar title="拍照记录" back="{{false}}" color="#2d2623" background="transparent">
   <view slot="left" class="nav-circle" bindtap="goBack"><view class="back-icon"></view></view>
-  <view slot="right" class="album-button" bindtap="chooseAlbum"><view class="album-icon"><view class="album-mountain"></view></view><text>相册</text></view>
 </navigation-bar>
 <view class="camera-page">
   <view wx:if="{{preparing || preparationError}}" class="prepare-banner"><text>{{preparing ? '正在创建餐食记录…' : preparationError}}</text></view>
@@ -14,6 +13,9 @@
     <view class="frame-note">请将食物置于取景框内</view>
     <view wx:if="{{cameraError}}" class="permission-card"><text>需要相机权限才能拍摄</text><button bindtap="openSettings">去授权</button></view>
   </view>
-  <button id="manual-record" class="manual-record" bindtap="startManualRecord" disabled="{{preparing}}">手工记录，不用拍照</button>
-  <view class="camera-controls"><view class="side-control" bindtap="toggleFlash"><view class="flash-icon"></view><text>闪光灯</text></view><view class="capture-wrap" bindtap="capture"><view class="capture-button"><view class="camera-icon"></view></view><text>拍照</text></view><view class="side-control" bindtap="switchCamera"><view class="switch-icon"><view class="switch-arrow top"></view><view class="switch-arrow bottom"></view></view><text>切换摄像头</text></view></view>
+  <view class="camera-controls">
+    <button id="camera-album" class="camera-action" bindtap="chooseAlbum" disabled="{{preparing}}" hover-class="camera-action-pressed"><view class="action-icon action-album"></view><text>相册</text></button>
+    <button id="camera-capture" class="camera-action capture-wrap" bindtap="capture" disabled="{{preparing}}" hover-class="camera-action-pressed"><view class="capture-button"><view class="action-icon action-camera"></view></view><text>拍照</text></button>
+    <button id="manual-record" class="camera-action" bindtap="startManualRecord" disabled="{{preparing}}" hover-class="camera-action-pressed"><view class="action-icon action-edit"></view><text>手动记录</text></button>
+  </view>
 </view>

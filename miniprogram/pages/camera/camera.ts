@@ -1,3 +1,4 @@
+import { defaultMealType } from '../../utils/meal-presentation'
 import {openPage,backPage,resumePendingPrimary} from '../../utils/navigation'
 import { ApiError, request } from '../../utils/api'
 import { completeOperation, getPendingOperation, operationPayload } from '../../utils/operation'
@@ -15,10 +16,22 @@ Page({
     flash: 'off' as 'auto'|'on'|'off', position: 'back' as 'back'|'front',
   },
   onShow() { resumePendingPrimary(this) },
-  onLoad() { void this.discardPendingMeal() },
-  onUnload() { void this.discardPendingMeal() },
+  _manualEntryPending:false,_manualEntryAlive:true,
+  onLoad(query:Record<string,string>) {
+    this._manualEntryPending=query.entry==='manual'
+    void this.discardPendingMeal().then(()=>{if(this._manualEntryPending)this.launchManualEntry()})
+  },
+  launchManualEntry(){
+    if(!this._manualEntryAlive||!this._manualEntryPending)return
+    // Wait for the existing navigation transition before reusing the manual flow.
+    if(getApp<{_navigation?:{navigating:boolean}}>()._navigation?.navigating){setTimeout(()=>this.launchManualEntry(),50);return}
+    this.startManualRecord()
+  },
+  onHide() { this._manualEntryPending=false },
+  onUnload() { this._manualEntryAlive=false;this._manualEntryPending=false;void this.discardPendingMeal() },
   async continueWithPhoto(photoPath: string) {
     if (this.data.preparing) return
+    const recordedAt = new Date()
     this.setData({ preparing: true, preparationError: '' })
     try {
       const active = await context()
@@ -41,7 +54,7 @@ Page({
       if (!mealId) {
         const scope = `create-meal:${active.subjectId}`
         const payload = getPendingOperation(scope) || operationPayload(scope, {
-          mealType: 'OTHER', occurredAt: new Date().toISOString(), notes: photoPath ? '拍照记录' : '手工记录',
+          mealType: defaultMealType(recordedAt), occurredAt: recordedAt.toISOString(), notes: photoPath ? '拍照记录' : '手工记录',
         })
         const meal = await request<{ mealId: string }>(`/subjects/${active.subjectId}/meals`, { method: 'POST', data: payload })
         completeOperation(scope, payload.operationId)
@@ -63,7 +76,7 @@ Page({
       wx.showToast({ title: message, icon: 'none' })
     } finally { this.setData({ preparing: false }) }
   },
-  startManualRecord() { void this.continueWithPhoto('') },
+  startManualRecord() { this._manualEntryPending=false;void this.continueWithPhoto('') },
   readyForPhoto(): boolean {
     if (this.data.preparing) { wx.showToast({ title: '正在创建餐食记录', icon: 'none' }); return false }
     return true

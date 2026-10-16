@@ -4,33 +4,30 @@
     <view class="profile-row" bindtap="openProfile" aria-role="button" aria-label="查看宝宝档案">
       <image class="avatar" src="/assets/baby-avatar-v2.jpg" mode="aspectFill"></image>
       <view class="profile-copy"><view class="name-row"><text class="baby-name">{{babyName}}</text><text wx:if="{{genderText}}" class="gender-mark">{{genderText}}</text></view><text class="baby-age">{{ageText}}</text></view>
-      <view class="notice" catchtap="showNotice" aria-role="button" aria-label="消息提醒"><view class="bell"><view class="bell-clapper"></view></view><view wx:if="{{warnings.length}}" class="notice-dot"></view></view>
     </view>
     <view class="hero ui-card" bindtap="openCamera" aria-role="button" aria-label="拍照记录饮食">
-      <image src="/assets/home-banner-cover-v3.jpg" mode="aspectFill"></image>
-      <view class="hero-cta"><view class="camera-icon"></view><text>拍照记录饮食</text><view class="chevron"></view></view>
+      <image class="hero-food" src="/assets/camera-food-guide-v5.jpg" mode="aspectFill"></image>
+      <view class="hero-copy"><text class="hero-title">记录每一餐</text><text class="hero-description">拍下日常，慢慢了解饮食</text></view>
+      <view class="hero-cta"><view class="hero-camera-icon"></view><text>拍照记录饮食</text></view>
     </view>
     <view class="nutrition-card ui-card" bindtap="openReport" aria-role="button" aria-label="查看今日营养报告">
       <view class="card-heading"><view class="heading-with-info"><text class="section-title">今日营养报告</text></view></view>
       <view class="report-summary">
-        <view class="report-summary-icon">报</view>
+        <view class="report-summary-icon"><view class="report-chart-icon"></view></view>
         <view class="report-summary-copy"><text class="report-summary-title">{{reportTitle}}</text><text class="report-summary-desc">{{reportDescription}}</text></view>
         <view class="chevron"></view>
       </view>
-      <view wx:if="{{warnings.length}}" class="report-warning"><view class="bulb-icon"></view><text>{{warnings[0]}}</text></view>
     </view>
-    <view id="home-menu-card" class="home-menu-card ui-card" bindtap="openHomeMenu" aria-role="button" aria-label="饮食推荐">
-      <view class="card-heading"><text class="section-title">饮食推荐</text><text wx:if="{{homeMenu.dateLabel}}" id="home-menu-date" class="home-menu-date">{{homeMenu.dateLabel}}</text></view>
-      <view wx:if="{{homeMenu.meals.length}}" id="home-menu-meals" class="home-menu-meals"><view wx:for="{{homeMenu.meals}}" wx:key="slot" class="home-menu-row"><text class="home-menu-slot">{{item.label}}</text><text class="home-menu-dish">{{item.names}}<text wx:if="{{item.optional}}" class="home-menu-optional">（按需）</text></text></view></view>
-      <text wx:else id="home-menu-message" class="home-menu-message">{{homeMenu.message}}</text>
-      <text wx:if="{{homeMenu.state==='READY' && homeMenu.generating}}" class="home-menu-progress">新菜单生成中</text>
-      <view class="home-menu-footer"><text class="home-menu-hint">{{homeMenu.state==='READY'?'AI生成，仅供参考':'按宝宝条件规划'}}</text><view wx:if="{{homeMenu.link}}" class="home-menu-link"><text>{{homeMenu.link}}</text><view class="chevron"></view></view></view>
+    <view id="home-menu-card" class="home-menu-card ui-card" bindtap="openHomeMenu" aria-role="button" aria-label="{{homeMenu.dateLabel || '饮食推荐'}}">
+      <view class="home-menu-heading"><text class="home-menu-title">{{homeMenuTitle}}</text><text wx:if="{{homeMenu.dateLabel}}" id="home-menu-date" class="home-menu-date">{{homeMenuDateLabel}}</text></view>
+      <view id="home-menu-preview" class="home-menu-preview"><image id="home-menu-photo" class="home-menu-photo" src="{{homeMenuImage}}" data-src="{{homeMenuImage}}" binderror="onHomeMenuImageError" mode="aspectFill"/><view class="home-menu-copy"><block wx:if="{{homeMenuFeatured}}"><text class="home-menu-name">{{homeMenuFeatured.name}}</text><text class="home-menu-meta">{{homeMenuFeatured.slotLabel}}{{homeMenuFeatured.texture ? ' · '+homeMenuFeatured.texture : ''}}</text><view class="home-menu-tags"><text wx:if="{{homeMenuFeatured.description}}" class="home-menu-tag">{{homeMenuFeatured.description}}</text><text wx:if="{{homeMenuFeatured.minutes}}" class="home-menu-tag home-menu-time">{{homeMenuFeatured.minutes}}分钟</text></view></block><text wx:else id="home-menu-message" class="home-menu-message">{{homeMenu.message}}</text><text wx:if="{{homeMenu.state==='READY' && homeMenu.generating}}" class="home-menu-progress">新菜单生成中</text></view><view wx:if="{{homeMenu.link}}" class="home-menu-chevron chevron"/></view>
+      <view class="home-menu-divider"/><button id="home-menu-week" class="home-menu-week" catchtap="openHomeMenuWeek" disabled="{{homeMenu.state==='LOADING'}}">{{homeMenu.state==='READY'?'查看7天菜单':homeMenu.link || '正在加载'}}</button>
     </view>
     <view class="advice-card ui-card">
       <view class="advice-title"><view class="spark-icon"></view><text class="section-title">今日记录提醒</text></view>
       <view class="advice-content">
         <image class="advice-baby" src="/assets/baby-eating-centered-v3.jpg" mode="aspectFill"></image>
-        <view class="advice-list"><view class="advice-row" wx:for="{{advice}}" wx:key="title" data-index="{{index}}" bindtap="openAdvice"><view class="food-badge {{item.tone}}">{{item.badge}}</view><view class="advice-copy"><text class="advice-row-title">{{item.title}}</text><text class="advice-desc">{{item.description}}</text></view><view wx:if="{{item.reportId && item.nutrientCode}}" class="chevron"></view></view></view>
+        <view class="advice-list"><view class="advice-row" wx:for="{{advice}}" wx:key="title" data-index="{{index}}" bindtap="openAdvice"><view class="advice-copy"><text class="advice-row-title">{{item.title}}{{item.reportId && item.nutrientCode ? '的记录情况' : ''}}</text><text wx:if="{{!item.reportId || !item.nutrientCode}}" class="advice-desc">{{item.description}}</text></view><view wx:if="{{item.reportId && item.nutrientCode}}" class="chevron"></view></view></view>
       </view>
     </view>
   </view>

@@ -1,7 +1,10 @@
+import { detailComparison } from '../../utils/nutrient-detail-visual'
 import { foodCards } from '../../utils/nutrient-detail-view'
 import { backPage,replacePage } from '../../utils/navigation'
 import { ApiError, reviewEnvironment } from '../../utils/api'
 import { formatNumber, loadReportBundle } from '../../utils/nutrition-report'
+import { categories, category } from '../../utils/nutrition-period'
+import type { ReportBundle } from '../../utils/nutrition-report'
 import type { NutrientView } from '../../utils/nutrition-report'
 import { ensureSessionContext } from '../../utils/session'
 import type { SessionContext } from '../../utils/session'
@@ -59,6 +62,8 @@ function referencePresentation(nutrient: NutrientView) {
 
 Page({
   data: {
+    categories,category:'ALL',optionCategory:'ALL',showNutrientOptions:true,options:[] as Array<{code:string;name:string;category:string}>,visibleOptions:[] as Array<{code:string;name:string;category:string}>,
+    comparisonAvailable:false,comparisonPercent:0,comparisonText:'—',comparisonColor:'neutral',comparisonStroke:'#d4c9bc',comparisonCaption:'仅展示记录量',
     reviewLabel:reviewEnvironment()?.label || '',foodCards:[] as ReturnType<typeof foodCards>,missingSources:[] as Array<{foodId:string;name:string;weight:string}>,loading: true,
     errorMessage: '',
     periodId:'',nutrientCode: '', reportId: '', dateLabel: '', referenceSource: '',
@@ -89,6 +94,7 @@ Page({
   },
 
   _sequence:0,
+  _bundle:null as ReportBundle|null,
   onHide(){++this._sequence},
   onShow(){if(this.data.loading)void this.loadDetail()},
   onLoad(query: Record<string, string>) {
@@ -98,6 +104,7 @@ Page({
 
   async loadDetail() {
     const sequence=++this._sequence
+    this._bundle=null
     this.setData({ loading: true, errorMessage: '' })
     try {
       const active = await context()
@@ -106,11 +113,33 @@ Page({
       if(sequence!==this._sequence)return
       const nutrient = bundle.nutrients.find((item) => item.nutrientCode === this.data.nutrientCode)
       if (!nutrient) throw new Error('没有找到该营养素的报告数据')
+      this._bundle=bundle
+      const options=bundle.nutrients.map(n=>({code:n.nutrientCode,name:n.name,category:category(n.nutrientCode)}))
+      const selectedCategory=category(nutrient.nutrientCode)
+      this.setData({options,visibleOptions:options.filter(n=>n.category===selectedCategory),category:selectedCategory,optionCategory:selectedCategory})
+      this.presentDetail()
+    } catch (caught) {
+      if(sequence!==this._sequence)return
+      this._bundle=null
+      this.setData({options:[],visibleOptions:[],comparisonAvailable:false,comparisonPercent:0,comparisonText:'—',foodCards:[],sources:[],missingSources:[],amountText:'—',hasValue:false,referenceAvailable:false,showCurrentMarker:false})
+      const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '详情加载失败'
+      this.setData({ errorMessage: message })
+    } finally {
+      if(sequence===this._sequence)this.setData({ loading: false })
+    }
+  },
+
+  presentDetail() {
+    const bundle=this._bundle
+    const nutrient=bundle?.nutrients.find(n=>n.nutrientCode===this.data.nutrientCode)
+    if(!bundle||!nutrient)return
       const reference = referencePresentation(nutrient)
+      const comparison = detailComparison(nutrient)
       const reasons = [nutrient.statusText]
       if (nutrient.dataNote) reasons.push(nutrient.dataNote + '，当前结果只代表已知部分。')
       const suggestions = ['本页只解释这一修订的记录量，不从单日结果推断营养状况。']
       this.setData({
+        ...comparison,
         name: nutrient.name,
         badge: nutrient.badge,
         amountText: nutrient.amountText,
@@ -136,16 +165,21 @@ Page({
         reasons,
         suggestions,
       })
-    } catch (caught) {
-      if(sequence!==this._sequence)return
-      this.setData({foodCards:[],sources:[],missingSources:[],amountText:'—',hasValue:false,referenceAvailable:false,showCurrentMarker:false})
-      const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '详情加载失败'
-      this.setData({ errorMessage: message })
-    } finally {
-      if(sequence===this._sequence)this.setData({ loading: false })
-    }
+    this.setData({category:category(nutrient.nutrientCode)})
   },
-
+  selectCategory(e:WechatMiniprogram.TouchEvent) {
+    if(this.data.loading||this.data.errorMessage)return
+    const key=String(e.currentTarget.dataset.key)
+    if(!this.data.categories.some(item=>item.key===key))return
+    this.setData({optionCategory:key,showNutrientOptions:!this.data.showNutrientOptions||this.data.optionCategory!==key,visibleOptions:key==='ALL'?this.data.options:this.data.options.filter(n=>n.category===key)})
+  },
+  selectNutrient(e:WechatMiniprogram.TouchEvent) {
+    if(this.data.loading||this.data.errorMessage||!this._bundle)return
+    const code=String(e.currentTarget.dataset.code)
+    if(!this.data.visibleOptions.some(n=>n.code===code)||!this._bundle.nutrients.some(n=>n.nutrientCode===code))return
+    this.setData({nutrientCode:code,aboutExpanded:false,conclusionExpanded:false})
+    this.presentDetail()
+  },
   changePeriodMode(e:WechatMiniprogram.CustomEvent<{mode:string}>){if(e.detail.mode==='TREND')this.switchToTrend()},
   switchToTrend(){if(this.data.loading)return;replacePage('/pages/nutrient-trend/nutrient-trend?code='+encodeURIComponent(this.data.nutrientCode)+'&endDate='+this.data.dateLabel+'&dayReportId='+encodeURIComponent(this.data.reportId)+(this.data.periodId?'&periodId='+encodeURIComponent(this.data.periodId):''))},
   toggleConclusion() { if (this.data.expandableConclusion) this.setData({ conclusionExpanded: !this.data.conclusionExpanded }) },

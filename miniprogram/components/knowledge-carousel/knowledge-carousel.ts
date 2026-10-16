@@ -1,6 +1,6 @@
 interface KnowledgeItem { id: string; title: string; text: string; evidence: Array<{id: string; bookPages: string}> }
 Component({
-  properties: { items: { type: Array, value: [] as KnowledgeItem[] } },
+  properties: { items: { type: Array, value: [] as KnowledgeItem[] }, appearance: { type: String, value: '' } },
   data: { current: 0, slideHeight: 160, visible: true, touching: false, attached: false, measurement: 0 },
   observers: {
     items() { this.setData({ current: 0, touching: false }); this.measureSlides() }

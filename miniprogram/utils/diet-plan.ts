@@ -1,9 +1,10 @@
+import type {AiDiagnostic} from './ai-failure'
 export interface MenuSettings { avoidance:'NONE'|'KNOWN';avoidIngredients:string[];texture:'PUREE'|'MASHED'|'SOFT';medicalDiet:boolean }
 export interface MenuPreference extends MenuSettings {medicalDiet:false;consentVersion:string}
 export interface MenuSettingsResponse {preference:MenuSettings|null;preferenceVersion:number}
 export interface MenuRecipe {key:string;name:string;description?:string;servings:1;preparationMinutes:number;texture:string;ingredients:{name:string;state:string;quantity:string;unit:string}[];steps:string[];textureAdvice:string;replacement:string}
 export interface MenuDay {date:string;meals:{slot:string;recipeKeys:string[]}[]}
-export interface MenuTask {taskId:string;state:string;plan:{rationale?:string;recipes:MenuRecipe[];days:MenuDay[]}|null;failureMessage:string|null;startDate:string;endDate:string;generatedAt:string;focus:{nutrientCode:string;comparableDays:number;lowDays:number}[];recordedDays:number;risk:string}
+export interface MenuTask {taskId:string;state:string;plan:{rationale?:string;recipes:MenuRecipe[];days:MenuDay[]}|null;failureMessage:string|null;diagnostic?:AiDiagnostic|null;startDate:string;endDate:string;generatedAt:string;focus:{nutrientCode:string;comparableDays:number;lowDays:number}[];recordedDays:number;risk:string}
 export interface MenuLatest {plan:MenuTask|null;task:MenuTask|null;preference:MenuSettings|null;preferenceVersion:number;quota:{firstRemaining:number;regenerationsRemaining:number;textCalls:number;imageRemaining:number};imageCapability:string;risk:string}
 export const menuRisk='AI生成，仅供参考。备餐用量为估算，请结合宝宝实际情况、食材适用性及咀嚼吞咽能力调整，不替代专业建议。'
 export const slotNames:Record<string,string>={BREAKFAST:'早餐',LUNCH:'午餐',DINNER:'晚餐',SNACK:'点心（按需）'}

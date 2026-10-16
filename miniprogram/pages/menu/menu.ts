@@ -41,7 +41,7 @@ function grams(value: string | null): string {
 
 Page({
   data: {
-    loading: true, babyName: '宝宝', ageText: '', error: '', notice: '仅供内部学习参考，不是医学诊断或喂养处方',
+    showInfo:false,loading: true, babyName: '宝宝', ageText: '', error: '', notice: '仅供内部学习参考，不是医学诊断或喂养处方',
     caregiverNotice: '需由照护者确认食材适用性', excludedCount: 0,
     candidates: [] as Array<MenuCandidate & { ageLabel: string; ingredientCount: number }>,
     recipes: [] as Array<RecipeSummary & { statusLabel: string; weightLabel: string }>,
@@ -80,6 +80,7 @@ Page({
       wx.showToast({ title: message, icon: 'none' })
     } finally { this.setData({ loading: false }) }
   },
+  toggleInfo(){this.setData({showInfo:!this.data.showInfo})},
   goBack() { backPage('/pages/profile/profile',this) },
   explainCandidate() { wx.showToast({ title: '候选不会自动记为实际摄入', icon: 'none' }) },
 })

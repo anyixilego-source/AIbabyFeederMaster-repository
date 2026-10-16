@@ -17,8 +17,9 @@ test('each meal keeps its own original photo instead of following the latest pic
 test('local photo persistence failure does not turn a successful meal save into failure',async()=>{const h=setup();h.failCopy();const saved=await h.submit.submitRecord('meal-create:s','/meals','POST','CREATE_CONFIRMED_MEAL',{items:[]},{...input,filePath:'/temp/one.jpg'});assert.equal(saved.mealId,'meal-one');assert.equal(h.calls.length,1);assert.equal(h.photos.mealPhotoPath('meal-one'),'')});
 test('sample artwork never becomes a recorded meal photo',async()=>{const h=setup();assert.equal(await h.photos.prepareMealPhoto({...input,filePath:'/assets/camera-food-guide-v5.jpg'}),undefined)});
 
+const labelModule={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(base,'utils/meal-presentation.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{module:labelModule,exports:labelModule.exports});
 function resultPage(h,manual){let page;const m={exports:{}},navigation=[];const mocks={
- '../../utils/api':h.api,'../../utils/image-retention':h.retention,'../../utils/record-submit':h.submit,
+ '../../utils/meal-presentation':labelModule.exports, '../../utils/api':h.api,'../../utils/image-retention':h.retention,'../../utils/record-submit':h.submit,
  '../../utils/meal-edit':{validNewWeight:s=>/^\d+(?:\.\d)?$/.test(s)&&Number(s)>0,gramUnits:s=>Math.round(Number(s)*1000000),exactGrams:n=>String(n/1000000),weightNotice:()=>''},
  '../../utils/navigation':{navigateRoot:url=>navigation.push(url)},'../../utils/pending-meal':{abandonCurrentMeal(){},discardAbandonedMeals:async()=>{}},
  };vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(base,'pages/result/result.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{module:m,exports:m.exports,require:x=>mocks[x]||{},Page:d=>page=d,wx:h.wx,getApp:()=>({globalData:{ready:Promise.resolve({subjectId:'s'})}}),console});
@@ -32,3 +33,6 @@ test('native saved-file URLs outside USER_DATA_PATH are reused rather than passe
  const original=await h.retention.saveLocalImage('/tmp/original.jpg','ONE_MONTH');assert.equal(original,'http://store/original.jpg');
  await h.submit.submitRecord('meal-create:s','/meals','POST','CREATE_CONFIRMED_MEAL',{items:[]},{filePath:original,retention:'ONE_MONTH'});assert.equal(copies,1);assert.equal(h.photos.mealPhotoPath('meal-one'),original);
 });
+
+test('recognized meal display name is saved with the same atomic food submission',async()=>{const h=setup(),p=resultPage(h,false);p.page.data.recognizedMealName='南瓜小米粥';await p.page.save();const writes=h.calls.filter(c=>c.options?.method==='POST');assert.equal(writes.length,1);assert.equal(writes[0].options.data.notes,'南瓜小米粥');assert.equal(writes[0].options.data.mealType,'OTHER');assert.equal(writes[0].options.data.occurredAt,'2026-10-14T04:00:00Z')});
+test('a photo without an AI name saves the fallback while manual entry keeps its original note',async()=>{for(const manual of [false,true]){const h=setup(),p=resultPage(h,manual);await p.page.save();assert.equal(h.calls.find(c=>c.options?.method==='POST').options.data.notes,manual?'手工记录':'拍照记录食物')}});
