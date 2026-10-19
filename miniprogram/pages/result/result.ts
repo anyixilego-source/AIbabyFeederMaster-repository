@@ -1,5 +1,7 @@
+import {hasCloudPhotoChoice,setCloudPhotoConsent} from '../../utils/shared-meal-photo'
+import { displayInteger } from '../../utils/quantity-format'
 import {aiFailureView,notifyAiFailure,type AiDiagnostic,type AiFailureView} from '../../utils/ai-failure'
-import { recognizedMealName, confirmedMealNotes } from '../../utils/meal-presentation'
+import { confirmedMealNotes } from '../../utils/meal-presentation'
 import {backTo,navigateRoot} from '../../utils/navigation'
 import { gramUnits, validNewWeight, weightNotice,exactGrams } from '../../utils/meal-edit'
 import { ApiError, request, uploadRecognitionImage } from '../../utils/api'
@@ -89,8 +91,7 @@ function snappedWeight(value: number): number {
   return Math.abs(bounded - tick) <= 6 ? tick : bounded
 }
 function numberText(value: string): string {
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed.toString() : value
+  return displayInteger(value)
 }
 function warningText(warning: string): string {
   const [nutrientCode, code] = warning.split(':')
@@ -120,12 +121,18 @@ function initialRatios(items: ConfirmedFoodItem[]): ConfirmedFoodItem[] {
   })
 }
 function applyRatioAmounts(items: ConfirmedFoodItem[], totalText: string): ConfirmedFoodItem[] {
-  const total = Math.round(Number(totalText) * 10)
-  if (!Number.isFinite(total) || total <= 0) return items.map((item) => ({ ...item, consumedAmount: '' }))
-  const allocations=items.map((item,index)=>({index,raw:total*Number(item.ratioPercent||0)/100,units:Math.floor(total*Number(item.ratioPercent||0)/100)}))
-  let remainder=total-allocations.reduce((sum,a)=>sum+a.units,0)
-  for(const a of [...allocations].sort((a,b)=>(b.raw-b.units)-(a.raw-a.units)||a.index-b.index)){if(remainder<=0)break;a.units++;remainder--}
-  return items.map((item,index)=>({...item,consumedAmount:String((allocations[index]?.units||0)/10)}))
+  const total = Number(totalText)
+  if (!Number.isSafeInteger(total) || total < items.length) return items.map(item => ({ ...item, consumedAmount: '' }))
+  const allocations = items.map((item,index) => ({ index, raw:total*Number(item.ratioPercent||0)/100, units:Math.floor(total*Number(item.ratioPercent||0)/100) }))
+  let remainder = total - allocations.reduce((sum,a) => sum+a.units,0)
+  for (const a of [...allocations].sort((a,b)=>(b.raw-b.units)-(a.raw-a.units)||a.index-b.index)) {if(remainder<=0)break;a.units++;remainder--}
+  // Keep each selected food positive without changing the confirmed whole-meal total.
+  for (const a of allocations.filter(a=>a.units===0)) {
+    const donor = [...allocations].filter(d=>d.units>1).sort((a,b)=>(b.units-b.raw)-(a.units-a.raw)||a.index-b.index)[0]
+    if (!donor) return items.map(item=>({...item,consumedAmount:''}))
+    donor.units--;a.units=1
+  }
+  return items.map((item,index)=>({...item,consumedAmount:String(allocations[index]!.units)}))
 }
 function linkedRatioChange(items: ConfirmedFoodItem[], index: number, requestedValue: number, adjustedOrder: number): {
   items: ConfirmedFoodItem[]
@@ -256,7 +263,7 @@ Page({
   openConsentDetails() {
     wx.showModal({
       title: '图片处理授权说明',
-      content: '为识别食物营养成分，需要将所选食物图片发送至 DeepSeek 模型。API 调用场景下图片不用于训练；服务端仅在请求期间临时接触且不保存；原始图片只保存在本地终端，并按你选择的期限自动删除；图片中的无关人物由 AI Prompt 忽略。不同意不影响手工搜索等基础功能。',
+      content: '为识别食品候选，需要将所选食物图片发送至 DeepSeek 模型。新餐食保存后，还会将你最终确认的标准食品名称单独发送给同一服务，生成一次整餐名称；修改记录不再调用，命名失败不影响保存。API 调用场景下图片不用于训练；服务端仅在请求期间临时接触且不保存；原始图片只保存在本地终端，并按你选择的期限自动删除；图片中的无关人物由 AI Prompt 忽略。不同意不影响手工搜索等基础功能。',
       showCancel: false,
       confirmText: '我知道了',
     })
@@ -340,7 +347,7 @@ Page({
       })
       const items = result.items || []
       this.setData({
-        result, recognizedMealName: recognizedMealName(result),
+        result, recognizedMealName: '',
         errorMessage: '',
         confirmedFoods: [], nutrition: [], coverageText: '', warnings: [],
         mealTotalAmount: '200', ...weightPresentation('200'), weightBubbleVisible: false, ratioTotal: 0, ratioAdjustmentSequence: 0,
@@ -490,7 +497,7 @@ Page({
       value: `${numberText(item.knownValue!)} ${unitNames[item.unitCode] || item.unitCode}`,
       tone: item.nutrientCode === 'ENERGY' ? 'heat' : item.nutrientCode === 'PROTEIN' ? 'protein' : 'mineral',
     }))
-    const coverage = Math.round(Number(calculation.coverageRatio) * 1000) / 10
+    const coverage = Math.round(Number(calculation.coverageRatio) * 100)
     this.setData({ nutrition: nutrients, coverageText: `${coverage}%`, warnings: calculation.warnings.map(warningText) })
     return calculation
   },
@@ -502,8 +509,9 @@ Page({
     if (!mealId) { wx.showToast({ title: '请从新增记录进入', icon: 'none' }); return }
     if (!foods.length) { wx.showToast({ title: '请至少确认一种标准食品', icon: 'none' }); return }
     if (!validNewWeight(this.data.mealTotalAmount)) {
-      wx.showToast({ title: '请填写有效的大于0的总克数（最多1位小数）', icon: 'none' }); return
+      wx.showToast({ title: '请填写大于0的整数总克数', icon: 'none' }); return
     }
+    if (Number(this.data.mealTotalAmount) < foods.length) { wx.showToast({title:'总克数不能少于食物种数，请核对',icon:'none'}); return }
     if (this.data.ratioTotal !== 100) {
       wx.showToast({ title: `食材占比合计需为100%，当前${this.data.ratioTotal}%`, icon: 'none' }); return
     }
@@ -525,7 +533,7 @@ Page({
       const active=await(getApp<IAppOption>().globalData.ready||ensureSessionContext())
       if(active.subjectId!==draft.subjectId)throw Error('当前宝宝已切换，请返回记录页重新进入')
       const scope='meal-create:'+draft.subjectId,total=exactGrams(actualTotal)
-      const body:Record<string,unknown>={mealType:draft.mealType,occurredAt:draft.occurredAt,notes:confirmedMealNotes(draft.notes,!this.data.manualEntry&&!this.data.samplePhoto,this.data.recognizedMealName),items:foods.map(food=>({observedName:food.observedName,consumedAmount:food.consumedAmount.trim(),source:food.source,weightOrigin:'USER_ACCEPTED_ESTIMATE',...(food.unmatched?{matchStatus:'UNMATCHED',matchReason:food.matchReason||'NO_MATCH_NO_NUTRITION'}:{matchStatus:'MATCHED',foodId:food.foodId,...(food.selectedFoodRevisionId?{selectedFoodRevisionId:food.selectedFoodRevisionId}:{})})}))}
+      const body:Record<string,unknown>={mealType:draft.mealType,occurredAt:draft.occurredAt,notes:confirmedMealNotes(draft.notes,!this.data.manualEntry&&!this.data.samplePhoto,''),...(!this.data.manualEntry&&!this.data.samplePhoto&&this.data.accepted?{mealNameConsentVersion:'CONFIRMED_MEAL_NAME_V1'}:{}),items:foods.map(food=>({observedName:food.observedName,consumedAmount:food.consumedAmount.trim(),source:food.source,weightOrigin:'USER_ACCEPTED_ESTIMATE',...(food.unmatched?{matchStatus:'UNMATCHED',matchReason:food.matchReason||'NO_MATCH_NO_NUTRITION'}:{matchStatus:'MATCHED',foodId:food.foodId,...(food.selectedFoodRevisionId?{selectedFoodRevisionId:food.selectedFoodRevisionId}:{})})}))}
       const previous=pendingRecord(scope)
       if(previous){
         const {operationId:_operationId,weightReview:_review,...oldBody}=previous.payload
@@ -535,6 +543,10 @@ Page({
       }else if(actualTotal>300000000){
         const accepted=await new Promise<boolean>(resolve=>wx.showModal({title:'核对本餐总量',content:weightNotice(total)+'确认记录这个重量吗？',confirmText:'确认记录',success:r=>resolve(r.confirm),fail:()=>resolve(false)}));if(!accepted)return
         body.weightReview={policyVersion:'MEAL_WEIGHT_REVIEW_V2',acknowledged:true,reviewedTotalGrams:total}
+      }
+      if(!this.data.manualEntry&&!this.data.samplePhoto&&active.current?.sharedVersion!=='legacy'&&!hasCloudPhotoChoice(draft.subjectId)){
+        const decision=await new Promise<{confirm:boolean}>((resolve)=>wx.showModal({title:'同步餐食照片给家人？',content:'同意后，本次及今后的新餐食照片上传私有云端，供有权照护者查看，默认保留30天。不同意也能保存餐食；不会补传旧照片。本地保存和AI识别用途分别处理。',confirmText:'同意同步',cancelText:'仅本地',success:resolve,fail:()=>resolve({confirm:false})}));
+        setCloudPhotoConsent(draft.subjectId,decision.confirm)
       }
       const saved=await submitRecord<{mealId:string;reportUpdate?:{status:string}}>(scope,'/subjects/'+draft.subjectId+'/meals/confirmed','POST','CREATE_CONFIRMED_MEAL',body,!this.data.manualEntry&&!this.data.samplePhoto?{filePath:this.data.photo,retention:this.data.retentionOptions[this.data.retentionIndex].value}:undefined)
       wx.setStorageSync('foodmaster.reportUpdateState',saved.reportUpdate?.status||'UNKNOWN')

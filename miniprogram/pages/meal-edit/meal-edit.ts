@@ -20,6 +20,7 @@ Page({
    const meal=await request<SavedMeal>('/meals/'+this.data.mealId)
    const active=await (getApp<IAppOption>().globalData.ready||ensureSessionContext())
    if(active.subjectId!==meal.subjectId)throw Error('当前宝宝已切换，请返回记录页重新进入')
+   if(active.current?.canRecord===false)throw Error('当前为仅查看权限，不能修改餐食')
    if(MEAL_EDIT_OCCUPANCY_ENABLED&&meal.revisionToken!==this._lease?.revisionToken)throw Error('编辑状态已失效，请返回记录页重新打开这餐')
    if(this._closed)return
    this.applyBaseline(meal);this.startHeartbeat()
@@ -53,7 +54,7 @@ Page({
   const d=new Date(meal.occurredAt),date=localDate(d),time=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')
   this.setData({date,time,mealType:meal.mealType,items:meal.items.map(draftItem),invalidated:false,unresolved:false,message:'',openSlider:'',originalLabel:date+' '+time+' · '+(meal.notes||mealTypes.find(t=>t.key===meal.mealType)?.label||'饮食记录')});this.recompute()
  },
- recompute(){if(!this._baseline)return;const base=this._baseline,d=new Date(base.occurredAt),changed=changedItems(this.data.items)||this.data.date!==localDate(d)||this.data.time!==String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')||this.data.mealType!==base.mealType;const total=totalText(this.data.items);this.setData({changed,total,validation:validateItems(this.data.items),weightWarning:weightNotice(total),impact:this.data.date===localDate(d)?'保存后，将更新'+this.data.date+'及相关报告':'这餐将从'+localDate(d)+'移动到'+this.data.date+'，两个日期的相关报告将更新'});if(changed&&!this.data.invalidated)wx.enableAlertBeforeUnload({message:'修改尚未保存，离开将放弃本次修改'});else wx.disableAlertBeforeUnload()},
+ recompute(){if(!this._baseline)return;const base=this._baseline,d=new Date(base.occurredAt),changed=changedItems(this.data.items)||this.data.date!==localDate(d)||this.data.time!==String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')||this.data.mealType!==base.mealType;const total=totalText(this.data.items);this.setData({changed,total,validation:validateItems(this.data.items),weightWarning:totalUnits(this.data.items)===null?'':weightNotice(exactGrams(totalUnits(this.data.items)!)),impact:this.data.date===localDate(d)?'保存后，将更新'+this.data.date+'及相关报告':'这餐将从'+localDate(d)+'移动到'+this.data.date+'，两个日期的相关报告将更新'});if(changed&&!this.data.invalidated)wx.enableAlertBeforeUnload({message:'修改尚未保存，离开将放弃本次修改'});else wx.disableAlertBeforeUnload()},
  weightInput(e:WechatMiniprogram.Input){if(!this.editable())return;const key=String(e.currentTarget.dataset.key);this.setData({items:this.data.items.map(i=>i.key===key?adjustWeight(i,e.detail.value.trim()):i)});this.recompute()},
  toggleSlider(e:WechatMiniprogram.TouchEvent){if(!this.editable())return;const key=String(e.currentTarget.dataset.key);this.setData({openSlider:this.data.openSlider===key?'':key})},
  slideChanging(e:WechatMiniprogram.SliderChanging){this.slide(e,false)},slideChanged(e:WechatMiniprogram.SliderChange){this.slide(e,true)},
@@ -95,7 +96,7 @@ Page({
     const original=new Date(this._baseline.occurredAt);let occurredAt=new Date(this.data.date+'T'+this.data.time+':'+String(original.getSeconds()).padStart(2,'0'));occurredAt.setMilliseconds(original.getMilliseconds())
     if(this.data.date===localDate(original)&&this.data.time===String(original.getHours()).padStart(2,'0')+':'+String(original.getMinutes()).padStart(2,'0'))occurredAt=original
     if(!Number.isFinite(occurredAt.getTime())||occurredAt.getTime()>Date.now()+300000)throw Error('日期和时间不能在未来')
-    if(totalUnits(this.data.items)!>300000000){const ok=await new Promise<boolean>(resolve=>wx.showModal({title:'核对本餐总量',content:weightNotice(this.data.total)+'确认记录这个重量吗？',confirmText:'确认记录',success:r=>resolve(r.confirm),fail:()=>resolve(false)}));if(!ok)return}
+    if(totalUnits(this.data.items)!>300000000){const ok=await new Promise<boolean>(resolve=>wx.showModal({title:'核对本餐总量',content:weightNotice(exactGrams(totalUnits(this.data.items)!))+'确认记录这个重量吗？',confirmText:'确认记录',success:r=>resolve(r.confirm),fail:()=>resolve(false)}));if(!ok)return}
     if(this.data.invalidated||(MEAL_EDIT_OCCUPANCY_ENABLED&&this._lease&&Date.now()>=this._lease.validUntil)){this.invalidate();return}
     const body={expectedRevision:this._baseline.revisionToken,...(MEAL_EDIT_OCCUPANCY_ENABLED&&this._lease?{editToken:this._lease.editToken}:{}),occurredAt:occurredAt.toISOString(),mealType:this.data.mealType,items:itemPayload(this.data.items),...(totalUnits(this.data.items)!>300000000?{weightReview:{policyVersion:'MEAL_WEIGHT_REVIEW_V2',acknowledged:true,reviewedTotalGrams:exactGrams(totalUnits(this.data.items)!)}}:{})},fingerprint=JSON.stringify(body)
     if(this._pending?.fingerprint!==fingerprint)this._pending={fingerprint,payload:{...body,operationId:operationId()}}

@@ -1,3 +1,4 @@
+import {canManageBaby} from '../../utils/family-state'
 import {openPage,navigateRoot,ensureHomeParent,backPage} from '../../utils/navigation'
 import { ApiError, request } from '../../utils/api'
 import { ageDisplay } from '../../utils/age'
@@ -53,6 +54,7 @@ Page({
       const active = await (ready || ensureSessionContext())
       if (!isCurrent()) return
       void this.loadFeedbackAccess(sequence, ready)
+      if (!active.subjectId && active.subjects.length) {this.setData({loading:false,errorMessage:'请选择当前宝宝'});return}
       if (!active.subjectId) {
         // 第一批：无宝宝档案时自动弹出创建表单（我的页首动作即建档），并提供可见入口。
         this.setData({ loading: false, editing: true, draftName: '宝宝', draftBirthDate: '', draftSexIndex: 2 })
@@ -108,8 +110,10 @@ Page({
   openConditions(){if(this.data.subjectId)openPage('/pages/diet-menu/diet-menu?settingsOnly=1&subjectId='+encodeURIComponent(this.data.subjectId))},
   toggleHealthInfo(){this.setData({showHealthInfo:!this.data.showHealthInfo})},
   selectSex(e:WechatMiniprogram.TouchEvent){const index=Number(e.currentTarget.dataset.index);if(!this.data.saving&&Number.isInteger(index)&&index>=0&&index<this.data.sexOptions.length)this.setData({draftSexIndex:index})},
-  toggleEdit(){if(this.data.loading||this.data.errorMessage)return;openPage('/pages/profile/profile?view=editor')},
+  openFamily(){openPage('/pages/family/family')},
+  toggleEdit(){if(!canManageBaby()){wx.showToast({title:'仅管理员可修改宝宝档案',icon:'none'});return}if(this.data.loading||this.data.errorMessage)return;openPage('/pages/profile/profile?view=editor')},
   prepareEdit() {
+    if(!canManageBaby()){this.setData({errorMessage:'仅管理员可修改宝宝档案'});return}
     if (this.data.errorMessage) return
     const draftSexIndex = this.data.sexText === '女宝宝' ? 0 : this.data.sexText === '男宝宝' ? 1 : 2
     this.setData({ editing: true, draftName: this.data.name, draftBirthDate: this.data.birthDate, draftSexIndex })
@@ -127,6 +131,7 @@ Page({
   onBirthDateChange(event: WechatMiniprogram.CustomEvent<{ value: string }>) { this.setData({ draftBirthDate: event.detail.value }) },
   onSexChange(event: WechatMiniprogram.CustomEvent<{ value: string }>) { this.setData({ draftSexIndex: Number(event.detail.value) }) },
   async saveProfile() {
+    if(!canManageBaby()){wx.showToast({title:'仅管理员可修改宝宝档案',icon:'none'});return}
     if (this.data.saving) return
     const displayName = this.data.draftName.trim()
     if (!displayName) { wx.showToast({ title: '请填写宝宝昵称', icon: 'none' }); return }

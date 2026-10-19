@@ -1,3 +1,4 @@
+import { displayInteger } from './quantity-format'
 import { ApiError, request, getAuth } from './api'
 import { ageDisplay, ageDisplayFromMonths } from './age'
 import { completeOperation, operationPayload } from './operation'
@@ -206,9 +207,7 @@ export function tomorrow(date: Date): string {
 }
 
 export function formatNumber(value: string | number): string {
-  const parsed = Number(value)
-  if (!Number.isFinite(parsed)) return String(value)
-  return parsed.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+  return displayInteger(value)
 }
 
 export function warningLabel(warning: string): string {

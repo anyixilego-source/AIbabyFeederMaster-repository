@@ -1,7 +1,10 @@
+import {familyState} from './family-state';
+import {queueSharedMealPhoto,retrySharedMealPhotos} from './shared-meal-photo';
 import { ApiError, getAuth, request } from './api';
 import {prepareMealPhoto,linkMealPhoto} from './meal-photo';
 import type {MealPhotoInput,LocalMealPhoto} from './meal-photo';
 export interface PendingRecord {
+    subjectId?:string;
     path: string;
     method: 'POST' | 'PATCH' | 'DELETE';
     kind: string;
@@ -14,12 +17,14 @@ export function pendingRecord(scope: string): PendingRecord | undefined { return
 function finishPhoto(pending: PendingRecord, result: unknown): void {
     if (pending.kind !== 'CREATE_CONFIRMED_MEAL' || !pending.localPhoto || !result || typeof result !== 'object') return;
     const mealId = (result as {mealId?: unknown}).mealId;
-    if (typeof mealId === 'string') { try { linkMealPhoto(mealId,pending.localPhoto); } catch { /* Photo cache failure must not turn a saved meal into a failed save. */ } }
+    if (typeof mealId === 'string') { try { linkMealPhoto(mealId,pending.localPhoto);const subject=/^\/subjects\/([^/]+)\/meals/.exec(pending.path)?.[1];
+      if(subject){queueSharedMealPhoto(mealId,subject,pending.localPhoto.filePath,pending.localPhoto.expiresAt);void retrySharedMealPhotos();} } catch { /* Photo cache failure must not turn a saved meal into a failed save. */ } }
 }
 export async function submitRecord<T>(scope: string, path: string, method: PendingRecord['method'], kind: string, body: Record<string, unknown>, photo?: MealPhotoInput): Promise<T> {
     const storageKey = key(scope), auth = getAuth();
     let pending = wx.getStorageSync(storageKey) as PendingRecord | undefined;
     if (pending) {
+        if(pending.subjectId&&familyState()?.subjectId&&pending.subjectId!==familyState()?.subjectId)throw Error('请切回原宝宝后核对这次提交');
         try {
             const receipt = await request<{
                 status: string;
@@ -38,7 +43,7 @@ export async function submitRecord<T>(scope: string, path: string, method: Pendi
         }
     }
     else {
-        pending = { path, method, kind, payload: { ...body, operationId: typeof body.operationId==='string'?body.operationId:'record-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 14) } };
+        pending = { subjectId:familyState()?.subjectId,path, method, kind, payload: { ...body, operationId: typeof body.operationId==='string'?body.operationId:'record-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 14) } };
         if (kind === 'CREATE_CONFIRMED_MEAL' && photo) {
             try { pending.localPhoto = await prepareMealPhoto(photo); } catch { /* Saving a meal remains available when a local image cannot be retained. */ }
             if (getAuth()?.clientSessionId !== auth?.clientSessionId) throw Error('登录状态已变化');
@@ -54,7 +59,7 @@ export async function submitRecord<T>(scope: string, path: string, method: Pendi
         return result;
     }
     catch (e) {
-        if (e instanceof ApiError && e.statusCode >= 400 && e.statusCode < 500 && ![401, 403, 429].includes(e.statusCode))
+        if (e instanceof ApiError && (e.data as {code?:string}|null)?.code!=='FAMILY_CONTEXT_CHANGED' && e.statusCode >= 400 && e.statusCode < 500 && ![401, 403, 429].includes(e.statusCode))
             wx.removeStorageSync(storageKey);
         throw e;
     }

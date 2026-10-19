@@ -18,7 +18,10 @@
     "pages/diet-menu/diet-menu",
     "pages/diet-favorites/diet-favorites",
     "pages/feedback-management/feedback-management",
-    "pages/milk-trend/milk-trend"
+    "pages/milk-trend/milk-trend",
+    "pages/family/family",
+    "pages/family-join/family-join",
+    "pages/menu-share/menu-share"
   ],
   "window": {
     "navigationBarTextStyle": "black",

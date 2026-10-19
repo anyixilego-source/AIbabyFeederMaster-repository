@@ -1,3 +1,4 @@
+import { displayInteger } from '../../utils/quantity-format'
 import {backPage} from '../../utils/navigation'
 import { ApiError, request } from '../../utils/api'
 import { ageDisplayFromMonths, ageMonths } from '../../utils/age'
@@ -36,7 +37,7 @@ async function context(): Promise<SessionContext> {
 }
 function grams(value: string | null): string {
   if (!value) return '尚无实测成品重量'
-  return `${Number(value).toString()} 克成品`
+  return `${displayInteger(value)} 克成品`
 }
 
 Page({

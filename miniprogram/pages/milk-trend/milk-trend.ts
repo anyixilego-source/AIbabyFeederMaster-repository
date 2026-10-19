@@ -1,3 +1,5 @@
+import {canRecordBaby} from '../../utils/family-state'
+import { displayInteger } from '../../utils/quantity-format'
 import {backPage,openPage} from '../../utils/navigation'
 import {request,reviewEnvironment} from '../../utils/api'
 import {loadPeriod} from '../../utils/nutrition-period'
@@ -7,7 +9,7 @@ import {ensureSessionContext} from '../../utils/session'
 
 function dateOnly(date:Date){return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
 function shortDate(value:string,year=false){const [y,m,d]=value.split('-');return value?`${year?y+'年':''}${Number(m)}月${Number(d)}日`:''}
-function integerMl(value:string){const n=Number(value.replace(/^约/,'').replace(/,/g,''));return Number.isFinite(n)?Math.round(n).toLocaleString('en-US'):value}
+function integerMl(value:string){return value.startsWith('<') ? value : displayInteger(value.replace(/^约/,'').replace(/,/g,''))}
 function recordView(record:MilkSnapshotRecord,offset:number){return {...milkRecordView(record,offset),volumeText:record.volumeMl===null?'仅记录喂养事件':integerMl(record.volumeMl)+' ml'}}
 
 Page({
@@ -55,7 +57,7 @@ Page({
   if(this.data.loading||!/^\d{4}-\d{2}-\d{2}$/.test(value)||!Number.isFinite(parsed.getTime())||dateOnly(parsed)!==value||value>dateOnly(new Date())||value===this.data.endDate)return;
   this.setData({endDate:value,periodId:'',selectedDate:'',showCalendar:false});this._scroll=0;void this.load();
  },
- openRecord(e:WechatMiniprogram.TouchEvent){const item=this.data.records.find(r=>r.milkRecordId===String(e.currentTarget.dataset.id));if(!item||!this.data.subjectId||this._returnFromEdit)return;this._editEpoch=Number(wx.getStorageSync('foodmaster.recordEpoch')||0);this._returnFromEdit=true;openPage('/pages/records/records?fromMilkTrend=1&milkRecordId='+encodeURIComponent(item.milkRecordId)+'&subjectId='+encodeURIComponent(this.data.subjectId),{fail:()=>{this._returnFromEdit=false;wx.showToast({title:'编辑暂未打开，请重试',icon:'none'})}})},
+ openRecord(e:WechatMiniprogram.TouchEvent){if(!canRecordBaby()){wx.showToast({title:'当前为仅查看权限，记录详情已展示在列表中',icon:'none'});return}const item=this.data.records.find(r=>r.milkRecordId===String(e.currentTarget.dataset.id));if(!item||!this.data.subjectId||this._returnFromEdit)return;this._editEpoch=Number(wx.getStorageSync('foodmaster.recordEpoch')||0);this._returnFromEdit=true;openPage('/pages/records/records?fromMilkTrend=1&milkRecordId='+encodeURIComponent(item.milkRecordId)+'&subjectId='+encodeURIComponent(this.data.subjectId),{fail:()=>{this._returnFromEdit=false;wx.showToast({title:'编辑暂未打开，请重试',icon:'none'})}})},
  toggleInfo(){this.setData({showInfo:!this.data.showInfo})},
  retry(){void this.load()},goBack(){backPage('/pages/report-overview/report-overview',this)}
 })

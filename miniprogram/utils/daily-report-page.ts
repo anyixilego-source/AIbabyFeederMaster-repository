@@ -1,6 +1,7 @@
+import {checkFamilyContext} from './family-sync'
 import { openPage, navigateRoot, backPage ,replacePage} from './navigation'
 import { ApiError, request, reviewEnvironment } from './api'
-import { loadReportBundle, nutrientNames, dateOnly } from './nutrition-report'
+import { loadReportBundle, nutrientNames, dateOnly, formatNumber } from './nutrition-report'
 import type { NutrientView, AssessmentReport } from './nutrition-report'
 interface MealSummary { status:string;occurredAt:string }
 import { ensureSessionContext } from './session'
@@ -21,7 +22,7 @@ Page({
   _loadSequence:0,_scroll:0,_loaded:false,_epoch:0,
   onPageScroll(e:{scrollTop:number}){this._scroll=e.scrollTop},
   onLoad(query:Record<string,string>){this._loaded=false;this.setData({periodId:query.periodId||'',periodEndDate:query.periodEndDate||'',selectedReportId:decodeURIComponent(query.reportId || ''),selectedDate:query.date || '',fromRecords:query.fromRecords==='1',fromPeriod:query.fromPeriod==='1'})},
-  onShow() { this.setData({today:dateOnly(new Date())});const app=getApp<IAppOption>();void (app.globalData.ready || ensureSessionContext()).then(async ctx=>{if(this._loaded&&ctx.subjectId===this.data.subjectId){const eligible=Boolean(this.data.selectedReportId);if(eligible){await request('/subjects/'+ctx.subjectId);wx.pageScrollTo({scrollTop:this._scroll,duration:0});this.setData({loading:false});return}}if(this.data.subjectId&&ctx.subjectId!==this.data.subjectId)this.clearResult();void this.loadReport()}).catch(()=>{this.clearResult();this.setData({loading:false,errorMessage:'会话暂不可用，请重试'})}) },
+  onShow() {void checkFamilyContext(); this.setData({today:dateOnly(new Date())});const app=getApp<IAppOption>();void (app.globalData.ready || ensureSessionContext()).then(async ctx=>{if(this._loaded&&ctx.subjectId===this.data.subjectId){const eligible=Boolean(this.data.selectedReportId);if(eligible){await request('/subjects/'+ctx.subjectId);wx.pageScrollTo({scrollTop:this._scroll,duration:0});this.setData({loading:false});return}}if(this.data.subjectId&&ctx.subjectId!==this.data.subjectId)this.clearResult();void this.loadReport()}).catch(()=>{this.clearResult();this.setData({loading:false,errorMessage:'会话暂不可用，请重试'})}) },
   onHide() { ++this._loadSequence },
   async loadReport() {
     const sequence=++this._loadSequence
@@ -38,7 +39,7 @@ Page({
       const milk = (result as { milk?: { summary: { feedCount: number; knownVolumeMl: string | null; unknownVolumeEventCount: number; estimatedVolumeRecordCount: number } } }).milk
       const milkSummary = milk?.summary
       const milkLine = milkSummary && milkSummary.feedCount > 0
-        ? (milkSummary.knownVolumeMl !== null ? String(milkSummary.knownVolumeMl)+'毫升' : '—')
+        ? (milkSummary.knownVolumeMl !== null ? formatNumber(milkSummary.knownVolumeMl)+'毫升' : '—')
         : ''
       const milkCount = milkSummary?.feedCount ?? 0
       const legacyReport = !bundle.snapshotAvailable

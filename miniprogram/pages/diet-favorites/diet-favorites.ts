@@ -2,7 +2,7 @@ import {aiFailureView,notifyAiFailure,type AiDiagnostic,type AiFailureView} from
 import {request,reviewEnvironment,downloadPrivateRecipeImage,cachedPrivateCollectionImage} from '../../utils/api'
 import {ensureSessionContext} from '../../utils/session'
 import {backPage,openPage,backTo} from '../../utils/navigation'
-import {operationId,menuRisk,type MenuRecipe} from '../../utils/diet-plan'
+import {operationId,menuRisk,recipeDisplay,type MenuRecipe} from '../../utils/diet-plan'
 interface CollectionItem {dishFingerprint:string;name:string;recipe:MenuRecipe;imageId:string|null;imageUrl:string|null;imagePath:string;imageLoading:boolean;imageRepairing:boolean;imageFailed:boolean;imageMessage:string;imageFailure?:AiFailureView|null}
 interface PictureState {status:string;imageId:string|null;imageUrl:string|null;message:string;diagnostic?:AiDiagnostic|null}
 Page({
@@ -67,7 +67,7 @@ Page({
   const item={...value,imagePath:file,imageLoading:!file,imageRepairing:!file&&!value.imageUrl,imageFailed:false,imageMessage:''};
   if(previous&&previous.imageId===value.imageId&&previous.imageUrl===value.imageUrl){Object.assign(item,{imagePath:previous.imagePath,imageLoading:previous.imageLoading,imageRepairing:previous.imageRepairing,imageFailed:previous.imageFailed,imageMessage:previous.imageMessage})}
   const index=this.data.items.findIndex(i=>i.dishFingerprint===key);if(index<0)this.setData({items:[...this.data.items,item]});else this.setData({['items['+index+']']:item});
-  this.setData({recipe:value.recipe,consentVersion:value.consentVersion,errorMessage:''});this.displayImage(item);if(!item.imagePath&&!previous)void this.loadImage(key,seq);
+  this.setData({recipe:recipeDisplay(value.recipe),consentVersion:value.consentVersion,errorMessage:''});this.displayImage(item);if(!item.imagePath&&!previous)void this.loadImage(key,seq);
  }catch(e){if(seq===this._sequence&&epoch===this._detailEpoch&&this.data.mode==='RECIPE')this.setData({recipe:null,errorMessage:e instanceof Error?e.message:'菜品暂未加载'})}finally{if(seq===this._sequence&&epoch===this._detailEpoch)this.setData({detailLoading:false})}},
  retryDetail(){void this.loadDetail(this.data.detailKey,this._sequence)},
  openImageViewer(){this.dismissConfirmation();void this.viewImage({currentTarget:{dataset:{key:this.data.detailKey}}} as unknown as WechatMiniprogram.TouchEvent)},

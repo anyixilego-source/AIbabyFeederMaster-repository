@@ -1,10 +1,11 @@
+const familyUnitMocks={familyState:()=>null,canRecordBaby:()=>true,canManageBaby:()=>true,familyGeneration:()=>0,checkFamilyContext:async()=>{},queueSharedMealPhoto(){},retrySharedMealPhotos:async()=>{},sharedMealPhoto:async()=>'',hasCloudPhotoChoice:()=>true,setCloudPhotoConsent(){}};
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm')
 const ts = require(process.env.FOODMASTER_TYPESCRIPT || path.resolve(__dirname,'../../../foodmaster/node_modules/typescript'))
 const base = path.resolve(__dirname,'../../miniprogram')
 function environment(){const store=new Map();const wx={getStorageSync:k=>store.get(k),setStorageSync:(k,v)=>store.set(k,v),removeStorageSync:k=>store.delete(k),getSystemInfoSync:()=>({platform:'test'}),showToast(){},showModal:o=>o.success({confirm:true}),enableAlertBeforeUnload(){},disableAlertBeforeUnload(){}};return {wx,store}}
-function load(rel,mocks,env,globals={}){const m={exports:{}};const source=ts.transpileModule(fs.readFileSync(path.join(base,rel),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;vm.runInNewContext(source,{module:m,exports:m.exports,require:n=>mocks[n]||{},wx:env.wx,console,Error,Date,Promise,Math,setTimeout,clearTimeout,...globals});return m.exports}
+function load(rel,mocks,env,globals={}){const m={exports:{}};const source=ts.transpileModule(fs.readFileSync(path.join(base,rel),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;vm.runInNewContext(source,{module:m,exports:m.exports,require:n=>/family-state|family-sync|shared-meal-photo/.test(n)?familyUnitMocks:n.endsWith('quantity-format')?require('../helpers/quantity-format.cjs'):mocks[n]||{},wx:env.wx,console,Error,Date,Promise,Math,setTimeout,clearTimeout,...globals});return m.exports}
 function auth(env){const api=load('utils/api.ts',{'../config':{apiBaseUrl:'https://synthetic.invalid/api/v1'}},env);api.setAuth({accessToken:'A-old',refreshToken:'A-refresh'});return api}
 function setData(d,callback){for(const [k,v]of Object.entries(d)){const parts=k.split('.');let p=this.data;for(const key of parts.slice(0,-1))p=p[key];p[parts.at(-1)]=v}callback?.()}
 function page(rel,mocks,env){let instance;load(rel,mocks,env,{Page:p=>instance=p,getApp:()=>({globalData:{ready:Promise.resolve({subjectId:'s',subjects:[{subjectId:'s',displayName:'虚拟'}]})}})});instance.setData=setData;return instance}

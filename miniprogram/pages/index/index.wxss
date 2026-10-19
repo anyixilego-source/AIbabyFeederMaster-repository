@@ -26,3 +26,5 @@
 .home-menu-card .home-menu-week{width:100%;margin:0;height:93rpx;min-height:44px}
 
 .home-menu-date{flex-shrink:0;font-size:22rpx;font-weight:400;line-height:1.4;white-space:nowrap;color:#ad7b39;background:#fff1d9;border-radius:28rpx;padding:10rpx 16rpx}.advice-list .advice-row-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.home-menu-source{display:block;color:#a17b5a;font-size:23rpx;line-height:1.5;margin-top:16rpx}

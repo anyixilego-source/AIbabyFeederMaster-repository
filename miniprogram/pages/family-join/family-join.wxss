@@ -1,0 +1,2 @@
+@import "../../styles/my-module.wxss";
+.my-input{margin:26rpx 0}.my-primary,.my-secondary{margin-top:26rpx}.my-title{display:block}.my-sub{margin-top:24rpx}

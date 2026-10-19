@@ -15,7 +15,7 @@
     <view class="manual-search"><input value="{{query}}" focus="{{manualFocus}}" bindinput="onQueryInput" bindblur="onManualBlur" placeholder="输入食品名称，无需先识别图片"></input><button bindtap="searchFood">搜索</button></view>
     <text class="mapping-tip">可逐项确认多种食材，已确认食材将自动分配初始占比。</text>
     <view class="meal-weight-card">
-      <view class="meal-total-row"><view class="total-meal-icon"><view class="bowl-icon"></view></view><view class="meal-total-copy"><text>本餐实际摄入总量</text><text>食物示例参照仅供估重</text></view><view class="meal-total-input"><input type="digit" value="{{mealTotalAmount}}" bindinput="onMealTotalInput" placeholder="200"></input><text>克</text></view></view>
+      <view class="meal-total-row"><view class="total-meal-icon"><view class="bowl-icon"></view></view><view class="meal-total-copy"><text>本餐实际摄入总量</text><text>食物示例参照仅供估重</text></view><view class="meal-total-input"><input type="number" value="{{mealTotalAmount}}" bindinput="onMealTotalInput" placeholder="200"></input><text>克</text></view></view>
       <view class="meal-weight-slider-area">
         <view wx:if="{{weightBubbleVisible && weightHint}}" class="meal-weight-bubble {{bubbleAlign}}" style="left: {{bubblePercent}}%;"><image class="weight-reference-item" mode="aspectFit" src="{{weightIcon}}"></image><text>{{weightHint}}</text></view>
         <view wx:if="{{weightWarning}}" class="meal-weight-warning">{{weightWarning}}</view>

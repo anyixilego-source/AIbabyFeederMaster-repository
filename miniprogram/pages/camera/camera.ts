@@ -1,3 +1,4 @@
+import {canRecordBaby} from '../../utils/family-state'
 import { defaultMealType } from '../../utils/meal-presentation'
 import {openPage,backPage,resumePendingPrimary} from '../../utils/navigation'
 import { ApiError, request } from '../../utils/api'
@@ -18,6 +19,7 @@ Page({
   onShow() { resumePendingPrimary(this) },
   _manualEntryPending:false,_manualEntryAlive:true,
   onLoad(query:Record<string,string>) {
+    if(!canRecordBaby()){wx.showToast({title:'当前为仅查看权限',icon:'none'});backPage('/pages/records/records',this);return}
     this._manualEntryPending=query.entry==='manual'
     void this.discardPendingMeal().then(()=>{if(this._manualEntryPending)this.launchManualEntry()})
   },

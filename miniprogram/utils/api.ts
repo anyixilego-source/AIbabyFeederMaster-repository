@@ -1,3 +1,4 @@
+import {familyGeneration,canRecordBaby,familyState} from './family-state'
 import { apiBaseUrl } from '../config'
 
 export function reviewEnvironment(): { baseUrl: string; label: string; householdId?: string; subjectId?: string } | null {
@@ -128,9 +129,13 @@ function unchangedSession(original: AuthSession | null, refreshed?: AuthSession)
 function changedSession(): ApiError { const error = new ApiError('登录状态已变化，请重新进入当前页面', 401, null); error.authExpired = true; return error }
 function affectsRecords(path: string): boolean { return /^\/subjects\/[^/?]+(?:\?.*)?$/.test(path) || /^\/(?:meals(?:\/|$)|milk-records\/|subjects\/[^/]+\/(?:meals|milk-records|profile)(?:\/|$))/.test(path) }
 export async function request<T>(path: string, options: RequestOptions = {}, retried = false): Promise<T> {
-  const original = getAuth()
+  const original = getAuth(),generation=familyGeneration(),scoped=!/^\/(?:identity|family|households|foods|feedback|health)(?:\/|$)/.test(path)
+  if(options.method&&options.method!=='GET'&&/^\/(?:meals|milk-records|subjects\/[^/]+\/(?:meals|milk-records|profile))(?:\/|$)/.test(path)&&!canRecordBaby())throw new ApiError('当前为仅查看权限，不能修改记录',403,null)
+  const requestedSubject=/^\/subjects\/([^/]+)(?:\/|$)/.exec(path)?.[1],selectedSubject=familyState()?.subjectId
+  if(options.method&&options.method!=='GET'&&requestedSubject&&selectedSubject&&requestedSubject!==selectedSubject)throw new ApiError('宝宝已切换，请返回原宝宝核对操作',409,{code:'FAMILY_CONTEXT_CHANGED'})
   try {
     const response = await rawRequest<T>(path, options)
+    if(scoped&&generation!==familyGeneration())throw new ApiError('宝宝或权限已变化，请重新打开页面',409,{code:'FAMILY_CONTEXT_CHANGED'})
     if (options.auth !== false && original && !unchangedSession(original)) throw changedSession()
     if (affectsRecords(path) && options.method && options.method !== 'GET') wx.setStorageSync('foodmaster.recordEpoch', Number(wx.getStorageSync('foodmaster.recordEpoch') || 0) + 1)
     return response
@@ -163,6 +168,7 @@ async function safeUpload<T>(path:string,filePath:string,formData:Record<string,
  const auth=getAuth();try{const response=await rawUpload<T>(path,filePath,formData);if(auth&&!unchangedSession(auth))throw changedSession();return response}catch(caught){const error=caught instanceof ApiError?caught:new ApiError('图片上传失败',0,caught);if(auth&&!unchangedSession(auth))throw changedSession();if(!retried&&error.statusCode===401&&auth?.refreshToken){let refreshed:AuthSession;try{refreshed=await refreshSession(auth.refreshToken)}catch{if(unchangedSession(auth)&&getAuth()?.refreshToken===auth.refreshToken)clearAuth();error.authExpired=true;throw error}if(!unchangedSession(auth,refreshed))throw changedSession();setAuth({...refreshed,clientSessionId:auth.clientSessionId});return safeUpload<T>(path,filePath,formData,true)}throw error}
 }
 export function uploadRecognitionImage<T>(filePath:string,consent:{policyVersion:string;localRetention:string},retried=false):Promise<T>{return safeUpload<T>('/recognition/candidates/image',filePath,{accepted:'true',policyVersion:consent.policyVersion,localRetention:consent.localRetention},retried)}
+export function uploadMealPhoto<T>(mealId:string,filePath:string,operationId:string):Promise<T>{return safeUpload<T>('/meals/'+mealId+'/photo',filePath,{operationId,consentVersion:'FAMILY_PHOTO_V1'})}
 export function uploadFeedbackImage<T>(filePath:string,operationId:string,retried=false):Promise<T>{return safeUpload<T>('/feedback/images',filePath,{operationId},retried)}
 
 // Use only after the current account has received authorized collection metadata.

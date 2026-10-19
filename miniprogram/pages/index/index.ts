@@ -1,4 +1,5 @@
-import { emptyHomeMenu, homeMenuPreview, homeMenuFeatured, chinaMenuDates } from '../../utils/home-menu'
+import {checkFamilyContext} from '../../utils/family-sync'
+import { emptyHomeMenu, homeMenuPreview, homeMenuFeatured, chinaMenuDates, nextMenuSlotRefreshIn } from '../../utils/home-menu'
 import type { MenuLatest } from '../../utils/diet-plan'
 import { openPage, navigateRoot } from '../../utils/navigation'
 import { ApiError, request, getAuth, downloadPrivateRecipeImage } from '../../utils/api'
@@ -39,6 +40,7 @@ Component({
     onHide() { this.stopHomeMenu() },
     onUnload() { this.stopHomeMenu() },
     startHomeMenu() {
+      void checkFamilyContext()
       if (this.data._homeMenuVisible) return
       this.setData({ _homeMenuVisible: true })
       this.updateHomeScrollHeight()
@@ -78,7 +80,8 @@ Component({
         this.setData({ _homeMenuLatest: latest })
         const homeMenu = homeMenuPreview(latest)
         this.presentHomeMenu(latest,seq)
-        const delay = homeMenu.generating ? Math.min(5000, chinaMenuDates().refreshIn) : chinaMenuDates().refreshIn
+        const nextRefresh = Math.min(chinaMenuDates().refreshIn, nextMenuSlotRefreshIn())
+        const delay = homeMenu.generating ? Math.min(5000, nextRefresh) : nextRefresh
         this.setData({ _homeMenuTimer: setTimeout(() => { if (this.data._homeMenuVisible) void this.loadHomeMenu() }, delay) as unknown as number })
       } catch {
         if (seq !== this.data._homeMenuSequence || !this.data._homeMenuVisible) return
@@ -87,10 +90,10 @@ Component({
       }
     },
     presentHomeMenu(latest:MenuLatest,seq:number,readImage=true) {
-      const preview=homeMenuPreview(latest),featured=homeMenuFeatured(latest,preview),session=getAuth()?.clientSessionId||'';
+      const now=Date.now(),preview=homeMenuPreview(latest,now),featured=homeMenuFeatured(latest,preview,now),session=getAuth()?.clientSessionId||'';
       const key=featured?[session,preview.taskId,preview.date,featured.recipeKey].join(':'):'';
       const same=key===this.data._homeMenuImageKey&&session===this.data._homeMenuImageSession;
-      this.setData({homeMenu:preview,homeMenuDateLabel:preview.dateLabel.replace(/^今日/,'今天').replace(/^明日/,'明天'),homeMenuTitle:preview.state==='READY'?preview.dateLabel.slice(0,2)+'饮食推荐':'饮食推荐',homeMenuFeatured:featured,homeMenuImage:same?this.data.homeMenuImage:'/assets/camera-food-guide-v5.jpg',_homeMenuImageKey:key,_homeMenuImageSession:session,...(session!==this.data._homeMenuImageSession?{_homeMenuImageFiles:{}}:{})});
+      this.setData({homeMenu:preview,homeMenuDateLabel:preview.dateLabel.replace(/^今日/,'今天').replace(/^明日/,'明天'),homeMenuTitle:preview.state==='READY'&&/^(今日|明日)/.test(preview.dateLabel)?preview.dateLabel.slice(0,2)+'饮食推荐':'饮食推荐',homeMenuFeatured:featured,homeMenuImage:same?this.data.homeMenuImage:'/assets/camera-food-guide-v5.jpg',_homeMenuImageKey:key,_homeMenuImageSession:session,...(session!==this.data._homeMenuImageSession?{_homeMenuImageFiles:{}}:{})});
       if(readImage&&featured)void this.loadHomeMenuImage(preview,featured,seq,key,session);
     },
     async loadHomeMenuImage(preview:ReturnType<typeof homeMenuPreview>,featured:NonNullable<ReturnType<typeof homeMenuFeatured>>,seq:number,key:string,session:string) {

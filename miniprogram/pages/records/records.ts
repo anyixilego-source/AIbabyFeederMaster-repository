@@ -1,5 +1,9 @@
+import {checkFamilyContext} from '../../utils/family-sync'
+import {canRecordBaby,familyState} from '../../utils/family-state'
+import {sharedMealPhoto,retrySharedMealPhotos} from '../../utils/shared-meal-photo'
+import { displayInteger, integerInput } from '../../utils/quantity-format'
 import {readMilkEntryDefaults,rememberMilkEntry,milkEntryOwner} from '../../utils/milk-entry-defaults'
-import { mealCardName } from '../../utils/meal-presentation'
+import { savedMealName, recordFoodName } from '../../utils/meal-presentation'
 import { openPage, navigateRoot ,ensureHomeParent,backPage} from '../../utils/navigation'
 import { MEAL_EDIT_OCCUPANCY_ENABLED,reserveMealEdit,releaseMealEdit,editReason } from '../../utils/meal-edit-session'
 import { SavedMeal,deleteSavedMeal,operationId } from '../../utils/meal-edit'
@@ -13,14 +17,16 @@ interface MealSummary {
   mealType: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK' | 'MILK_FEED' | 'OTHER'
   occurredAt: string
   status: 'DRAFT' | 'CONFIRMED' | 'VOID'
+  recordedBy?:string;modifiedBy?:string
+  displayName?:string|null;nameState?:string|null
   notes: string | null
 }
 interface MealDetail extends MealSummary {
-  items: Array<{ mealItemId: string; foodId?: string | null; observedName: string | null; servedAmount: string | null; consumedAmount: string | null; unit: string; status: string; source?: string; weightOrigin?: string }>
+  items: Array<{ mealItemId: string; foodId?: string | null; canonicalNameZh?:string|null;matchStatus?:string; observedName: string | null; servedAmount: string | null; consumedAmount: string | null; unit: string; status: string; source?: string; weightOrigin?: string }>
 }
 interface DisplayMeal {
   mealId: string; type: string; time: string; dateLabel: string; title: string; name: string
-  ingredients: string; foodCount: number; consumedTotal: string; tone: string; photoPath: string; recordLabel: string
+  recordedBy:string;modifiedBy:string;ingredients: string; foodCount: number; consumedTotal: string; tone: string; photoPath: string; recordLabel: string
   items: Array<{ mealItemId: string; name: string; served: string | null; consumed: string; unit: string }>
 }
 
@@ -44,9 +50,7 @@ function formatGrams(value: string | number | null): string {
   if (value === null || value === '') return '未填写'
   const grams = Number(value)
   if (!Number.isFinite(grams)) return '未填写'
-  if (grams > 0 && grams < 0.1) return '<0.1'
-  const rounded = Math.round(grams * 10) / 10
-  return rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1)
+  return displayInteger(grams)
 }
 function datesAround(selectedDate: string) {
   const selected = new Date(`${selectedDate}T00:00:00`)
@@ -63,6 +67,7 @@ async function context(): Promise<SessionContext> {
 
 // 第一批方案 §7.4/§7.6：紧凑奶量卡片——已知奶量+次数、未知事件另写、不显示 0ml 冒充已知。
 interface MilkRow {
+  recordedBy?:string;modifiedBy?:string
   milkRecordId: string
   occurredAt: string
   milkType: 'FORMULA' | 'LIQUID_MILK' | 'EXPRESSED_BREAST_MILK' | 'DIRECT_BREASTFEEDING'
@@ -88,21 +93,21 @@ function formatMl(value: string | number | null): string {
   if (value === null || value === '') return ''
   const ml = Number(value)
   if (!Number.isFinite(ml)) return ''
-  return ml.toFixed(0)
+  return displayInteger(ml)
 }
 function milkTypeLabel(key: string): string {
   return milkTypeLabels.find((item) => item.key === key)?.label ?? '奶类'
 }
 
 Page({
-  data: { reviewLabel:wx.getSystemInfoSync().platform==='devtools'?(wx.getStorageSync('foodmaster.reviewEnvironment')?.label || ''):'',
+  data: { canRecord:true,reviewLabel:wx.getSystemInfoSync().platform==='devtools'?(wx.getStorageSync('foodmaster.reviewEnvironment')?.label || ''):'',
     pendingMealScope:'',pendingMealBusy:false,recordsScrollTop:0,savedAction:'本餐已保存', deleting:false, editing:false, showCalendar:false, reportUpdateState: '', saved: false, loading: false, errorMessage: '', selectedDate: dateOnly(new Date()), selectedDateLabel: '', todayDate: dateOnly(new Date()),
     dates: datesAround(dateOnly(new Date())),
     meals: [] as DisplayMeal[], selectedMeal: null as DisplayMeal | null,
     confirmedCount: 0, consumedTotal: '0',
     milkAmount: '', milkHasKnownVolume: false, milkPreview: '',
     milkCount:0,milkTitle: '今日奶量', milkMain: '奶量未知', milkSub: '', milkHasRecords: false,
-    milkItems: [] as Array<{ milkRecordId: string; time: string; typeLabel: string; volumeLabel: string }>,
+    milkItems: [] as Array<{ milkRecordId: string; time: string; typeLabel: string; volumeLabel: string;recordedBy?:string;modifiedBy?:string }>,
     milkExpanded: false,milkCursor:'',milkHasMore:false,milkLoadingMore:false,
     milkTypes: milkTypeLabels,
     milkPanel: { visible: false, mode: 'create', recordId: '', revisionToken: '', recordDate: dateOnly(new Date()), time: '08:00', milkTypeIndex: 0, volume: '', unknownVolume:false,errorMessage:'', about: false, retrying:false,subjectId:'',originalOccurredAt:'',volumeTouched:false,originTouched:false,saving: false, deleting: false, operationId: '' },
@@ -114,7 +119,8 @@ Page({
     if(query.date)this.setData({selectedDate:query.date})
     if (query.saved === '1' || wx.getStorageSync('foodmaster.mealSaved')) this.setData({ saved: true })
   },
-  onShow() {
+  onShow() {this._nameChecks=0;
+    void checkFamilyContext()
     this._markersAlive=true
     this._milkEntryAlive=true
     if(this._milkEntryId){void this.loadMilkEntry();return}
@@ -124,11 +130,11 @@ Page({
     void this.loadMeals().finally(()=>this.setData({recordsScrollTop:scrollTop}))
   },
 
-  onHide(){this._markersAlive=false;++this._markerSequence;if(this._milkEntryId)++this._milkEntrySequence},
-  onUnload(){this._markersAlive=false;++this._markerSequence;this._milkEntryAlive=false;++this._milkEntrySequence},
+  onHide(){if(this._nameTimer)clearTimeout(this._nameTimer);this._nameTimer=null;this._markersAlive=false;++this._markerSequence;if(this._milkEntryId)++this._milkEntrySequence},
+  onUnload(){if(this._nameTimer)clearTimeout(this._nameTimer);this._nameTimer=null;this._markersAlive=false;++this._markerSequence;this._milkEntryAlive=false;++this._milkEntrySequence},
   async loadMilkEntry(){
     const seq=++this._milkEntrySequence,id=this._milkEntryId;this.setData({loading:true,errorMessage:''});
-    try{const active=await context();if(active.subjectId!==this._milkEntrySubject)throw Error('宝宝已切换，请返回后重新打开');
+    try{const active=await context();if(active.current?.canRecord===false)throw Error('当前为仅查看权限，请在奶量列表中查看记录');if(active.subjectId!==this._milkEntrySubject)throw Error('宝宝已切换，请返回后重新打开');
       const row=await request<MilkRow&{recordId:string;recordDate:string;subjectId:string;recordSaved:boolean}>('/milk-records/'+encodeURIComponent(id));
       if(seq!==this._milkEntrySequence||!this._milkEntryAlive)return;
       if(row.subjectId!==active.subjectId||row.recordId!==id)throw Error('奶量记录所属宝宝不一致');
@@ -154,12 +160,31 @@ Page({
       this.setData({dates:this.data.dates.map(day=>({...day,recorded:recorded.has(day.date)}))})
     }catch{/* Unknown dates remain unmarked; do not infer absence from a failed read. */}
   },
+  _nameTimer:null as ReturnType<typeof setTimeout>|null,
+  _nameChecks:0,
+  pollMealNames(details:MealDetail[],sequence:number){
+    if(this._nameTimer)clearTimeout(this._nameTimer)
+    const pending=details.filter(m=>['PENDING','RUNNING'].includes(m.nameState||''))
+    if(!pending.length||this._nameChecks>=10)return
+    this._nameTimer=setTimeout(async()=>{
+      this._nameTimer=null;this._nameChecks++
+      if(sequence!==this._loadSequence||!this._markersAlive)return
+      const updates=await Promise.all(pending.map(async meal=>{try{return await request<MealDetail>('/meals/'+meal.mealId)}catch{return null}}))
+      if(sequence!==this._loadSequence||!this._markersAlive)return
+      const valid=updates.filter((m):m is MealDetail=>Boolean(m))
+      const meals=this.data.meals.map(row=>{const meal=valid.find(m=>m.mealId===row.mealId);if(!meal)return row;const name=savedMealName(meal,true,row.name);return {...row,name,title:row.time+' · '+name}})
+      const selected=this.data.selectedMeal,selectedUpdate=selected&&meals.find(row=>row.mealId===selected.mealId)
+      this.setData({meals,...(selected&&selectedUpdate?{selectedMeal:{...selected,name:selectedUpdate.name,title:selectedUpdate.title}}:{})})
+      this.pollMealNames(valid,sequence)
+    },2000)
+  },
   async loadMeals() {
     const sequence=++this._loadSequence,selectedKey=this.data.selectedDate
     this.setData({ loading: true, errorMessage: '' })
     try {
       const active = await context()
       if (!active.subjectId) throw new Error('请先建立宝宝档案')
+      this.setData({canRecord:canRecordBaby()})
       const pendingScope='meal-create:'+active.subjectId;this.setData({pendingMealScope:pendingRecord(pendingScope)?pendingScope:''})
       const from=new Date(selectedKey+'T00:00:00'),before=new Date(from);before.setDate(before.getDate()+1)
       let details:MealDetail[]
@@ -177,21 +202,24 @@ Page({
         const time = `${occurredAt.getHours().toString().padStart(2, '0')}:${occurredAt.getMinutes().toString().padStart(2, '0')}`
         const photoPath = mealPhotoPath(meal.mealId)
         const isPhoto = Boolean(photoPath || meal.notes === '拍照记录' || meal.notes === '拍照记录食物' || confirmed.some(item => item.source === 'AI_CANDIDATE'))
-        const name = mealCardName(meal.notes, isPhoto, mealLabels[meal.mealType] + '记录')
+        const name = savedMealName({...meal,items:confirmed}, isPhoto, mealLabels[meal.mealType] + '记录')
         return {
-          mealId: meal.mealId, photoPath, recordLabel:isPhoto?'拍照记录':meal.notes==='手工记录'?'手工记录':'', type: mealLabels[meal.mealType],
+          recordedBy:meal.recordedBy||'',modifiedBy:meal.modifiedBy||'',mealId: meal.mealId, photoPath, recordLabel:isPhoto?'拍照记录':meal.notes==='手工记录'?'手工记录':'', type: mealLabels[meal.mealType],
           time, dateLabel: `${occurredAt.getFullYear()}年${occurredAt.getMonth() + 1}月${occurredAt.getDate()}日`,
           title: `${time} · ${name}`, name,
-          ingredients: confirmed.map((item) => item.observedName || '已确认食品').join('、') || '暂无已确认食物',
+          ingredients: confirmed.map(recordFoodName).join('、') || '暂无已确认食物',
           foodCount: new Set(confirmed.map(item => item.foodId ? 'food:' + item.foodId : 'item:' + item.mealItemId)).size, consumedTotal: (estimated?'约':'')+formatGrams(mealConsumed),
           tone: meal.mealType === 'DINNER' ? 'night' : meal.mealType === 'SNACK' ? 'snack' : 'day',
           items: confirmed.map((item) => ({
-            mealItemId: item.mealItemId, name: item.observedName || '已确认食品',
+            mealItemId: item.mealItemId, name: recordFoodName(item),
             served: item.servedAmount ? formatGrams(item.servedAmount) : null,
             consumed: (item.weightOrigin==='USER_ACCEPTED_ESTIMATE'?'约':'')+formatGrams(item.consumedAmount), unit: unitLabel(item.unit),
           })),
         }
       })
+      this.pollMealNames(details,sequence)
+      void this.loadSharedPhotos(meals,active.subjectId,sequence)
+      void retrySharedMealPhotos()
       const selectedDate = new Date(`${this.data.selectedDate}T00:00:00`)
       this.setData({
         selectedDateLabel: `${selectedDate.getFullYear()}年${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日`, meals,
@@ -209,6 +237,15 @@ Page({
     } finally { if(sequence===this._loadSequence)this.setData({ loading: false }) }
   },
 
+  async loadSharedPhotos(meals:DisplayMeal[],subjectId:string,sequence:number){
+    if(familyState()?.sharedVersion==='legacy')return
+    const pending=meals.filter(m=>!m.photoPath);let next=0
+    await Promise.all(Array.from({length:Math.min(3,pending.length)},async()=>{while(next<pending.length){const m=pending[next++];if(!m)return
+      try{const photoPath=await sharedMealPhoto(m.mealId,subjectId);if(!photoPath||sequence!==this._loadSequence)return
+        this.setData({meals:this.data.meals.map(row=>row.mealId===m.mealId?{...row,photoPath}:row)})
+      }catch{ /* No cloud photo or no access: keep default illustration, never substitute generated food. */ }
+    }}))
+  },
   async loadMilk(more=false) {
     if(more&&(this.data.milkLoadingMore||!this.data.milkHasMore))return
     const sequence = more?this._milkSequence:++this._milkSequence,date=this.data.selectedDate
@@ -241,7 +278,7 @@ Page({
           const at = new Date(row.occurredAt)
           const time = `${at.getHours().toString().padStart(2, '0')}:${at.getMinutes().toString().padStart(2, '0')}`
           const volumeLabel = row.quantityMode === 'EVENT_ONLY' ? '奶量未知' : `${formatMl(row.volumeMl)}毫升`
-          return { milkRecordId: row.milkRecordId, time, typeLabel: milkTypeLabel(row.milkType), volumeLabel }
+          return { recordedBy:row.recordedBy,modifiedBy:row.modifiedBy,milkRecordId: row.milkRecordId, time, typeLabel: milkTypeLabel(row.milkType), volumeLabel }
         }),
       })
     } catch (caught) {
@@ -255,6 +292,7 @@ Page({
   toggleMilkExpand() { this.setData({ milkExpanded: !this.data.milkExpanded }) },
   collapseMilk(){this.setData({milkExpanded:false,recordsScrollTop:this._scrollTop},()=>{this.setData({recordsScrollTop:0});this._scrollTop=0})},
   async openMilkCreate() {
+    if(!canRecordBaby()){wx.showToast({title:'当前为仅查看权限',icon:'none'});return}
     if (this.data.loading) return
     const now = new Date()
     const time = this.data.selectedDate === this.data.todayDate
@@ -262,18 +300,19 @@ Page({
       : '08:00'
     const active=await context();if(!active.subjectId){wx.showToast({title:'请先建立宝宝档案',icon:'none'});return}const previous=pendingRecord('milk-create:'+active.subjectId),defaults=readMilkEntryDefaults(active.subjectId)
     this.setData({ milkPanel: { visible: true, mode: 'create', recordId: '', revisionToken: '', recordDate: this.data.selectedDate, time, milkTypeIndex: 0, volume: '', unknownVolume:false,errorMessage:'', about: false, retrying:false,subjectId:'',originalOccurredAt:'',volumeTouched:false,originTouched:false,saving: false, deleting: false, operationId: operationId() } })
-    this.setData({'milkPanel.subjectId':active.subjectId,...(defaults?{'milkPanel.milkTypeIndex':milkTypeLabels.findIndex(t=>t.key===defaults.milkType),'milkPanel.volume':formatMl(defaults.volume),'milkPanel.unknownVolume':defaults.eventOnly}:{})})
+    this.setData({'milkPanel.subjectId':active.subjectId,...(defaults?{'milkPanel.milkTypeIndex':milkTypeLabels.findIndex(t=>t.key===defaults.milkType),'milkPanel.volume':integerInput(defaults.volume),'milkPanel.unknownVolume':defaults.eventOnly}:{})})
     if(previous)this.restoreMilkSubmission(previous.payload)
   },
-  restoreMilkSubmission(body:Record<string,unknown>){const at=new Date(String(body.occurredAt));this.setData({'milkPanel.retrying':true,'milkPanel.recordDate':String(body.recordDate||dateOnly(at)),'milkPanel.time':String(at.getHours()).padStart(2,'0')+':'+String(at.getMinutes()).padStart(2,'0'),'milkPanel.volume':body.volumeMl===null||body.volumeMl===undefined?'':formatMl(String(body.volumeMl)),'milkPanel.milkTypeIndex':milkTypeLabels.findIndex(t=>t.key===body.milkType),'milkPanel.unknownVolume':body.quantityMode==='EVENT_ONLY'||body.quantityMode===undefined&&body.milkType==='DIRECT_BREASTFEEDING'&&body.volumeMl==null,'milkPanel.about':body.volumeOrigin==='USER_ACCEPTED_ESTIMATE'});wx.showToast({title:'上次提交待核对，重试将核对原提交',icon:'none'})},
+  restoreMilkSubmission(body:Record<string,unknown>){const at=new Date(String(body.occurredAt));this.setData({'milkPanel.retrying':true,'milkPanel.recordDate':String(body.recordDate||dateOnly(at)),'milkPanel.time':String(at.getHours()).padStart(2,'0')+':'+String(at.getMinutes()).padStart(2,'0'),'milkPanel.volume':body.volumeMl===null||body.volumeMl===undefined?'':integerInput(String(body.volumeMl)),'milkPanel.milkTypeIndex':milkTypeLabels.findIndex(t=>t.key===body.milkType),'milkPanel.unknownVolume':body.quantityMode==='EVENT_ONLY'||body.quantityMode===undefined&&body.milkType==='DIRECT_BREASTFEEDING'&&body.volumeMl==null,'milkPanel.about':body.volumeOrigin==='USER_ACCEPTED_ESTIMATE'});wx.showToast({title:'上次提交待核对，重试将核对原提交',icon:'none'})},
   openMilkEdit(event: WechatMiniprogram.TouchEvent) {
+    if(!canRecordBaby()){wx.showToast({title:'当前为仅查看权限，可在列表查看明细',icon:'none'});return}
     const recordId = String(event.currentTarget.dataset.id)
     const row = this._milkRecords.find((item) => item.milkRecordId === recordId)
     if (!row) return
     const at = new Date(row.occurredAt)
     const time = `${at.getHours().toString().padStart(2, '0')}:${at.getMinutes().toString().padStart(2, '0')}`
     const index = milkTypeLabels.findIndex((item) => item.key === row.milkType)
-    this.setData({ milkPanel: { visible: true, mode: 'edit', recordId, revisionToken: row.revisionToken, recordDate: this.data.selectedDate, time, milkTypeIndex: index < 0 ? 0 : index, volume: formatMl(row.volumeMl), unknownVolume:row.quantityMode==='EVENT_ONLY',errorMessage:'', about: row.volumeOrigin === 'USER_ACCEPTED_ESTIMATE', retrying:false,subjectId:'',originalOccurredAt:'',volumeTouched:false,originTouched:false,saving: false, deleting: false, operationId: operationId() } })
+    this.setData({ milkPanel: { visible: true, mode: 'edit', recordId, revisionToken: row.revisionToken, recordDate: this.data.selectedDate, time, milkTypeIndex: index < 0 ? 0 : index, volume: row.volumeMl === null ? '' : integerInput(row.volumeMl), unknownVolume:row.quantityMode==='EVENT_ONLY',errorMessage:'', about: row.volumeOrigin === 'USER_ACCEPTED_ESTIMATE', retrying:false,subjectId:'',originalOccurredAt:'',volumeTouched:false,originTouched:false,saving: false, deleting: false, operationId: operationId() } })
     this.setData({'milkPanel.subjectId':this._milkSubject,'milkPanel.originalOccurredAt':row.occurredAt})
     const previous=pendingRecord('milk-update:'+recordId);if(previous)this.restoreMilkSubmission(previous.payload)
   },
@@ -348,6 +387,7 @@ Page({
   startEmptyPhoto(){void this.addMeal()},
   startEmptyManual(){if(!this.data.loading)openPage('/pages/camera/camera?entry=manual')},
   async addMeal() {
+    if(!canRecordBaby()){wx.showToast({title:'当前为仅查看权限',icon:'none'});return}
     if (this.data.loading) return
     this.setData({ loading: true })
     try {
@@ -375,9 +415,9 @@ Page({
     const mealId = String(event.currentTarget.dataset.mealId)
     this.setData({ selectedMeal: this.data.meals.find((meal) => meal.mealId === mealId) || null })
   },
-  async editSelectedMeal(){if(this.data.deleting||this.data.editing||!this.data.selectedMeal)return;const id=this.data.selectedMeal.mealId;this.setData({editing:true});let lease;try{if(MEAL_EDIT_OCCUPANCY_ENABLED)lease=await reserveMealEdit(id);await new Promise<void>((resolve,reject)=>openPage('/pages/meal-edit/meal-edit?mealId='+id,{success:()=>{this.setData({selectedMeal:null});resolve()},fail:reject}))}catch(e){if(MEAL_EDIT_OCCUPANCY_ENABLED&&lease)void releaseMealEdit(id,lease).catch(()=>{});wx.showModal({title:editReason(e)==='MEAL_EDIT_BUSY'?'这餐正在编辑':'暂时不能编辑',content:e instanceof Error?e.message:'请稍后重试',showCancel:false})}finally{this.setData({editing:false})}},
+  async editSelectedMeal(){if(!canRecordBaby())return;if(this.data.deleting||this.data.editing||!this.data.selectedMeal)return;const id=this.data.selectedMeal.mealId;this.setData({editing:true});let lease;try{if(MEAL_EDIT_OCCUPANCY_ENABLED)lease=await reserveMealEdit(id);await new Promise<void>((resolve,reject)=>openPage('/pages/meal-edit/meal-edit?mealId='+id,{success:()=>{this.setData({selectedMeal:null});resolve()},fail:reject}))}catch(e){if(MEAL_EDIT_OCCUPANCY_ENABLED&&lease)void releaseMealEdit(id,lease).catch(()=>{});wx.showModal({title:editReason(e)==='MEAL_EDIT_BUSY'?'这餐正在编辑':'暂时不能编辑',content:e instanceof Error?e.message:'请稍后重试',showCancel:false})}finally{this.setData({editing:false})}},
   prepareSavedReturn(selectedDate:string){this._loadSequence++;this._details.clear();this._deletePending=null;this.setData({selectedDate,dates:datesAround(selectedDate),selectedMeal:null,meals:[],confirmedCount:0,consumedTotal:'0',loading:true,errorMessage:''})},
-  async deleteSelectedMeal(){if(this.data.deleting||this.data.editing||!this.data.selectedMeal)return;const meal=this._details.get(this.data.selectedMeal.mealId);if(!meal)return;if(this._deletePending?.mealId!==meal.mealId||this._deletePending.expectedRevision!==meal.revisionToken)this._deletePending={mealId:meal.mealId,operationId:operationId(),expectedRevision:meal.revisionToken};this.setData({deleting:true});try{if(await deleteSavedMeal(meal,this._deletePending)){this.setData({selectedMeal:null,saved:true,savedAction:'这餐已删除',reportUpdateState:String(wx.getStorageSync('foodmaster.reportUpdateState'))});await this.loadMeals()}}catch(e){const conflict=e instanceof ApiError&&e.statusCode===409,occupied=editReason(e)==='MEAL_EDIT_BUSY';wx.showModal({title:occupied?'这餐正在编辑':conflict?'这餐已有新修改':'尚未删除',content:occupied?(e instanceof Error?e.message:'这餐正在其他设备编辑，请稍后再试。'):conflict?'尚未删除最新记录，请重新打开核对。':e instanceof Error?e.message:'请重试',showCancel:false});if(conflict&&!occupied){this.setData({selectedMeal:null});await this.loadMeals()}}finally{this.setData({deleting:false})}},
+  async deleteSelectedMeal(){if(!canRecordBaby())return;if(this.data.deleting||this.data.editing||!this.data.selectedMeal)return;const meal=this._details.get(this.data.selectedMeal.mealId);if(!meal)return;if(this._deletePending?.mealId!==meal.mealId||this._deletePending.expectedRevision!==meal.revisionToken)this._deletePending={mealId:meal.mealId,operationId:operationId(),expectedRevision:meal.revisionToken};this.setData({deleting:true});try{if(await deleteSavedMeal(meal,this._deletePending)){this.setData({selectedMeal:null,saved:true,savedAction:'这餐已删除',reportUpdateState:String(wx.getStorageSync('foodmaster.reportUpdateState'))});await this.loadMeals()}}catch(e){const conflict=e instanceof ApiError&&e.statusCode===409,occupied=editReason(e)==='MEAL_EDIT_BUSY';wx.showModal({title:occupied?'这餐正在编辑':conflict?'这餐已有新修改':'尚未删除',content:occupied?(e instanceof Error?e.message:'这餐正在其他设备编辑，请稍后再试。'):conflict?'尚未删除最新记录，请重新打开核对。':e instanceof Error?e.message:'请重试',showCancel:false});if(conflict&&!occupied){this.setData({selectedMeal:null});await this.loadMeals()}}finally{this.setData({deleting:false})}},
   closeMeal() {if(this.data.deleting)return; this.setData({ selectedMeal: null }) },
   noop() {},
   closeSaved() { this.setData({ saved: false }); wx.removeStorageSync('foodmaster.mealSaved') },
