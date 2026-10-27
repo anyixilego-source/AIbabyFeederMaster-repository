@@ -47,7 +47,7 @@ Page({
       const compatibilityMessage = legacyReport ? this.data.selectedReportId
         ? '这份历史报告未保存新版记录统计与解读，按原有内容展示。'
         : '当前服务返回旧版报告，尚未支持新版记录统计与解读。已保存餐食不受影响，可在记录页查看。' : ''
-      this.setData({interpretationText:result.interpretationSummary?.text || '',foodRecommendationText:'',foodPreparationText:'',foodSuggestionNote:'',currentRecordSummary:'',errorMessage:[failedMessage,compatibilityMessage].filter(Boolean).join(''),legacyReport,hasResult:true,hasRecords:bundle.mealCount>0,babyName:bundle.subject.displayName,ageText:bundle.ageText,dateLabel:bundle.dateLabel,reportDate:bundle.date,
+      this.setData({interpretationText:result.interpretationSummary?.text || '',foodRecommendationText:'',foodPreparationText:'',foodSuggestionNote:'',currentRecordSummary:'',errorMessage:[failedMessage,compatibilityMessage].filter(Boolean).join(''),legacyReport,hasResult:true,hasRecords:bundle.mealCount>0||milkCount>0,babyName:bundle.subject.displayName,ageText:bundle.ageText,dateLabel:bundle.dateLabel,reportDate:bundle.date,
         mealCount:bundle.mealCount,foodCount:bundle.foodCount,totalConsumedText:bundle.totalConsumedText.replace(/^约/,''),weightLabel:'食物重量',
         allNutrients:bundle.nutrients,nutrients:this.data.category==='ALL'?bundle.nutrients:bundle.nutrients.filter(n=>n.category===this.data.category),observations:observations,observationCount:observations.length,visibleObservations:this.data.showObservations?observations:observations.slice(0,3),observationCards:dailyCards(this.data.showObservations?observations:observations.slice(0,3),bundle.nutrients),
         allActions:result.actions || [],actions:this.data.showActions?(result.actions || []):(result.actions || []).slice(0,2),actionCount:(result.actions || []).length,knowledge:knowledge,knowledgeCount:knowledge.length,...knowledgePanel(knowledge,this.data.showKnowledge,this.data.showKnowledgeSources),knowledgeScope:result.knowledge?.scopeDeclaration || '',knowledgeAgeText:ageStageFromMonths(result.knowledge?.ageMonths ?? result.evidence?.ageMonths),
@@ -55,7 +55,7 @@ Page({
         reportId:bundle.report.reportId,generatedAt:new Date(bundle.report.generatedAt).toLocaleString('zh-CN'),evaluationVersion:result.assessment.assessmentAlgorithmVersion || '历史版本',
         knowledgeVersion:result.knowledge?.version || '历史知识未保存',supersedesReportId:bundle.report.supersedesReportId || '',snapshotAvailable:bundle.snapshotAvailable,emptyRecordSnapshot:Boolean(bundle.snapshotAvailable&&milkSummary&&bundle.mealCount===0&&milkCount===0),milkLine:milkLine,milkCount:milkCount})
       this._loaded=true;this._epoch=Number(wx.getStorageSync('foodmaster.recordEpoch') || 0)
-      if(bundle.mealCount>0)void this.loadFoodSuggestions(sequence,bundle.report.reportId,bundle.updateState==='CURRENT'&&!this.data.selectedReportId)
+      if(bundle.mealCount>0||milkCount>0)void this.loadFoodSuggestions(sequence,bundle.report.reportId,bundle.updateState==='CURRENT'&&!this.data.selectedReportId)
       if(bundle.updateState==='FAILED'&&!this.data.selectedReportId)void this.loadCurrentRecords(sequence,bundle.date)
       if(bundle.updateState==='CURRENT')wx.removeStorageSync('foodmaster.reportNeedsRefresh')
     } catch(error) {

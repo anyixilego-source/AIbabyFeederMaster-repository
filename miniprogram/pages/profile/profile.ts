@@ -1,7 +1,7 @@
-import {canManageBaby} from '../../utils/family-state'
+import {canManageBaby,canRecordBaby} from '../../utils/family-state'
 import {openPage,navigateRoot,ensureHomeParent,backPage} from '../../utils/navigation'
 import { ApiError, request } from '../../utils/api'
-import { ageDisplay } from '../../utils/age'
+import { ageDisplay,ageMonths } from '../../utils/age'
 import { ensureSessionContext, refreshSessionContext, SessionContext, SubjectSummary } from '../../utils/session'
 
 interface Avoidance { foodId: string; foodName: string; reason: string | null }
@@ -25,6 +25,7 @@ function todayDate(): string {
 
 Page({
   data: { reviewLabel:wx.getSystemInfoSync().platform==='devtools'?(wx.getStorageSync('foodmaster.reviewEnvironment')?.label || ''):'',
+    weightEditorVisible:false,weightReferenceEnabled:false,
     editorView:false,healthView:false,showHealthInfo:false,familyAvoidances:[] as Avoidance[],savedAvoidanceText:'未设置',savedTextureText:'未设置',preferenceError:'',
     loading: true, saving: false, editing: false, name: '宝宝', sexText: '未设置', birthDate: '', ageText: '',
     canReadFeedback: false, errorMessage: '', subjectId: '', draftName: '', draftBirthDate: '', draftSexIndex: 2, todayDate: todayDate(),
@@ -33,15 +34,18 @@ Page({
     health: [] as Array<{ tone: string; badge: string; label: string; value: string; good?: boolean; editable?: boolean }>,
   },
 
+  openWeight(){if(canRecordBaby())this.setData({weightEditorVisible:true})},
+  closeWeight(){this.setData({weightEditorVisible:false})},
+  weightSaved(){this.setData({weightEditorVisible:false});wx.showToast({title:'体重已保存',icon:'success'})},
   _profileView:'',
   onLoad(q:Record<string,string>){this._profileView=q.view==='editor'||q.view==='health'?q.view:'';this.setData({editorView:this._profileView==='editor',healthView:this._profileView==='health'})},
   _loadSequence: 0,
   onShow() { if(ensureHomeParent(this))return;void this.load() },
-  onHide() { ++this._loadSequence },
+  onHide() { ++this._loadSequence;this.setData({weightEditorVisible:false}) },
 
   openCreateProfile() { this.setData({ editing: true, draftName: '宝宝', draftBirthDate: '', draftSexIndex: 2 }) },
   clearProfile() {
-    this.setData({ subjectId: '', name: '宝宝', sexText: '未设置', birthDate: '', ageText: '', basic: [], health: [],familyAvoidances:[],savedAvoidanceText:'未设置',savedTextureText:'未设置',preferenceError:'', editing: false, draftName: '', draftBirthDate: '', draftSexIndex: 2 })
+    this.setData({ weightEditorVisible:false,weightReferenceEnabled:false,subjectId: '', name: '宝宝', sexText: '未设置', birthDate: '', ageText: '', basic: [], health: [],familyAvoidances:[],savedAvoidanceText:'未设置',savedTextureText:'未设置',preferenceError:'', editing: false, draftName: '', draftBirthDate: '', draftSexIndex: 2 })
   },
   async load() {
     const sequence = ++this._loadSequence
@@ -70,7 +74,7 @@ Page({
       const avoidanceText = avoidances.length ? avoidances.map(item => item.foodName).join('、') : '暂无'
       this.setData({
         familyAvoidances:avoidances,savedAvoidanceText:preference?.preference?(preference.preference.avoidance==='NONE'?'已确认暂无':preference.preference.avoidIngredients.join('、')):'未设置',savedTextureText:({PUREE:'细泥',MASHED:'压碎',SOFT:'软小块'} as Record<string,string>)[preference?.preference?.texture||'']||'未设置',preferenceError:this.data.healthView&&preference===null?'饮食条件暂不可读取，可点击修改重试。':'',
-        subjectId: active.subjectId, name: subject.displayName, sexText: sexLabel(subject.sex), birthDate: subject.birthDate, ageText: age,
+        weightReferenceEnabled:ageMonths(subject.birthDate)>=6&&ageMonths(subject.birthDate)<12&&canRecordBaby(),subjectId: active.subjectId, name: subject.displayName, sexText: sexLabel(subject.sex), birthDate: subject.birthDate, ageText: age,
         basic: [
           { tone: 'coral', badge: '性', label: '性别', value: sexLabel(subject.sex), editable: true },
           { tone: 'green', badge: '生', label: '出生日期', value: subject.birthDate, editable: true },

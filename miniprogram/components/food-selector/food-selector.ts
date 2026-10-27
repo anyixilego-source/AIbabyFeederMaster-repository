@@ -13,7 +13,15 @@ interface Food {
     nutritionSummary?: {numericNutrientCount:number;sourceVersions:string[]};
     infoText?:string;
 }
-const states: Record<string, string> = { RAW: '生', COOKED: '熟', BOILED: '煮', STEAMED: '蒸', FRIED: '炸', DRIED: '干制' };
+const states: Record<string, string> = { RAW: '生', COOKED: '熟', BOILED: '煮', STEAMED: '蒸', FRIED: '炸', STIR_FRIED: '炒', BAKED: '烤', DRIED: '干制' };
+function foodDescription(food: Food): string {
+    const tags = Array.isArray(food.profile?.distinctionTags) ? food.profile!.distinctionTags.map(tag => {
+        const text = String(tag);
+        const legacy = text.match(/^已存处理方式[：:]\s*(.+)$/);
+        return legacy ? states[legacy[1]!.trim().toUpperCase()] || '' : text;
+    }) : [];
+    return [...new Set([food.foodForm, states[(food.processingMethod || '').trim().toUpperCase()] || '', ...tags].filter(Boolean))].join(' · ');
+}
 Component({ properties: { visible: { type: Boolean, value: false }, initialQuery: { type: String, value: '' } }, data: { sequence: 0, timer: null as ReturnType<typeof setTimeout> | null, query: '', items: [] as Food[], cursor: '', hasMore: false, loading: false, message: '', state: 'idle', detail: '', detailFoodId: '' },
     observers: { 'visible,initialQuery': function (visible: boolean, initialQuery: string) { ++this.data.sequence; if (this.data.timer)
             clearTimeout(this.data.timer); if (visible) {
@@ -41,10 +49,16 @@ Component({ properties: { visible: { type: Boolean, value: false }, initialQuery
             if (sequence !== this.data.sequence || !this.data.visible)
                 return;
             const seen = new Set(more ? this.data.items.map(i => i.foodId) : []);
-            const items = response.items.filter(i => !seen.has(i.foodId)).map(i => ({ ...i, description: [i.foodForm, states[i.processingMethod || ''] || i.processingMethod, ...(Array.isArray(i.profile?.distinctionTags) ? i.profile!.distinctionTags.map(String) : [])].filter(Boolean).join(' · '), infoText:i.nutritionSummary?'每100克可食部分 · '+i.nutritionSummary.numericNutrientCount+'项有数值资料'+(i.nutritionSummary.sourceVersions.length?' · 来源：'+i.nutritionSummary.sourceVersions.join('、'):''):'' }));
+            const items = response.items.filter(i => !seen.has(i.foodId)).map(i => ({ ...i, description: foodDescription(i), infoText:i.nutritionSummary?'每100克可食部分 · '+i.nutritionSummary.numericNutrientCount+'项有数值资料'+(i.nutritionSummary.sourceVersions.length?' · 来源：'+i.nutritionSummary.sourceVersions.join('、'):''):'' }));
             this.setData({ items: more ? [...this.data.items, ...items] : items, cursor: response.nextCursor || '', hasMore: response.hasMore, state: items.length || more ? 'results' : 'empty', message: items.length || more ? '' : '没有找到标准食品；可按名称记录，营养资料暂缺。' });
         }
         catch (e) {
+            if (sequence === this.data.sequence && this.data.visible && more && e instanceof ApiError
+                && e.statusCode === 400 && (e.data as {code?: string} | null)?.code === 'FOOD_SEARCH_CURSOR_STALE') {
+                this.setData({ items: [], cursor: '', hasMore: false, loading: false });
+                await this.search(false);
+                return;
+            }
             if (sequence === this.data.sequence)
                 this.setData({ state: 'error', message: e instanceof ApiError && e.statusCode === 429 ? '查询过于频繁，请稍候重试。' : e instanceof Error ? e.message : '查询未完成，请重试；仍可按名称记录。' });
         }

@@ -1,6 +1,7 @@
 {
   "usingComponents": {
     "navigation-bar": "/components/navigation-bar/navigation-bar",
-    "period-mode-switch": "/components/period-mode-switch/period-mode-switch"
+    "period-mode-switch": "/components/period-mode-switch/period-mode-switch",
+    "weight-editor": "/components/weight-editor/weight-editor"
   }
 }

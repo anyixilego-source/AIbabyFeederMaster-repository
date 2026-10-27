@@ -42,10 +42,10 @@ test('late AI upload response cannot enter another account session',async()=>{co
 test('private recipe image download refreshes authorization and writes the original image bytes',async()=>{const env=environment(),writes=[];env.wx.env={USER_DATA_PATH:'/private-synthetic'};env.wx.getFileSystemManager=()=>({writeFile:o=>{writes.push(o);o.success()}});const api=load('utils/api.ts',{'../config':{apiBaseUrl:'https://synthetic.invalid/api/v1'}},env,{ArrayBuffer,Uint8Array});api.setAuth({accessToken:'A-old',refreshToken:'A-refresh'});const bytes=new Uint8Array([137,80,78,71]).buffer;env.wx.request=o=>o.url.endsWith('/identity/refresh')?o.success({statusCode:200,data:{accessToken:'A-new',refreshToken:'A-new-refresh'}}):o.success({statusCode:o.header.Authorization==='Bearer A-old'?401:200,data:bytes});const file=await api.downloadPrivateRecipeImage('/diet-plan-images/00000000-0000-4000-8000-000000000001');assert.ok(file.endsWith('00000000-0000-4000-8000-000000000001.png'));assert.equal(writes.length,1);assert.equal(writes[0].data,bytes);assert.equal(api.getAuth().accessToken,'A-new')})
 
 
-test('AI preselects the first ranked name-related candidate without requiring unique exact identity',async()=>{
+test('ambiguous AI candidates stay name-only until the user selects an identity',async()=>{
  const env=environment();const p=resultPage(env,async()=>({results:[{localId:'0',autoSelectable:false,unmatchedReason:'AMBIGUOUS_NAME',candidates:[{foodId:'egg',canonicalNameZh:'鸡蛋（煮）',processingMethod:'BOILED',score:0.7,conflicts:[]},{foodId:'yolk',canonicalNameZh:'鸡蛋黄',processingMethod:null,score:0.7,conflicts:[]}]}]}));
  const items=[{observedName:'蛋'}];p.data.foods=items.map((i,index)=>({...i,index,mappedName:''}));await p.autoMapCandidates(items);
- assert.equal(p.data.confirmedFoods[0].foodId,'egg');assert.equal(p.data.confirmedFoods[0].unmatched,false);assert.equal(p.data.confirmedFoods[0].matchReason,undefined);
+ assert.equal(p.data.confirmedFoods[0].foodId,null);assert.equal(p.data.confirmedFoods[0].unmatched,true);assert.equal(p.data.confirmedFoods[0].matchReason,'AMBIGUOUS_NAME');
  assert.equal(p.data.confirmedFoods[0].consumedAmount,'200');
  p.data.result={items};p.data.confirmedFoods[0].consumedAmount='120';p.data.mealTotalAmount='120';const originalId=p.data.confirmedFoods[0].localId;
  p.useCandidate({currentTarget:{dataset:{index:0}}});assert.equal(p.data.showFoodSelector,true);
@@ -54,7 +54,7 @@ test('AI preselects the first ranked name-related candidate without requiring un
 });
 test('AI default selection skips conflicts and does not infer processing state or select unrelated aliases',async()=>{
  const env=environment();const p=resultPage(env,async()=>({results:[
- {localId:'0',autoSelectable:false,processingMethodHint:'COOKED',candidates:[{foodId:'raw',canonicalNameZh:'鱼',processingMethod:'RAW',score:0.49,conflicts:['PROCESSING_METHOD_CONFLICT']},{foodId:'cooked',canonicalNameZh:'鱼',processingMethod:'COOKED',score:0.7,conflicts:[]}]},
+ {localId:'0',autoSelectable:true,processingMethodHint:'COOKED',candidates:[{foodId:'raw',canonicalNameZh:'鱼',processingMethod:'RAW',score:0.49,conflicts:['PROCESSING_METHOD_CONFLICT']},{foodId:'cooked',canonicalNameZh:'鱼',processingMethod:'COOKED',score:0.7,conflicts:[]}]},
  {localId:'1',autoSelectable:false,unmatchedReason:'STATE_UNKNOWN',processingMethodHint:'COOKED',candidates:[{foodId:'unknown',canonicalNameZh:'肉',processingMethod:null,score:1,conflicts:[]}]},
  {localId:'2',autoSelectable:false,unmatchedReason:'AMBIGUOUS_NAME',candidates:[{foodId:'unrelated',canonicalNameZh:'其他',processingMethod:null,score:0,conflicts:[]}]}
  ]}));const items=['鱼','肉','无对应'].map(observedName=>({observedName}));p.data.foods=items.map((i,index)=>({...i,index,mappedName:''}));await p.autoMapCandidates(items);
@@ -64,3 +64,26 @@ test('AI matching failure retains every original food as a name-only record',asy
  const env=environment();const p=resultPage(env,async()=>{throw Error('network failure')});const items=['南瓜','米饭'].map(observedName=>({observedName}));p.data.foods=items.map((i,index)=>({...i,index,mappedName:''}));await p.autoMapCandidates(items);
  assert.deepEqual(Array.from(p.data.confirmedFoods,i=>i.observedName),['南瓜','米饭']);assert.ok(p.data.confirmedFoods.every(i=>i.unmatched&&i.matchReason==='REQUEST_FAILED'));
 });
+
+
+test('food selector translates processing states and hides unknown codes without changing identities',async()=>{
+ const env=environment();let component;
+ const foods=['STIR_FRIED','baked',' UNKNOWN ','NEW_UNVERIFIED_CODE',null].map((processingMethod,i)=>({foodId:'f'+i,canonicalNameZh:'真实食品'+i,processingMethod,profile:{distinctionTags:['已存处理方式：'+(processingMethod||'UNKNOWN')]}}));
+ load('components/food-selector/food-selector.ts',{'../../utils/api':{ApiError:class extends Error{},request:async()=>({items:foods,hasMore:false,nextCursor:null})}},env,{Component:c=>component=c});
+ const c={...component.methods,data:{...component.data,visible:true,query:'食品'},setData};
+ await c.search(false);
+ assert.deepEqual(Array.from(c.data.items,i=>i.description),['炒','烤','','','']);
+ assert.deepEqual(Array.from(c.data.items,i=>i.foodId),foods.map(i=>i.foodId));
+});
+
+
+test('stale food cursor reloads page one once and never appends an old page',async()=>{
+ const env=environment();let component;const calls=[];
+ class ApiError extends Error {constructor(){super('stale');this.statusCode=400;this.data={code:'FOOD_SEARCH_CURSOR_STALE'}}}
+ load('components/food-selector/food-selector.ts',{'../../utils/api':{ApiError,request:async url=>{calls.push(url);if(url.includes('cursor='))throw new ApiError();return {items:[{foodId:'new',canonicalNameZh:'新列表'}],hasMore:false,nextCursor:null}}}},env,{Component:c=>component=c});
+ const c={...component.methods,data:{...component.data,visible:true,query:'蛋',items:[{foodId:'old'}],hasMore:true,cursor:'stale'},setData};
+ await c.search(true);
+ assert.equal(calls.length,2);assert.ok(!calls[1].includes('cursor='));assert.deepEqual(Array.from(c.data.items,i=>i.foodId),['new']);assert.equal(c.data.loading,false);
+});
+
+test('recorded nutrition preview requests the current DFE scope and preserves matched/unmatched rows',async()=>{const env=environment(),calls=[];const p=resultPage(env,async(route,options)=>{calls.push({route,options});return {nutrients:[],coverageRatio:'0',warnings:[]}});p.data.confirmedFoods=[{foodId:'egg',observedName:'鸡蛋',unmatched:false,consumedAmount:'100'},{foodId:null,observedName:'菜',unmatched:true,consumedAmount:'50'}];await p.calculate();assert.equal(calls[0].options.data.targetScopeVersion,'core-13-v2-dfe');assert.equal(calls[0].options.data.items[1].matchStatus,'UNMATCHED')});

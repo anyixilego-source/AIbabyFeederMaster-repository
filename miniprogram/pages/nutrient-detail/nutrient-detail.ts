@@ -1,6 +1,8 @@
+import type {SpecialReferenceView} from '../../utils/nutrient-special-reference'
 import { detailComparison } from '../../utils/nutrient-detail-visual'
 import { foodCards } from '../../utils/nutrient-detail-view'
 import { backPage,replacePage } from '../../utils/navigation'
+import {canRecordBaby} from '../../utils/family-state'
 import { ApiError, reviewEnvironment } from '../../utils/api'
 import { formatNumber, loadReportBundle } from '../../utils/nutrition-report'
 import { categories, category } from '../../utils/nutrition-period'
@@ -15,7 +17,7 @@ async function context(): Promise<SessionContext> {
 }
 
 function referencePresentation(nutrient: NutrientView) {
-  const suspended = ['CARBOHYDRATE', 'VITAMIN_A_RAE', 'FOLATE', 'IODINE'].includes(nutrient.nutrientCode)
+  const suspended = ['CARBOHYDRATE', 'VITAMIN_A_RAE', 'FOLATE', 'IODINE'].includes(nutrient.nutrientCode) && !nutrient.referenceSourceApproved
   const recommended = nutrient.recommendedValue === null ? null : Number(nutrient.recommendedValue)
   const upper = nutrient.upperLimitValue === null ? null : Number(nutrient.upperLimitValue)
   const lowerRange = nutrient.rangeLowerValue === null ? null : Number(nutrient.rangeLowerValue)
@@ -35,7 +37,7 @@ function referencePresentation(nutrient: NutrientView) {
     referenceText = `一般参考值 ${formatNumber(recommended)}；上限参考 ${formatNumber(upper)} ${nutrient.unitText}/日`
     scaleMax = Math.max(upper, current, 1)
   } else if (recommended !== null) {
-    referenceText = `${isEnergyEstimate ? '一般能量估计值' : '一般参考值'} ${formatNumber(recommended)} ${nutrient.unitText}/日`
+    referenceText = `${isEnergyEstimate ? (nutrient.weightEnergy?'按体重估计需要量':'一般能量估计值') : nutrient.referenceType==='EAR' ? 'EAR背景参考（非达标线）' : nutrient.referenceType==='AI' ? '适宜摄入量参考（AI）' : '一般参考值'} ${formatNumber(recommended)} ${nutrient.unitText}/日`
     scaleMax = Math.max(recommended * 1.25, current, 1)
   } else if (upper !== null) {
     referenceText = `上限参考值 ${formatNumber(upper)} ${nutrient.unitText}/日`
@@ -43,16 +45,16 @@ function referencePresentation(nutrient: NutrientView) {
   }
   const markerPercent = Math.max(0, Math.min(100, Math.round(current / scaleMax * 10000) / 100))
   return {
-    referenceText, markerPercent, scaleMaxText: formatNumber(scaleMax), informationalMarker: hasRange && nutrient.referenceType === 'AI_RANGE', currentMarkerText: (nutrient.dataNote ? '已知部分 ' : '已记录 ') + nutrient.amountText,
+    referenceText:nutrient.specialReferenceView?'':referenceText, markerPercent, scaleMaxText: formatNumber(scaleMax), informationalMarker: hasRange && nutrient.referenceType === 'AI_RANGE', currentMarkerText: (nutrient.dataNote ? '已知部分 ' : '已记录 ') + nutrient.amountText,
     referenceAvailable: !suspended && (nutrient.outputEligibility === 'FULL_COMPARISON' || (hasRange && nutrient.referenceType === 'AI_RANGE')),
     hasRange, rangeLowerText: lowerRange === null ? '' : formatNumber(lowerRange), rangeUpperText: upperRange === null ? '' : formatNumber(upperRange),
     rangeStartPercent: hasRange ? Math.round(lowerRange / scaleMax * 10000) / 100 : 0,
     rangeWidthPercent: hasRange ? Math.round((upperRange - lowerRange) / scaleMax * 10000) / 100 : 0,
     showCurrentMarker: !suspended && (nutrient.outputEligibility === 'FULL_COMPARISON' || (hasRange && nutrient.referenceType === 'AI_RANGE' && nutrient.outputEligibility === 'REFERENCE_ONLY')) && !isCarbEstimate && nutrient.numericValue !== null && Number.isFinite(nutrient.numericValue) && nutrient.numericValue >= 0
       && nutrient.status !== 'UNIT_MISMATCH' && nutrient.status !== 'INSUFFICIENT_COVERAGE',
-    referenceMainText: suspended ? '目前仅展示可计算的已记录量' : hasRange ? '两端为AI参考区间的下端和上端' : isEnergyEstimate
-      ? '按月龄和性别估计的一般能量需要量' : nutrient.referenceType === 'RNI' ? '已记录量与RNI推荐摄入量对照' : '参考类型：'+nutrient.referenceLabel+'（仅供了解）',
-    referenceSubText: suspended ? '来源定义或食品覆盖仍待核对，不据此判断摄入是否充足。' : isCarbEstimate
+    referenceMainText:nutrient.specialReferenceView?(nutrient.specialReferenceView.kind==='FAT_ENERGY_SHARE'?'按已记录脂肪与能量计算供能比':'适宜摄入参考与控制方向分别展示'):suspended ? '目前仅展示可计算的已记录量' : hasRange ? '两端为AI参考区间的下端和上端' : isEnergyEstimate
+      ? (nutrient.weightEnergy?'按已记录体重与测量日期估计的能量需要量':'按月龄和性别估计的一般能量需要量') : nutrient.referenceType === 'RNI' ? '已记录量与RNI推荐摄入量对照' : '参考类型：'+nutrient.referenceLabel+'（仅供了解）',
+    referenceSubText:nutrient.specialReferenceView?(nutrient.specialReferenceView.kind==='FAT_ENERGY_SHARE'?'脂肪克数×9千卡/克÷同批已记录能量×100%；任一项资料不足不计算。参考区间不作达标判断。':'AI不是需要达到的最低值；PI-NCD不是AI上界，不据此建议加盐或判断医学风险。'):suspended ? '来源定义或食品覆盖仍待核对，不据此判断摄入是否充足。' : isCarbEstimate
       ? '由能量供能比推算；食品碳水口径待核对，暂不判断达标。'
       : hasRange ? '区间上限不是安全摄入上限，也不是过量判断线。'
         : '仅供了解，不代表营养达标、缺乏或医学判断。',
@@ -62,6 +64,7 @@ function referencePresentation(nutrient: NutrientView) {
 
 Page({
   data: {
+    specialReferenceView:null as SpecialReferenceView,
     categories,category:'ALL',optionCategory:'ALL',showNutrientOptions:true,options:[] as Array<{code:string;name:string;category:string}>,visibleOptions:[] as Array<{code:string;name:string;category:string}>,
     comparisonAvailable:false,comparisonPercent:0,comparisonText:'—',comparisonColor:'neutral',comparisonStroke:'#d4c9bc',comparisonCaption:'仅展示记录量',
     reviewLabel:reviewEnvironment()?.label || '',foodCards:[] as ReturnType<typeof foodCards>,missingSources:[] as Array<{foodId:string;name:string;weight:string}>,loading: true,
@@ -69,6 +72,7 @@ Page({
     periodId:'',nutrientCode: '', reportId: '', dateLabel: '', referenceSource: '',
     name: '营养素',
     badge: '营',
+    weightEditorVisible:false,weightSubjectId:'',weightEntryEnabled:false,weightEntryNote:'',weightEntryLabel:'补充体重',
     amountText: '—',
     unitText: '',
     sourceCount: 0,sourceSnapshotAvailable:false,hasValue:false,
@@ -93,9 +97,13 @@ Page({
     suggestions: [] as string[],
   },
 
+  _weightRefreshDate:'',
+  openWeight(){if(canRecordBaby())this.setData({weightEditorVisible:true})},
+  closeWeight(){this.setData({weightEditorVisible:false})},
+  weightSaved(e:WechatMiniprogram.CustomEvent<{reportDate:string}>){this.setData({weightEditorVisible:false});this._weightRefreshDate=e.detail.reportDate;void this.loadDetail()},
   _sequence:0,
   _bundle:null as ReportBundle|null,
-  onHide(){++this._sequence},
+  onHide(){++this._sequence;this.setData({weightEditorVisible:false})},
   onShow(){if(this.data.loading)void this.loadDetail()},
   onLoad(query: Record<string, string>) {
     this.setData({ periodId:query.periodId||'',nutrientCode: decodeURIComponent(query.code || ''), reportId: decodeURIComponent(query.reportId || '') })
@@ -109,7 +117,9 @@ Page({
     try {
       const active = await context()
       if (!active.subjectId) throw new Error('请先建立宝宝档案')
-      const bundle = await loadReportBundle(active.subjectId, false, this.data.reportId)
+      const weightDate=this._weightRefreshDate;this._weightRefreshDate='';
+      const bundle = await loadReportBundle(active.subjectId, !!weightDate, weightDate?'':this.data.reportId,weightDate)
+      if(sequence===this._sequence)this.setData({weightSubjectId:active.subjectId})
       if(sequence!==this._sequence)return
       const nutrient = bundle.nutrients.find((item) => item.nutrientCode === this.data.nutrientCode)
       if (!nutrient) throw new Error('没有找到该营养素的报告数据')
@@ -139,7 +149,9 @@ Page({
       if (nutrient.dataNote) reasons.push(nutrient.dataNote + '，当前结果只代表已知部分。')
       const suggestions = ['本页只解释这一修订的记录量，不从单日结果推断营养状况。']
       this.setData({
-        ...comparison,
+        ...comparison,specialReferenceView:nutrient.specialReferenceView||null,
+        weightEntryEnabled:nutrient.nutrientCode==='ENERGY_KCAL'&&(bundle.report.result.evidence?.ageMonths??-1)>=6&&(bundle.report.result.evidence?.ageMonths??-1)<12&&canRecordBaby(),
+        weightEntryNote:nutrient.weightEnergy?('采用'+Number(nutrient.weightEnergy.weightKg)+'公斤 · 测量于'+nutrient.weightEnergy.measuredOn):'',weightEntryLabel:nutrient.weightEnergy?'修改体重':'补充体重',
         name: nutrient.name,
         badge: nutrient.badge,
         amountText: nutrient.amountText,

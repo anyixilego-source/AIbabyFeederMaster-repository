@@ -1,10 +1,13 @@
+import {specialReferenceView,type SpecialReferenceData,type SpecialReferenceView} from './nutrient-special-reference'
 import { displayInteger } from './quantity-format'
 import { ApiError, request, getAuth } from './api'
 import { ageDisplay, ageDisplayFromMonths } from './age'
 import { completeOperation, operationPayload } from './operation'
 import type { SubjectSummary } from './session'
 
+export interface WeightEnergyEvidence {version:string;weightKg:string;measuredOn:string;estimatedKcal:string}
 export interface AssessmentNutrient {
+  specialReference?:SpecialReferenceData
   nutrientCode: string
   status: string
   referenceType?: string | null
@@ -17,12 +20,18 @@ export interface AssessmentNutrient {
   rangeUpperValue?: string | null
   warnings: string[]
   outputEligibility?: string
+  referenceAudit?: {policyVersion:string;approved:boolean;approvalIds:string[];referenceTypes:string[]}
   numericRelation?: string
   statement?: string
   reasonCodes?: string[]
-  indicators?: Array<{ rule: { source: string; sourceVersion: string; code: string; reviewedBy: string; referenceType: string }; ambiguous: boolean }>
+  indicators?: Array<{ rule: { source: string; sourceVersion: string; code: string; reviewedBy: string; referenceType: string; weightEnergy?:WeightEnergyEvidence }; ambiguous: boolean }>
 }
 
+export interface MilkEvidence {
+ records:Array<{milkRecordId:string;name:string;volumeMl:string|null;linkedActive?:boolean;nutritionProfileRevisionId:string|null}>;
+ facts:Array<{milkRecordId:string;nutrientCode:string;contribution:string|null;excludedDuplicate:boolean;sourceVersion:string|null;nutritionProfileRevisionId:string|null;reasonCode:string|null}>;
+ calculationVersion?:string;
+}
 export interface AssessmentReport {
   reportId: string
   subjectId?: string
@@ -34,7 +43,7 @@ export interface AssessmentReport {
   supersedesReportId?: string | null
   result: {
     assessment: { status: string; nutrients: AssessmentNutrient[]; boundaryStatement: string; assessmentAlgorithmVersion?: string }
-    evidence?: { ageMonths: number; date: string; subject: { birthDate: string }; records: ReportRecord[]; facts: ReportFact[] }
+    evidence?: { ageMonths: number; date: string; subject: { birthDate: string }; records: ReportRecord[]; facts: ReportFact[]; milk?:MilkEvidence; weightReference?:{selected:{weightKg:string;measuredOn:string;revisionId:string}|null;maxWeightAgeDays:number} }
     interpretationSummary?: { version:string; text:string; allMet:boolean; recordedCodes:string[]; focusCodes:string[] }
     observations?: Array<{ id: string; nutrientCode: string; text: string }>
     limitations?: Array<{ nutrientCode: string; text: string; reasonCodes: string[] }>
@@ -43,7 +52,7 @@ export interface AssessmentReport {
   }
 }
 
-interface ReportRecord { mealId: string; mealItemId: string; foodId: string | null; name: string; consumedGrams: string; weightOrigin: string }
+interface ReportRecord { mealId: string; mealItemId: string; foodId: string | null; name: string; consumedGrams: string; weightOrigin: string; sourceKind?:'FOOD'|'MILK';volumeMl?:string|null }
 interface ReportFact { mealItemId: string; foodId: string; nutrientCode: string; contribution: string | null; nutrientFactId?: string; sourceReleaseId?: string; sourceVersion: string }
 
 export interface NutrientSource {
@@ -59,6 +68,8 @@ export interface NutrientSource {
 }
 
 export interface NutrientView {
+  weightEnergy?:WeightEnergyEvidence
+  specialReferenceView?:SpecialReferenceView
   nutrientCode: string
   name: string
   badge: string
@@ -80,6 +91,7 @@ export interface NutrientView {
   rangeLowerValue: string | null
   rangeUpperValue: string | null
   referenceType: string | null
+  referenceSourceApproved?: boolean
   sources: NutrientSource[]
   sourceText: string
   outputEligibility: string
@@ -124,7 +136,7 @@ export const nutrientNames: Record<string, string> = {
 }
 
 export const unitNames: Record<string, string> = {
-  KILOCALORIE: '千卡', KCAL: '千卡', GRAM: '克', MILLIGRAM: '毫克', MICROGRAM: '微克', MICROGRAM_RAE: '微克 RAE',
+  KILOCALORIE: '千卡', KCAL: '千卡', GRAM: '克', MILLIGRAM: '毫克', PERCENT: '%', MICROGRAM: '微克', MICROGRAM_DFE: '微克 DFE', MICROGRAM_RAE: '微克 RAE',
 }
 
 const statusLabels: Record<string, string> = {
@@ -137,7 +149,15 @@ const statusLabels: Record<string, string> = {
 }
 
 const warningLabels: Record<string, string> = {
-  NO_CONFIRMED_INTAKE: '本报告没有已确认的餐食记录；奶量如有记录会另行展示。',
+  NO_CONFIRMED_INTAKE: '本报告没有已确认的饮食记录。',
+  MILK_VOLUME_UNKNOWN:'部分奶量仅记录喂养事件，未知体积未按零营养计算。',
+  MILK_REFERENCE_MISSING:'部分奶量尚未绑定营养资料，未计算部分不按零处理。',
+  MILK_REFERENCE_NOT_APPLICABLE:'部分奶资料不适用于记录日期或奶类，未据此计算。',
+  MILK_PREPARATION_BASIS_UNVERIFIED:'部分干粉资料缺少可核的最终冲调依据，暂未计算。',
+  MILK_CHEMICAL_BASIS_UNVERIFIED:'部分奶类营养素化学口径待核，未混用。',
+  MILK_NUTRIENT_MISSING:'部分奶类营养资料缺项，数值只包含可计算部分。',
+  MILK_NUTRIENT_TRACE:'部分奶类资料标为微量，未当作精确零值。',
+  MILK_LINKED_FOOD_COUNTED_ONCE:'关联的同一次摄入已在食物记录计算，奶量未重复计入。',
   NO_NUTRIENT_DATA: '今天暂无可用于计算的营养数据。',
   NO_INTAKE_DATA: '没有已确认的摄入数据，无法进行参考值比较。',
   INSUFFICIENT_COVERAGE_NO_COMPARISON: '部分营养数据不完整，当前数值仅代表已知部分。',
@@ -152,12 +172,13 @@ const warningLabels: Record<string, string> = {
 
 const suspendedReferenceCodes = new Set(['CARBOHYDRATE', 'VITAMIN_A_RAE', 'FOLATE', 'IODINE'])
 const suspendedWarning = 'REFERENCE_COMPARISON_SUSPENDED_PENDING_SOURCE_AUDIT'
+function hasScopedReference(item:AssessmentNutrient){const a=item.referenceAudit;return !!a&&a.policyVersion==='reference-source-audit-v1'&&a.approved===true&&Array.isArray(a.approvalIds)&&a.approvalIds.length>0&&Array.isArray(a.referenceTypes)&&a.referenceTypes.length>0&&(!item.referenceType||a.referenceTypes.includes(item.referenceType))}
 
 // The public API and historical snapshots may still use the older comparison
 // policy. Normalize at the report boundary without changing stored history.
 export function suspendReportComparison(report: AssessmentReport): AssessmentReport {
   const nutrients = report.result.assessment.nutrients.map((item) => {
-    if (!suspendedReferenceCodes.has(item.nutrientCode)) return item
+    if (!suspendedReferenceCodes.has(item.nutrientCode) || hasScopedReference(item)) return item
     const noIntake = item.averageDailyValue === null
     const incomplete = !noIntake && Number(item.coverageRatio) < 1
     return {
@@ -281,7 +302,8 @@ async function createReportBundle(subjectId: string, reportId: string, sequence:
   report = suspendReportComparison(report)
   const records = report.result.evidence?.records || []
   const facts = report.result.evidence?.facts || []
-  const sources = buildSources(records,facts)
+  const milkEvidence=milkContributionEvidence(report.result.evidence?.milk);
+  const sources = buildSources([...records,...milkEvidence.records],[...facts,...milkEvidence.facts])
   const nutrients = report.result.assessment.nutrients.map(item=>{const view=nutrientView(item,sources.get(item.nutrientCode)||[]);return report.result.evidence?view:{...view,sourceText:'旧报告未保存来源明细，不能从当前食品重建'}})
     .sort((left,right)=>categoryOrder[left.category]-categoryOrder[right.category] || nutrientRank(left.nutrientCode)-nutrientRank(right.nutrientCode))
   const date = new Date(report.periodStart + 'T12:00:00')
@@ -297,10 +319,11 @@ async function createReportBundle(subjectId: string, reportId: string, sequence:
 }
 
 export function nutrientView(item: AssessmentNutrient, sources: NutrientSource[]): NutrientView {
+  const special=item.specialReference?specialReferenceView(item.specialReference):null
   const name = nutrientNames[item.nutrientCode] || '其他营养素'
   const coverage = Number(item.coverageRatio)
   const numericValue = item.averageDailyValue === null ? null : Number(item.averageDailyValue)
-  const suspended = suspendedReferenceCodes.has(item.nutrientCode)
+  const suspended = suspendedReferenceCodes.has(item.nutrientCode) && !hasScopedReference(item)
   const informational = suspended || item.outputEligibility !== 'FULL_COMPARISON'
   const rangeLowerValue = item.rangeLowerValue ?? null
   const rangeUpperValue = item.rangeUpperValue ?? null
@@ -311,6 +334,8 @@ export function nutrientView(item: AssessmentNutrient, sources: NutrientSource[]
   const progressRatio = !informational && hasComparableReference ? numericValue / reference * 100 : null
   const progressLabel = rangeLowerValue !== null && rangeUpperValue !== null
     ? `一般参考区间 ${formatNumber(rangeLowerValue)}–${formatNumber(rangeUpperValue)} ${unitNames[item.unitCode] || ''}/日（非达标判断）`
+    : item.referenceType === 'EAR' && reference !== null
+      ? `EAR背景参考 ${formatNumber(reference)} ${unitNames[item.unitCode] || ''}/日（非达标线）`
     : item.referenceType === 'EER' && reference !== null
       ? `一般能量估计值约 ${formatNumber(reference)} ${unitNames[item.unitCode] || ''}/日`
     : progressRatio !== null
@@ -319,7 +344,7 @@ export function nutrientView(item: AssessmentNutrient, sources: NutrientSource[]
       ? `参考信息 ${formatNumber(reference)} ${unitNames[item.unitCode] || ''}/日（仅供了解）`
       : suspended ? '数据口径待核对，暂不展示参考进度' : '当前月龄暂无适用参考值'
   return {
-    nutrientCode: item.nutrientCode, name, badge: name.slice(0, 1), iconPath: nutrientIcon(item.nutrientCode), category: nutrientCategory(item.nutrientCode),
+    specialReferenceView:special, nutrientCode: item.nutrientCode, name, badge: name.slice(0, 1), iconPath: nutrientIcon(item.nutrientCode), category: nutrientCategory(item.nutrientCode),
     progressPercent: progressRatio === null ? 0 : Math.max(0, Math.min(100, progressRatio)),
     progressLabel,
     progressTone: nutrientProgressTone(item.nutrientCode),
@@ -328,12 +353,12 @@ export function nutrientView(item: AssessmentNutrient, sources: NutrientSource[]
     numericValue,
     unitText: unitNames[item.unitCode] || '单位待核对', status: item.status,
     statusText: item.outputEligibility ? (item.statement || statusLabels[item.status] || '暂无法比较') : '历史策略，仅展示原记录值与参考信息', statusTone: item.outputEligibility === 'FULL_COMPARISON' ? statusTone(item.status) : 'neutral',
-    dataNote: item.reasonCodes?.some(r=>['UNIT_BASIS_OR_SOURCE_UNVERIFIED','REFERENCE_UNIT_MISMATCH','UNIT_CONFLICT','SOURCE_CONFLICT','SOURCE_VERSION_MISSING','SOURCE_LINEAGE_MISSING','BASIS_UNSUPPORTED','DUPLICATE_NUTRIENT_FACTS'].includes(r)) ? '单位、基准或来源尚不可核对，暂不比较' : item.averageDailyValue === null ? '已记录食品暂无本项可计算值' : coverage < 1 ? `部分食物缺少${name}数据` : item.reasonCodes?.includes('PARTIAL_NUTRIENT_DATA') ? `部分${name}数值仍不完整` : '',
-    recommendedValue: item.recommendedValue, upperLimitValue: item.upperLimitValue,
-    rangeLowerValue, rangeUpperValue, referenceType: item.referenceType ?? null, sources,
+    dataNote: item.reasonCodes?.some(r=>['UNIT_BASIS_OR_SOURCE_UNVERIFIED','REFERENCE_UNIT_MISMATCH','UNIT_CONFLICT','SOURCE_CONFLICT','SOURCE_VERSION_MISSING','SOURCE_LINEAGE_MISSING','FOLATE_DFE_BASIS_UNVERIFIED','BASIS_UNSUPPORTED','DUPLICATE_NUTRIENT_FACTS'].includes(r)) ? '单位、基准或来源尚不可核对，暂不比较' : item.averageDailyValue === null ? '已记录食品暂无本项可计算值' : coverage < 1 && !['FULL_COMPARISON','REFERENCE_ONLY'].includes(item.outputEligibility||'') ? `部分记录缺少${name}数据` : item.reasonCodes?.includes('PARTIAL_NUTRIENT_DATA') ? `部分${name}数值仍不完整` : '',
+    ...(item.indicators?.find(i=>!i.ambiguous&&i.rule.weightEnergy)?.rule.weightEnergy?{weightEnergy:item.indicators.find(i=>!i.ambiguous&&i.rule.weightEnergy)!.rule.weightEnergy!}:{}),recommendedValue: item.recommendedValue, upperLimitValue: item.upperLimitValue,
+    rangeLowerValue, rangeUpperValue, referenceType: item.referenceType ?? null, referenceSourceApproved:hasScopedReference(item), sources,
     outputEligibility:item.outputEligibility || 'LEGACY_UNVERIFIED',numericRelation:item.numericRelation || 'NOT_CALCULABLE',
     reasonCodes:item.reasonCodes || item.warnings,
-    referenceSource:(item.indicators || []).filter(i=>!i.ambiguous).map(i=>i.rule.source + ' · ' + i.rule.sourceVersion).join('；'),
+    referenceSource:special?.sourceText||(item.indicators || []).filter(i=>!i.ambiguous).map(i=>i.rule.source + ' · ' + i.rule.sourceVersion).join('；'),
     referenceLabel:item.referenceType || '',
     sourceText: sources.length > 0 ? sources.slice(0, 3).map((source) => source.name).join('、') : '暂无可计算来源',
   }
@@ -380,6 +405,10 @@ function statusTone(status: string): string {
   return 'neutral'
 }
 
+export function milkContributionEvidence(milk?:MilkEvidence):{records:ReportRecord[];facts:ReportFact[]} {
+  return {records:(milk?.records||[]).filter(r=>!r.linkedActive).map(r=>({mealId:'',mealItemId:'milk:'+r.milkRecordId,foodId:'milk:'+r.milkRecordId,name:r.name||'奶类喂养',consumedGrams:'',weightOrigin:'UNKNOWN_METHOD',sourceKind:'MILK',volumeMl:r.volumeMl})),
+    facts:(milk?.facts||[]).filter(f=>!f.excludedDuplicate).map(f=>({mealItemId:'milk:'+f.milkRecordId,foodId:'milk:'+f.milkRecordId,nutrientCode:f.nutrientCode,contribution:f.contribution,nutrientFactId:f.nutritionProfileRevisionId||undefined,sourceVersion:f.sourceVersion||'未绑定营养资料'}))};
+}
 function buildSources(records: ReportRecord[], facts: ReportFact[]): Map<string,NutrientSource[]> {
   const grouped = new Map<string,Map<string,{foodId:string;name:string;value:number}>>()
   for (const fact of facts) {
@@ -399,7 +428,7 @@ function buildSources(records: ReportRecord[], facts: ReportFact[]): Map<string,
       const usedRecords=records.filter(r=>r.foodId===row.foodId)
       const usedFacts=facts.filter(f=>f.foodId===row.foodId && f.nutrientCode===code)
       return {...row,badge:row.name.slice(0,1),valueText:formatNumber(row.value),percent:total>0?Math.round(row.value/total*100):0,
-        recordWeightText:(usedRecords.some(r=>r.weightOrigin==='USER_ACCEPTED_ESTIMATE')?'约':'')+formatNumber(usedRecords.reduce((sum,r)=>sum+Number(r.consumedGrams),0))+' 克',
+        recordWeightText:usedRecords[0]?.sourceKind==='MILK'?(usedRecords.some(r=>r.volumeMl===null)?'奶量未知':formatNumber(usedRecords.reduce((sum,r)=>sum+Number(r.volumeMl),0))+' ml'):(usedRecords.some(r=>r.weightOrigin==='USER_ACCEPTED_ESTIMATE')?'约':'')+formatNumber(usedRecords.reduce((sum,r)=>sum+Number(r.consumedGrams),0))+' 克',
         sourceVersionText:[...new Set(usedFacts.map(f=>f.sourceVersion))].sort().join('、'),
         evidenceIds:[...new Set(usedFacts.map(f=>f.nutrientFactId).filter((id):id is string=>Boolean(id)))].sort()}
     })]

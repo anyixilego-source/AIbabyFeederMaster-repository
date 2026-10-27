@@ -1,3 +1,4 @@
+@import "../../templates/nutrient-special-reference.wxss";
 @import "../../styles/record-empty.wxss";
 @import "../../styles/report-page-header.wxss";
 @import "../../styles/report-controls.wxss";

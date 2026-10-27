@@ -1,1 +1,2 @@
+<wxs module="weeklyVisual" src="../../utils/weekly-report-visual.wxs"/>
 <include src="../report-overview/report-overview.wxml"/>

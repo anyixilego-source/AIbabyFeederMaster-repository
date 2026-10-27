@@ -22,7 +22,7 @@
       <view wx:if="{{!detailUnavailable && records.length === 0}}" class="milk-empty">这一天没有奶量记录。</view>
       <view wx:for="{{records}}" wx:key="milkRecordId" class="milk-feed-row" data-id="{{item.milkRecordId}}" bindtap="openRecord" aria-role="button" aria-label="查看{{item.typeLabel}}喂养记录"><view class="milk-feed-icon"></view><view class="milk-feed-copy"><text class="milk-feed-type">{{item.typeLabel}}</text><text class="milk-feed-volume">{{item.volumeText}}</text></view><text class="milk-feed-time">{{item.time}}</text><view class="milk-feed-chevron"></view></view>
     </view>
-    <view class="milk-disclosure"><view id="milk-info-toggle" class="milk-disclosure-heading" bindtap="toggleInfo" aria-role="button" aria-expanded="{{showInfo}}"><text>记录说明</text><text>{{showInfo ? '−' : '+'}}</text></view><view wx:if="{{showInfo}}" class="milk-disclosure-body"><text>总量仅汇总已记录且明确体积的奶量，不代表全天实际摄入。{{knownDays ? '日均按' + knownDays + '天有量记录计算，未记录日不当作0。' : '没有已知奶量，日均保持未知。'}}未知体积仅计次数{{unknownCount ? '，本周期共' + unknownCount + '次' : ''}}。当前奶量暂未计入营养计算。</text><text>点击柱或日期查看当天逐次记录，点击记录可修改该次喂养。数值以整数显示，用户接受的估算性质及原始精度保留；查看历史报告使用其保存的记录快照。</text></view></view>
+    <view class="milk-disclosure"><view id="milk-info-toggle" class="milk-disclosure-heading" bindtap="toggleInfo" aria-role="button" aria-expanded="{{showInfo}}"><text>记录说明</text><text>{{showInfo ? '−' : '+'}}</text></view><view wx:if="{{showInfo}}" class="milk-disclosure-body"><text>总量仅汇总已记录且明确体积的奶量，不代表全天实际摄入。{{knownDays ? '日均按' + knownDays + '天有量记录计算，未记录日不当作0。' : '没有已知奶量，日均保持未知。'}}未知体积仅计次数{{unknownCount ? '，本周期共' + unknownCount + '次' : ''}}。已绑定且基准可核的奶量按资料参与营养统计，历史报告保留原计算版本。</text><text>点击柱或日期查看当天逐次记录，点击记录可修改该次喂养。数值以整数显示，用户接受的估算性质及原始精度保留；查看历史报告使用其保存的记录快照。</text></view></view>
   </block>
 </view>
 

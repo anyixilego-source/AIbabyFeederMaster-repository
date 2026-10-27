@@ -6,7 +6,7 @@ import type {MealPhotoInput,LocalMealPhoto} from './meal-photo';
 export interface PendingRecord {
     subjectId?:string;
     path: string;
-    method: 'POST' | 'PATCH' | 'DELETE';
+    method: 'POST' | 'PATCH' | 'PUT' | 'DELETE';
     kind: string;
     payload: Record<string, unknown>;
     localPhoto?: LocalMealPhoto;

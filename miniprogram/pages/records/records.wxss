@@ -131,3 +131,9 @@
 .detail-authorship{display:block;font-size:21rpx;color:#92847a;margin:18rpx 0;line-height:1.6}
 
 .milk-row-copy{flex:1;min-width:0}.milk-row-copy>.milk-row-type{display:block}.milk-row-author{display:block;font-size:20rpx;line-height:1.6;color:#92847a;overflow-wrap:anywhere}
+
+.milk-nutrition-choice{display:flex;justify-content:space-between;gap:20rpx;padding:22rpx 0;color:#9b765c;font-size:24rpx}.milk-nutrition-choice text:last-child{max-width:65%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.milk-nutrition-mask{z-index:1200}.milk-nutrition-body{height:65vh}.milk-nutrition-note{display:block;color:#9b9288;font-size:23rpx;line-height:1.6;margin:16rpx 0}.milk-nutrition-option{padding:24rpx 0;border-bottom:1rpx solid #eee7de;font-size:26rpx;color:#745f50}.milk-nutrition-field{display:flex;align-items:center;gap:14rpx;padding:17rpx 0;border-bottom:1rpx solid #eee7de;font-size:25rpx}.milk-nutrition-field input{flex:1;min-width:60rpx;text-align:right;color:#332c26}.milk-nutrition-field>text:first-child{min-width:120rpx}
+
+.milk-nutrition-edit{float:right;padding:0 12rpx;color:#b67d5a;font-size:24rpx}
+
+.milk-nutrition-secondary{background:#fff5ed;color:#9b765c;margin-top:20rpx}

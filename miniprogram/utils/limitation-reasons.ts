@@ -1,5 +1,9 @@
 // Explain only saved reason codes. Never recalculate or infer a nutrient result.
 const reasons:Record<string,string>={
+ FAT_OR_ENERGY_DATA_INCOMPLETE:'脂肪或能量资料暂缺，供能比暂不计算；克数仍保留。',
+ RECORDED_ENERGY_NOT_POSITIVE:'当前能量不能作为供能比的分母。',
+ FAT_ENERGY_EXCEEDS_RECORDED_ENERGY:'脂肪与能量资料口径需核对，供能比暂不计算。',
+ AMBIGUOUS_SPECIAL_REFERENCE:'有多条可能适用的特殊参考，核对前不选定。',
  PARTIAL_NUTRIENT_DATA:'部分食物缺少本项营养数据，当前只能汇总已知部分。',
  NO_CALCULABLE_VALUE:'已保存食品缺少本项可计算数值，不能把缺失当作零。',
  REFERENCE_COMPARISON_SUSPENDED:'本项参考口径仍待核验，暂不进行高低比较。',

@@ -1,0 +1,4 @@
+function dateLabel(d) { d=d||''; if(d.length!==10 || d.charAt(4)!=='-' || d.charAt(7)!=='-') return d; return (+d.slice(5,7))+'月'+(+d.slice(8,10))+'日'; }
+function color(item) { if (!item.showProgress) return 'neutral'; var p=item.progressPercent; return p < 30 ? 'red' : p < 70 ? 'yellow' : 'green'; }
+function description(item) { if(item.showProgress) return item.comparableDays+'个可比较日中，'+item.nonLowDays+'日记录量未低于参考值。'; return item.statusText || ''; }
+module.exports={color:color,dateLabel:dateLabel,description:description};

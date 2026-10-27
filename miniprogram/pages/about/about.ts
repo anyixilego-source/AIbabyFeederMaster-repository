@@ -15,7 +15,7 @@ Page({
     publicSecurityFilingNumber: complianceInfo.publicSecurityFilingNumber,
   },
 
-  onLoad(q:Record<string,string>){const section=['privacy','photos','functions','filing'].includes(q.section)?q.section:'';let versionText='体验版 0.1.5';try{const app=wx.getAccountInfoSync().miniProgram,label=app.envVersion==='release'?'正式版':'体验版';versionText=label+' '+(app.version||'0.1.5')}catch{}this.setData({section,versionText})},
+  onLoad(q:Record<string,string>){const section=['privacy','photos','functions','filing'].includes(q.section)?q.section:'';let versionText='体验版 0.1.6';try{const app=wx.getAccountInfoSync().miniProgram,label=app.envVersion==='release'?'正式版':'体验版';versionText=label+' '+(app.version||'0.1.6')}catch{}this.setData({section,versionText})},
   openSection(e:WechatMiniprogram.TouchEvent){const section=String(e.currentTarget.dataset.section||'');if(['privacy','photos','functions','filing'].includes(section))openPage('/pages/about/about?section='+section)},
   openFeedback(){openPage('/pages/feedback/feedback')},
   goBack() { backPage('/pages/profile/profile',this) },

@@ -433,10 +433,10 @@ Page({
     if(this.data.abandoned)return
     const confirmedFoods=items.map((candidate,index)=>{
       const match=results.find(r=>r.localId===String(index))
-      // 默认使用有名称匹配依据的首个候选；一次保存统一确认，点击仍可修改。
-      // 不把默认选择说成唯一身份，也不越过已知生熟冲突。
+      // 只采用服务端允许的唯一精确身份预选；检索词／展示名仅用于召回。
+      // 一次保存仍由用户确认，歧义行继续按名称保留并可手动选择。
       const selected=match?.candidates.find(food=>
-        Boolean(food.foodId) && (match.autoSelectable || (food.score ?? 0)>0)
+        Boolean(food.foodId) && match.autoSelectable
         && !food.conflicts?.length
         && (!match.processingMethodHint || food.processingMethod===match.processingMethodHint))
       const food:FoodResult=selected?{...selected,foodForm:null}:{foodId:'',canonicalNameZh:candidate.observedName,foodForm:null,processingMethod:null}
@@ -489,7 +489,7 @@ Page({
       .map((item) => ({...(item.foodId?{foodId:item.foodId}:{}),observedName:item.observedName,matchStatus:item.unmatched?'UNMATCHED':'MATCHED',amount:item.consumedAmount.trim(),unit:'g'}))
     if (!items.length || items.some((item) => !/^\d+(?:\.\d{1,6})?$/.test(item.amount) || Number(item.amount) <= 0)) return null
     const calculation = await request<CalculationResult>('/nutrition/calculate', {
-      method: 'POST', data: { mode:'RECORDED_ITEMS_V2',items, targetScopeVersion: 'core-13-v1' },
+      method: 'POST', data: { mode:'RECORDED_ITEMS_V2',items, targetScopeVersion: 'core-13-v2-dfe' },
     })
     const nutrients = calculation.nutrients.filter((item) => item.knownValue !== null).slice(0, 6).map((item) => ({
       name: nutrientNames[item.nutrientCode] || item.nutrientCode,
