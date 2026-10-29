@@ -3,7 +3,7 @@
 <wxs module="weeklyVisual" src="../../utils/weekly-report-visual.wxs"/>
 <template name="weekly-nutrient">
  <view class="weekly-nutrient-head"><image class="weekly-nutrient-icon" src="{{item.iconPath}}" mode="aspectFit"/><text class="weekly-nutrient-name">{{item.name}}</text><text class="weekly-chevron">›</text></view>
- <text wx:if="{{weeklyVisual.description(item)}}" class="weekly-nutrient-description">{{weeklyVisual.description(item)}}</text>
+ <text wx:if="{{item.aiSummary}}" style="color:#7350a1;font-size:24rpx;display:block;margin-top:10rpx">{{item.aiSummary}}</text><text wx:if="{{weeklyVisual.description(item)}}" class="weekly-nutrient-description">{{weeklyVisual.description(item)}}</text>
  <view wx:if="{{item.showProgress}}" class="weekly-nutrient-progress"><view class="weekly-progress-track"><view class="weekly-progress-fill {{weeklyVisual.color(item)}}" style="width:{{item.progressPercent}}%"></view></view><view class="weekly-progress-caption"><text>未低于参考值的天数</text><text>{{item.nonLowDays}} / {{item.comparableDays}}日</text></view></view>
  <template wx:if="{{item.specialReferenceView.kind==='SODIUM_INFORMATION'}}" is="nutrient-special-reference" data="{{special:item.specialReferenceView,compact:true}}"/><text wx:if="{{item.sourceText}}" class="weekly-nutrient-description">主要来源：{{item.sourceText}}</text><text wx:if="{{item.dataNote}}" class="weekly-nutrient-description">{{item.dataNote}}</text>
 </template>

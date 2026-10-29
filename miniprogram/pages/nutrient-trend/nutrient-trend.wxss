@@ -10,3 +10,5 @@ page{background:linear-gradient(160deg,#fff8f2 0,#fffcf9 58%,#fffaf6 100%);color
 .date-label.selected{color:#bb8d56;font-weight:600}
 
 .bar.information{background:#c5ae93;}
+
+.bar{position:relative;overflow:hidden}.bar-ai-piece{position:absolute;top:0;left:0;width:100%;background:#b49ad9}.ai-day-source{display:flex;flex-direction:column;gap:10rpx;color:#7350a1;font-size:24rpx;margin-top:20rpx}.ai-source-legend{display:flex;gap:24rpx;font-size:23rpx;color:#8d7e6a;margin:15rpx 0}.ai-source-legend text:last-child{color:#7350a1}

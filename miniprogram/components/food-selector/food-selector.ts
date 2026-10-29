@@ -1,3 +1,5 @@
+import {cachedAiNutrition} from '../../utils/ai-nutrition';
+import {familyState} from '../../utils/family-state';
 import { ApiError, request } from '../../utils/api';
 interface Food {
     foodId: string;
@@ -22,16 +24,17 @@ function foodDescription(food: Food): string {
     }) : [];
     return [...new Set([food.foodForm, states[(food.processingMethod || '').trim().toUpperCase()] || '', ...tags].filter(Boolean))].join(' · ');
 }
-Component({ properties: { visible: { type: Boolean, value: false }, initialQuery: { type: String, value: '' } }, data: { sequence: 0, timer: null as ReturnType<typeof setTimeout> | null, query: '', items: [] as Food[], cursor: '', hasMore: false, loading: false, message: '', state: 'idle', detail: '', detailFoodId: '' },
+Component({ properties: { visible: { type: Boolean, value: false }, initialQuery: { type: String, value: '' } }, data: { aiCandidate:null as {id:string;name:string}|null,sequence: 0, timer: null as ReturnType<typeof setTimeout> | null, query: '', items: [] as Food[], cursor: '', hasMore: false, loading: false, message: '', state: 'idle', detail: '', detailFoodId: '' },
     observers: { 'visible,initialQuery': function (visible: boolean, initialQuery: string) { ++this.data.sequence; if (this.data.timer)
             clearTimeout(this.data.timer); if (visible) {
-            this.setData({ query: initialQuery, items: [], cursor: '', hasMore: false, message: '', state: 'idle', loading: false, detail: '', detailFoodId: '' });
+            this.setData({ query: initialQuery,aiCandidate:null,items: [], cursor: '', hasMore: false, message: '', state: 'idle', loading: false, detail: '', detailFoodId: '' });
             if (initialQuery.trim())
                 void this.search(false);
         } } },
     lifetimes: { detached() { ++this.data.sequence; if (this.data.timer)
             clearTimeout(this.data.timer); } },
     methods: {
+        chooseAi(){const c=this.data.aiCandidate;if(c)this.triggerEvent('select',{food:{foodId:'',aiFoodNutritionId:c.id,canonicalNameZh:c.name,foodForm:null,processingMethod:null},unmatched:true,matchReason:'AI_ESTIMATE'})},
         noop() { }, close() { ++this.data.sequence; this.triggerEvent('close'); },
         input(e: WechatMiniprogram.Input) { ++this.data.sequence; this.setData({ query: e.detail.value, cursor: '', hasMore: false, loading: false, detail: '' }); if (this.data.timer)
             clearTimeout(this.data.timer); this.data.timer = setTimeout(() => { void this.search(false); }, 350); },
@@ -48,6 +51,7 @@ Component({ properties: { visible: { type: Boolean, value: false }, initialQuery
             }>('/foods/search?q=' + encodeURIComponent(query) + '&limit=15' + (more ? '&cursor=' + encodeURIComponent(this.data.cursor) : ''));
             if (sequence !== this.data.sequence || !this.data.visible)
                 return;
+            if(!more){let aiCandidate:{id:string;name:string}|null=null;const subject=familyState()?.subjectId;if(subject)try{const r=await cachedAiNutrition(subject,[{localId:'selector',observedName:query}]);if(r[0]?.aiFoodNutritionId)aiCandidate={id:r[0].aiFoodNutritionId,name:query}}catch{}if(sequence!==this.data.sequence||!this.data.visible)return;this.setData({aiCandidate});}
             const seen = new Set(more ? this.data.items.map(i => i.foodId) : []);
             const items = response.items.filter(i => !seen.has(i.foodId)).map(i => ({ ...i, description: foodDescription(i), infoText:i.nutritionSummary?'每100克可食部分 · '+i.nutritionSummary.numericNutrientCount+'项有数值资料'+(i.nutritionSummary.sourceVersions.length?' · 来源：'+i.nutritionSummary.sourceVersions.join('、'):''):'' }));
             this.setData({ items: more ? [...this.data.items, ...items] : items, cursor: response.nextCursor || '', hasMore: response.hasMore, state: items.length || more ? 'results' : 'empty', message: items.length || more ? '' : '没有找到标准食品；可按名称记录，营养资料暂缺。' });

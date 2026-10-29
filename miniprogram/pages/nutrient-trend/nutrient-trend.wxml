@@ -9,13 +9,13 @@
   <scroll-view wx:if="{{showNutrientOptions}}" id="nutrient-options" class="nutrient-options" scroll-x enhanced show-scrollbar="{{false}}"><view class="nutrient-options-row"><view wx:for="{{visibleOptions}}" wx:key="code" id="nutrient-choice-{{item.code}}" class="nutrient-option {{nutrientCode===item.code?'active':''}}" data-code="{{item.code}}" bindtap="selectNutrient">{{item.name}}</view></view></scroll-view>
   <view id="trend-chart-card" class="card chart-card">
    <view class="heading"><text id="selected-nutrient-title">{{name}}</text><text class="unit-label">单位 {{unitText}}</text></view>
-   <text class="scope-note">{{nutrientCode==='FAT_TOTAL' && unitText==='%'?'仅显示资料足够的记录供能比，不代表全天膳食结构。点击柱查看当天。':'仅显示记录中的可计算量，不代表全天摄入。点击柱查看当天数值。'}}</text>
+   <view wx:if="{{hasAiValues}}" class="ai-source-legend"><text>资料计算</text><text>浅紫部分：AI估算</text></view><text class="scope-note">{{nutrientCode==='FAT_TOTAL' && unitText==='%'?'仅显示资料足够的记录供能比，不代表全天膳食结构。点击柱查看当天。':'仅显示记录中的可计算量，不代表全天摄入。点击柱查看当天数值。'}}</text>
    <view wx:if="{{lines.length > 1}}" class="range-reference-labels"><text wx:for="{{lines}}" wx:key="label">{{item.label}} {{item.valueText}} {{unitText}}</text></view>
    <view id="trend-chart" class="chart">
     <view id="chart-axis" class="axis {{wideAxis?'wide-axis':''}}"><text wx:for="{{axisLabels}}" wx:key="key" class="axis-label {{item.reference?'reference-value':''}} {{item.alternate?'alternate':''}}" style="bottom:{{item.bottom}}%">{{item.text}}</text></view>
     <view class="plot">
      <view wx:for="{{axisTicks}}" wx:key="key" class="grid-line" style="bottom:{{item.bottom}}%"><view class="axis-tick"></view></view>
-     <view class="columns"><view wx:for="{{bars}}" wx:key="date" class="column" data-date="{{item.date}}" bindtap="selectDay"><text wx:if="{{item.value === null || item.valueText === '0'}}" class="bar-value">{{item.valueText}}</text><view class="bar {{item.tone}} {{item.date===selectedDate?'latest':''}}" style="height:{{item.height}}%"></view></view></view>
+     <view class="columns"><view wx:for="{{bars}}" wx:key="date" class="column" data-date="{{item.date}}" bindtap="selectDay"><text wx:if="{{item.value === null || item.valueText === '0'}}" class="bar-value">{{item.valueText}}</text><view class="bar {{item.tone}} {{item.date===selectedDate?'latest':''}}" style="height:{{item.height}}%"><view wx:if="{{item.hasAiValue}}" class="bar-ai-piece" style="height:{{item.aiPercent}}%"></view></view></view></view>
      <view wx:for="{{lines}}" wx:key="label" class="ref-line" style="bottom:{{item.bottom}}%"><text wx:if="{{lines.length === 1}}" class="ref-label">{{item.valueText}} {{unitText}} {{item.label}}</text></view>
     </view>
    </view>
@@ -28,7 +28,7 @@
   <view wx:if="{{dayPreview}}" id="trend-day-preview" class="card day-card">
    <view class="heading"><text>{{dayPreview.date}}</text><view wx:if="{{dayReportId}}" id="trend-open-single" class="day-link" bindtap="switchToDay">查看单日 <text>›</text></view></view>
    <view class="day-value-row"><text class="day-value-label">{{nutrientCode==='FAT_TOTAL' && unitText==='%'?'记录供能比':dayPreview.partial?'已知部分记录量':'已记录量'}}</text><view class="day-value {{!dayPreview.hasValue?'unavailable':''}}"><text>{{dayPreview.valueText}}</text><text wx:if="{{dayPreview.hasValue}}" class="day-unit">{{dayPreview.unitText||unitText}}</text></view></view>
-  <text wx:if="{{dayPreview.sourceAmountText}}" class="sub">{{dayPreview.sourceAmountText}}</text></view>
+  <view wx:if="{{dayPreview.hasAiValue}}" class="ai-day-source"><text>AI估算 {{dayPreview.aiAmountText}}</text><text wx:if="{{dayPreview.aiShareText}}">AI占本项参考合计 {{dayPreview.aiShareText}}</text></view><text wx:if="{{dayPreview.sourceAmountText}}" class="sub">{{dayPreview.sourceAmountText}}</text></view>
   <view class="report-disclosure"><view id="trend-report-toggle" class="disclosure-heading" bindtap="toggleReportNotes"><text>报告说明</text><text>{{showReportNotes?'−':'+'}}</text></view>
    <view wx:if="{{showReportNotes}}" id="trend-report-body" class="disclosure-body">
     <text class="sub">{{description}}</text><text wx:if="{{!informationalMode}}" class="sub">{{comparableDays}}天可比较 · {{excludedDays}}天排除（合计7天）</text><text wx:if="{{comparableDays}}" class="sub">其中低于参考值{{lowDays}}天，达到或超过参考值{{nonLowDays}}天。部分已知达到仅作限定解释。</text>

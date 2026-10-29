@@ -20,6 +20,7 @@ export interface AuthSession {
 }
 
 interface RequestOptions {
+  timeout?:number
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   data?: unknown
   responseType?: 'text' | 'arraybuffer'
@@ -70,6 +71,7 @@ function rawRequest<T>(path: string, options: RequestOptions): Promise<T> {
     wx.request({
       url: `${runtimeBaseUrl()}${path}`,
       responseType: options.responseType || 'text',
+      timeout:options.timeout??60000,
       method: (options.method || 'GET') as WechatMiniprogram.RequestOption['method'],
       data: options.data as WechatMiniprogram.IAnyObject | string | ArrayBuffer | undefined,
       header,

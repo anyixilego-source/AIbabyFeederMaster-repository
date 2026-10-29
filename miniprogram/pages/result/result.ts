@@ -1,3 +1,5 @@
+import {prepareAiNutrition,cachedAiNutrition,AI_ALGORITHM_NOTICE} from '../../utils/ai-nutrition'
+import {familyState} from '../../utils/family-state'
 import {hasCloudPhotoChoice,setCloudPhotoConsent} from '../../utils/shared-meal-photo'
 import { displayInteger } from '../../utils/quantity-format'
 import {aiFailureView,notifyAiFailure,type AiDiagnostic,type AiFailureView} from '../../utils/ai-failure'
@@ -19,8 +21,10 @@ interface RecognitionItem {
   uncertainties: string[]
 }
 interface RecognitionResult { mealName?: string | null; mode: 'AI_CANDIDATES' | 'MANUAL_SEARCH'; items?: RecognitionItem[]; reason?: string; diagnostic?:AiDiagnostic }
-interface FoodResult { selectedFoodRevisionId?:string|null;foodId: string; canonicalNameZh: string; foodForm: string | null; processingMethod: string | null }
+interface FoodResult { aiFoodNutritionId?:string|null; selectedFoodRevisionId?:string|null;foodId: string; canonicalNameZh: string; foodForm: string | null; processingMethod: string | null }
 interface ConfirmedFoodItem {
+  aiFoodNutritionId?:string|null
+  nutritionSource?:string
   selectedFoodRevisionId?:string|null
   localId: string
   candidateIndex: number
@@ -196,7 +200,8 @@ function confirmedFoodSelection(
     ratioAdjustedOrder: current?.ratioAdjustedOrder || 0,
     source: unmatched ? 'MANUAL' : (candidate ? 'AI_CANDIDATE' : 'SEARCH'),
     unmatched,
-    matchReason: unmatched ? 'NO_MATCH_NO_NUTRITION' : undefined,
+    aiFoodNutritionId:food.aiFoodNutritionId,nutritionSource:food.aiFoodNutritionId?'AI_ESTIMATE':undefined,
+    matchReason: food.aiFoodNutritionId?'AI_ESTIMATE':unmatched ? 'NO_MATCH_NO_NUTRITION' : undefined,
   }
 }
 
@@ -211,6 +216,7 @@ Page({
     confirmedFoods: [] as ConfirmedFoodItem[],
     mealTotalAmount: '200', ...weightPresentation('200'), weightBubbleVisible: false, weightTicks,
     ratioTotal: 0, ratioAdjustmentSequence: 0,
+    aiSaveStatus:'',aiAlgorithmNotice:AI_ALGORITHM_NOTICE,
     nutrition: [] as Array<{ name: string; badge: string; value: string; tone: string }>,
     coverageText: '', warnings: [] as string[],
     recognitionFailure:null as AiFailureView|null, errorMessage: '', scrollIntoView: '', manualFocus: false,
@@ -445,6 +451,9 @@ Page({
     const foods=this.data.foods.map((row,index)=>({...row,mappedName:confirmedFoods[index]?.foodId?'建议匹配：'+confirmedFoods[index].canonicalNameZh:'待选择；可按名称记录'}))
     const allocated=applyRatioAmounts(initialRatios(confirmedFoods),this.data.mealTotalAmount||'200')
     this.setData({confirmedFoods:allocated,foods,pendingCandidateIndex:-1,scrollIntoView:'confirm-section',ratioTotal:ratioTotal(allocated)})
+    const subject=familyState()?.subjectId
+    if(subject)try{const cached=await cachedAiNutrition(subject,allocated.map(f=>({localId:f.localId,foodId:f.foodId,observedName:f.observedName})));if(!this.data.abandoned&&familyState()?.subjectId===subject)this.setData({confirmedFoods:this.data.confirmedFoods.map(f=>{const r=cached.find(r=>r.localId===f.localId);return !f.foodId&&!f.aiFoodNutritionId&&allocated.find(v=>v.localId===f.localId)?.observedName===f.observedName&&r?.aiFoodNutritionId?{...f,aiFoodNutritionId:r.aiFoodNutritionId,nutritionSource:'AI_ESTIMATE',matchReason:'AI_ESTIMATE',badge:'AI估算'}:f})})}catch{/* Cache lookup never blocks confirmation. */}
+
   },
 
   onSearchResultTap(event: WechatMiniprogram.TouchEvent): void {
@@ -533,7 +542,7 @@ Page({
       const active=await(getApp<IAppOption>().globalData.ready||ensureSessionContext())
       if(active.subjectId!==draft.subjectId)throw Error('当前宝宝已切换，请返回记录页重新进入')
       const scope='meal-create:'+draft.subjectId,total=exactGrams(actualTotal)
-      const body:Record<string,unknown>={mealType:draft.mealType,occurredAt:draft.occurredAt,notes:confirmedMealNotes(draft.notes,!this.data.manualEntry&&!this.data.samplePhoto,''),...(!this.data.manualEntry&&!this.data.samplePhoto&&this.data.accepted?{mealNameConsentVersion:'CONFIRMED_MEAL_NAME_V1'}:{}),items:foods.map(food=>({observedName:food.observedName,consumedAmount:food.consumedAmount.trim(),source:food.source,weightOrigin:'USER_ACCEPTED_ESTIMATE',...(food.unmatched?{matchStatus:'UNMATCHED',matchReason:food.matchReason||'NO_MATCH_NO_NUTRITION'}:{matchStatus:'MATCHED',foodId:food.foodId,...(food.selectedFoodRevisionId?{selectedFoodRevisionId:food.selectedFoodRevisionId}:{})})}))}
+      const body:Record<string,unknown>={mealType:draft.mealType,occurredAt:draft.occurredAt,notes:confirmedMealNotes(draft.notes,!this.data.manualEntry&&!this.data.samplePhoto,''),...(!this.data.manualEntry&&!this.data.samplePhoto&&this.data.accepted?{mealNameConsentVersion:'CONFIRMED_MEAL_NAME_V1'}:{}),items:foods.map(food=>({observedName:food.observedName,...(food.aiFoodNutritionId?{aiFoodNutritionId:food.aiFoodNutritionId,nutritionSource:'AI_ESTIMATE'}:{}),consumedAmount:food.consumedAmount.trim(),source:food.source,weightOrigin:'USER_ACCEPTED_ESTIMATE',...(food.unmatched?{matchStatus:'UNMATCHED',matchReason:food.matchReason||'NO_MATCH_NO_NUTRITION'}:{matchStatus:'MATCHED',foodId:food.foodId,...(food.selectedFoodRevisionId?{selectedFoodRevisionId:food.selectedFoodRevisionId}:{})})}))}
       const previous=pendingRecord(scope)
       if(previous){
         const {operationId:_operationId,weightReview:_review,...oldBody}=previous.payload
@@ -544,6 +553,7 @@ Page({
         const accepted=await new Promise<boolean>(resolve=>wx.showModal({title:'核对本餐总量',content:weightNotice(total)+'确认记录这个重量吗？',confirmText:'确认记录',success:r=>resolve(r.confirm),fail:()=>resolve(false)}));if(!accepted)return
         body.weightReview={policyVersion:'MEAL_WEIGHT_REVIEW_V2',acknowledged:true,reviewedTotalGrams:total}
       }
+      if(!previous){body.items=await prepareAiNutrition(draft.subjectId,body.items as import('../../utils/ai-nutrition').AiSaveItem[],()=>!this.data.abandoned,text=>this.setData({aiSaveStatus:text}),mealId);if(this.data.abandoned)throw Error('页面状态已变化，未自动保存');}
       if(!this.data.manualEntry&&!this.data.samplePhoto&&active.current?.sharedVersion!=='legacy'&&!hasCloudPhotoChoice(draft.subjectId)){
         const decision=await new Promise<{confirm:boolean}>((resolve)=>wx.showModal({title:'同步餐食照片给家人？',content:'同意后，本次及今后的新餐食照片上传私有云端，供有权照护者查看，默认保留30天。不同意也能保存餐食；不会补传旧照片。本地保存和AI识别用途分别处理。',confirmText:'同意同步',cancelText:'仅本地',success:resolve,fail:()=>resolve({confirm:false})}));
         setCloudPhotoConsent(draft.subjectId,decision.confirm)

@@ -1,3 +1,4 @@
+import {aiSourceView} from './ai-source'
 import type { PeriodNutrient } from './nutrition-period'
 import { chartNumber } from './trend-chart'
 import {unitNames} from './nutrition-report'
@@ -12,6 +13,6 @@ export function trendPresentation(n:PeriodNutrient,dayReportId:string,startDate:
  const value=fat?day?.specialReference?.ratioPercent??null:day?.value??null
  return { rangeLabel:[trendDate(startDate),trendDate(endDate)].filter(Boolean).join(' — '),
   hasReference:n.specialReference?!n.specialReference.crossReference&&n.specialReference.indicators.length>0:!!n.reference,selectedDate:day?.date||selectedDate,
-  dayPreview:day ? {date:trendDate(day.date),valueText:value===null?'—':chartNumber(Number(value)),hasValue:value!==null,unitText:fat?'%':unitNames?.[day.unit]||day.unit,partial:fat?false:day.partial,sourceAmountText:fat?'已记录脂肪'+(day.specialReference?.fatGrams==null?'—':chartNumber(Number(day.specialReference.fatGrams)))+'克；能量'+(day.specialReference?.energyKcal==null?'资料暂缺':chartNumber(Number(day.specialReference.energyKcal))+'千卡'):''} : null,
+  dayPreview:day ? {...aiSourceView(day.sourceBreakdown,unitNames?.[day.unit]||day.unit),date:trendDate(day.date),valueText:value===null?'—':chartNumber(Number(value)),hasValue:value!==null,unitText:fat?'%':unitNames?.[day.unit]||day.unit,partial:fat?false:day.partial,sourceAmountText:fat?'已记录脂肪'+(day.specialReference?.fatGrams==null?'—':chartNumber(Number(day.specialReference.fatGrams)))+'克；能量'+(day.specialReference?.energyKcal==null?'资料暂缺':chartNumber(Number(day.specialReference.energyKcal))+'千卡'):''} : null,
   comparisonSummary:n.comparableDays>0 ? n.comparableDays+'个可比较日中，'+n.nonLowDays+'日记录量未低于参考值' : n.description }
 }

@@ -1,3 +1,4 @@
+import {recognizeMilkLabel,labelConsentKey,labelForm} from '../../utils/milk-label'
 import {checkFamilyContext} from '../../utils/family-sync'
 import {canRecordBaby,familyState} from '../../utils/family-state'
 import {sharedMealPhoto,retrySharedMealPhotos} from '../../utils/shared-meal-photo'
@@ -107,12 +108,13 @@ Page({
     meals: [] as DisplayMeal[], selectedMeal: null as DisplayMeal | null,
     confirmedCount: 0, consumedTotal: '0',
     milkLinkedChoice:'UNCHANGED',milkLinkIndex:0,milkLinkOptions:[] as Array<{id:string;label:string}>,milkLinkLabels:[] as string[],milkReferenceChoice:'AUTO',milkReferenceLabel:'未设置',milkReferenceExisting:'',
-    milkNutrition:{visible:false,manual:false,loading:false,firstUse:false,canRemember:true,saving:false,error:'',options:[] as Array<{revisionId:string;profileId:string;revision:number;canSetDefault?:boolean;profile:{name:string}}>,defaultRevision:0,makeDefault:true,name:'',source:'用户核对产品营养成分表',energyUnitIndex:0,energyUnitLabels:['千焦（kJ）','千卡（kcal）'],basisIndex:0,basisLabels:['每100毫升冲调后奶液','每100克干粉'],ageFrom:'6',ageTo:'72',powderGrams:'',preparedVolumeMl:'',choIndex:0,choLabels:['口径待确认','总碳水（含膳食纤维）','可利用碳水（不含膳食纤维）'],aIndex:0,aLabels:['口径待确认','RAE','RE'],folateIndex:0,folateLabels:['口径待确认','DFE','天然叶酸','合成叶酸'],fields:[] as Array<{code:string;name:string;unit:string;unitCode:string;value:string;originalStatus?:string;touched?:boolean}>},
+    milkNutrition:{visible:false,manual:false,loading:false,firstUse:false,canRemember:true,saving:false,error:'',options:[] as Array<{revisionId:string;profileId:string;revision:number;canSetDefault?:boolean;profile:{name:string}}>,defaultRevision:0,makeDefault:true,name:'',source:'用户核对产品营养成分表',energyUnitIndex:0,energyUnitLabels:['千焦（kJ）','千卡（kcal）'],basisIndex:0,basisLabels:['每100毫升冲调后奶液','每100克干粉','请核对营养基准'],ageFrom:'6',ageTo:'72',powderGrams:'',preparedVolumeMl:'',choIndex:0,choLabels:['口径待确认','总碳水（含膳食纤维）','可利用碳水（不含膳食纤维）'],aIndex:0,aLabels:['口径待确认','RAE','RE'],folateIndex:0,folateLabels:['口径待确认','DFE','天然叶酸','合成叶酸'],fields:[] as Array<{code:string;name:string;unit:string;unitCode:string;value:string;originalStatus?:string;touched?:boolean;labelRawText?:string}>},
     milkAmount: '', milkHasKnownVolume: false, milkPreview: '',
     milkCount:0,milkTitle: '今日奶量', milkMain: '奶量未知', milkSub: '', milkHasRecords: false,
     milkItems: [] as Array<{ milkRecordId: string; time: string; typeLabel: string; volumeLabel: string;recordedBy?:string;modifiedBy?:string }>,
     milkExpanded: false,milkCursor:'',milkHasMore:false,milkLoadingMore:false,
     milkTypes: milkTypeLabels,
+    milkLabelBusy:false,milkLabelError:'',milkLabelNote:'',milkLabelMatches:[] as Array<{revisionId:string;name:string}>,
     milkPanel: { visible: false, mode: 'create', recordId: '', revisionToken: '', recordDate: dateOnly(new Date()), time: '08:00', milkTypeIndex: 0, volume: '', unknownVolume:false,errorMessage:'', about: false, retrying:false,subjectId:'',originalOccurredAt:'',volumeTouched:false,originTouched:false,saving: false, deleting: false, operationId: '' },
   },
 
@@ -133,8 +135,8 @@ Page({
     void this.loadMeals().finally(()=>this.setData({recordsScrollTop:scrollTop}))
   },
 
-  onHide(){++this._milkReferenceAttempt;this._milkReferenceResumeAfterChoice=false;++this._milkNutritionSequence;if(this._nameTimer)clearTimeout(this._nameTimer);this._nameTimer=null;this._markersAlive=false;++this._markerSequence;if(this._milkEntryId)++this._milkEntrySequence},
-  onUnload(){++this._milkReferenceAttempt;this._milkReferenceResumeAfterChoice=false;++this._milkNutritionSequence;if(this._nameTimer)clearTimeout(this._nameTimer);this._nameTimer=null;this._markersAlive=false;++this._markerSequence;this._milkEntryAlive=false;++this._milkEntrySequence},
+  onHide(){++this._milkLabelSequence;this.setData({milkLabelBusy:false});++this._milkReferenceAttempt;this._milkReferenceResumeAfterChoice=false;++this._milkNutritionSequence;if(this._nameTimer)clearTimeout(this._nameTimer);this._nameTimer=null;this._markersAlive=false;++this._markerSequence;if(this._milkEntryId)++this._milkEntrySequence},
+  onUnload(){++this._milkLabelSequence;++this._milkReferenceAttempt;this._milkReferenceResumeAfterChoice=false;++this._milkNutritionSequence;if(this._nameTimer)clearTimeout(this._nameTimer);this._nameTimer=null;this._markersAlive=false;++this._markerSequence;this._milkEntryAlive=false;++this._milkEntrySequence},
   async loadMilkEntry(){
     const seq=++this._milkEntrySequence,id=this._milkEntryId;this.setData({loading:true,errorMessage:''});
     try{const active=await context();if(active.current?.canRecord===false)throw Error('当前为仅查看权限，请在奶量列表中查看记录');if(active.subjectId!==this._milkEntrySubject)throw Error('宝宝已切换，请返回后重新打开');
@@ -297,6 +299,7 @@ Page({
   toggleMilkExpand() { this.setData({ milkExpanded: !this.data.milkExpanded }) },
   collapseMilk(){this.setData({milkExpanded:false,recordsScrollTop:this._scrollTop},()=>{this.setData({recordsScrollTop:0});this._scrollTop=0})},
   async openMilkCreate() {
+    this.resetMilkLabel();
     if(!canRecordBaby()){wx.showToast({title:'当前为仅查看权限',icon:'none'});return}
     if (this.data.loading) return
     const now = new Date()
@@ -312,6 +315,7 @@ Page({
   },
   restoreMilkSubmission(body:Record<string,unknown>){const at=new Date(String(body.occurredAt));this.setData({'milkPanel.retrying':true,'milkPanel.recordDate':String(body.recordDate||dateOnly(at)),'milkPanel.time':String(at.getHours()).padStart(2,'0')+':'+String(at.getMinutes()).padStart(2,'0'),'milkPanel.volume':body.volumeMl===null||body.volumeMl===undefined?'':integerInput(String(body.volumeMl)),'milkPanel.milkTypeIndex':milkTypeLabels.findIndex(t=>t.key===body.milkType),'milkPanel.unknownVolume':body.quantityMode==='EVENT_ONLY'||body.quantityMode===undefined&&body.milkType==='DIRECT_BREASTFEEDING'&&body.volumeMl==null,milkLinkedChoice:Object.prototype.hasOwnProperty.call(body,'linkedMealItemId')?String(body.linkedMealItemId||'NONE'):'UNCHANGED',milkReferenceChoice:Object.prototype.hasOwnProperty.call(body,'nutritionProfileRevisionId')?String(body.nutritionProfileRevisionId||'NONE'):'UNCHANGED','milkPanel.about':body.volumeOrigin==='USER_ACCEPTED_ESTIMATE'});wx.showToast({title:'上次提交待核对，重试将核对原提交',icon:'none'})},
   openMilkEdit(event: WechatMiniprogram.TouchEvent) {
+    this.resetMilkLabel();
     if(!canRecordBaby()){wx.showToast({title:'当前为仅查看权限，可在列表查看明细',icon:'none'});return}
     const recordId = String(event.currentTarget.dataset.id)
     const row = this._milkRecords.find((item) => item.milkRecordId === recordId)
@@ -356,7 +360,7 @@ Page({
     }catch(e){if(seq===this._milkNutritionSequence)this.setData({'milkNutrition.loading':false,'milkNutrition.error':'营养资料暂不可用，仍可保存奶量记录'});}
   },
   openMilkNutrition(){if(this.milkEditorLocked())return;this.setData({'milkNutrition.visible':true,'milkNutrition.manual':false});void this.loadMilkNutritionOptions()},
-  closeMilkNutrition(){if(this.data.milkNutrition.saving)return;if(this.data.milkNutrition.firstUse&&this.data.milkReferenceChoice==='AUTO')this.setData({milkReferenceChoice:'NONE',milkReferenceLabel:'仅记录奶量'});this._milkReferenceResumeAfterChoice=false;this.setData({'milkNutrition.visible':false,'milkNutrition.firstUse':false})},
+  closeMilkNutrition(){if(this.data.milkNutrition.saving)return;++this._milkLabelSequence;this.setData({milkLabelBusy:false,milkLabelError:'',milkLabelNote:'',milkLabelMatches:[]});this._milkLabelPhotos=[];if(this.data.milkNutrition.firstUse&&this.data.milkReferenceChoice==='AUTO')this.setData({milkReferenceChoice:'NONE',milkReferenceLabel:'仅记录奶量'});this._milkReferenceResumeAfterChoice=false;this.setData({'milkNutrition.visible':false,'milkNutrition.firstUse':false})},
   chooseMilkNutrition(e:WechatMiniprogram.TouchEvent){if(this.data.milkNutrition.saving)return;const id=String(e.currentTarget.dataset.id),row=this.data.milkNutrition.options.find(r=>r.revisionId===id);if(id!=='NONE'&&id!=='UNCHANGED'&&!row)return;this.setData({milkReferenceChoice:id,milkReferenceLabel:row?.profile.name||(id==='UNCHANGED'?'保留原参考':'仅记录奶量'),'milkNutrition.canRemember':id!=='UNCHANGED'&&row?.canSetDefault!==false,...(id==='UNCHANGED'||row?.canSetDefault===false?{'milkNutrition.makeDefault':false}:{})});},
   milkReferenceScope(){const p=this.data.milkPanel;return [milkEntryOwner(),p.subjectId,p.recordDate,milkTypeLabels[p.milkTypeIndex]?.key].join('|')},
   async ensureMilkReferenceSelection():Promise<boolean>{
@@ -394,8 +398,37 @@ Page({
     }catch(e){this.setData({'milkNutrition.error':e instanceof Error?e.message:'设置结果待核对，请重试'});}
     finally{this.setData({'milkNutrition.saving':false});}
   },
+  resetMilkLabel(){++this._milkLabelSequence;this._milkLabelEvidenceRef='';this._milkLabelPhotos=[];this._milkLabelOperation='';this.setData({milkLabelBusy:false,milkLabelError:'',milkLabelNote:'',milkLabelMatches:[]})},
+  copyMilkLabelError(){if(this.data.milkLabelError)wx.setClipboardData({data:this.data.milkLabelError})},
+  previewMilkLabel(){if(this._milkLabelPhotos.length)wx.previewImage({urls:this._milkLabelPhotos,current:this._milkLabelPhotos[0]})},
+  _milkLabelEvidenceRef:'',_milkLabelSequence:0,_milkLabelPhotos:[] as string[],_milkLabelOperation:'',
+  async openMilkLabel(){
+    if(this.data.milkLabelBusy||this.milkEditorLocked()||this._milkNutritionSaved||!canRecordBaby())return;
+    const scope=this.milkReferenceScope();
+    try{const selected=await new Promise<WechatMiniprogram.ChooseMediaSuccessCallbackResult>((resolve,reject)=>wx.chooseMedia({count:3,mediaType:['image'],sourceType:['camera','album'],sizeType:['compressed'],success:resolve,fail:reject}));
+      if(scope!==this.milkReferenceScope()||!this.data.milkNutrition.visible)return;this._milkLabelPhotos=selected.tempFiles.map(f=>f.tempFilePath);this._milkLabelOperation=operationId();await this.retryMilkLabel();
+    }catch(e){if(!String((e as {errMsg?:string})?.errMsg||'').includes('cancel'))this.setData({milkLabelError:'照片未选好，请重新选择'})}
+  },
+  async retryMilkLabel(){
+    if(this.data.milkLabelBusy||!this._milkLabelPhotos.length||!canRecordBaby())return;
+    const scope=this.milkReferenceScope(),owner=milkEntryOwner(),panel={...this.data.milkPanel};
+    if(!wx.getStorageSync(labelConsentKey())){const agreed=await new Promise<boolean>(r=>wx.showModal({title:'识别产品标签',content:'本次标签图片将发送至DeepSeek提取资料。识别后请核对，未读出的项目不会自动补全。',confirmText:'同意并识别',success:x=>r(x.confirm),fail:()=>r(false)}));if(!agreed||scope!==this.milkReferenceScope()||owner!==milkEntryOwner())return;wx.setStorageSync(labelConsentKey(),true)}
+    const sequence=++this._milkLabelSequence;this.setData({milkLabelBusy:true,milkLabelError:'',milkLabelNote:''});
+    try{const type=milkTypeLabels[panel.milkTypeIndex]?.key||'';const result=await recognizeMilkLabel(panel.subjectId,type,panel.recordDate,this._milkLabelPhotos,this._milkLabelOperation,()=>sequence===this._milkLabelSequence&&scope===this.milkReferenceScope()&&owner===milkEntryOwner()&&this.data.milkNutrition.visible);
+      if(sequence!==this._milkLabelSequence||scope!==this.milkReferenceScope()||owner!==milkEntryOwner()||!this.data.milkNutrition.visible)return;
+      if(result.status==='AI_UNAVAILABLE'){this.setData({milkLabelError:[result.message,result.diagnostic?.code,result.diagnostic?.meaning,result.diagnostic?.diagnosticId].filter(Boolean).join(' · ')});return}
+      if(result.status==='NEEDS_NUTRITION_TABLE'){this.setData({milkLabelError:'已识别到包装或配料信息，请补拍清晰的营养成分表。'});return}
+      const c=result.candidate;if(!c)throw Error('未取得可核对的标签资料');
+      let replace=true;if(this.data.milkNutrition.manual&&this.data.milkNutrition.fields.some(f=>f.value)){const answer=await new Promise<number>(r=>wx.showActionSheet({itemList:['仅补充空白项','替换为本次识别结果'],success:x=>r(x.tapIndex),fail:()=>r(-1)}));if(answer<0)return;replace=answer===1}
+      if(sequence!==this._milkLabelSequence||scope!==this.milkReferenceScope())return;
+      if(!replace&&(c.basis!==(this.data.milkNutrition.basisIndex===0?'PER_100ML_PREPARED':'PER_100G_POWDER')||this.data.milkNutrition.name&&c.name!==this.data.milkNutrition.name)){this.setData({milkLabelError:'产品或营养基准与现有输入不同，请选择替换后核对。'});return;}
+      if(!this.data.milkNutrition.manual)this.beginMilkProduct();this._milkLabelEvidenceRef=result.evidence?JSON.stringify(result.evidence):'';const previous=this.data.milkNutrition,energy=c.nutrients.find(f=>f.nutrientCode==='ENERGY_KCAL'),a=c.nutrients.find(f=>f.nutrientCode==='VITAMIN_A_RAE'),folate=c.nutrients.find(f=>f.nutrientCode==='FOLATE'),cho=c.nutrients.find(f=>f.nutrientCode==='CARBOHYDRATE');
+      this.setData({'milkNutrition.name':replace?c.name:previous.name||c.name,'milkNutrition.source':'用户核对产品标签（AI辅助提取）'+(result.evidence?'；识别号'+result.evidence.id+'；'+result.evidence.model+'；'+result.evidence.promptVersion:''),'milkNutrition.fields':labelForm(c,previous.fields,replace),...(replace?{'milkNutrition.basisIndex':c.basis==='PER_100ML_PREPARED'?0:c.basis==='PER_100G_POWDER'?1:2,'milkNutrition.ageFrom':c.ageFromMonths===null?'':String(c.ageFromMonths),'milkNutrition.ageTo':c.ageToMonthsExclusive===null?'':String(c.ageToMonthsExclusive),'milkNutrition.powderGrams':c.powderGrams||'','milkNutrition.preparedVolumeMl':c.preparedVolumeMl||'','milkNutrition.energyUnitIndex':energy?.unitCode==='KILOCALORIE'?1:0,'milkNutrition.aIndex':a?.chemicalBasis==='RAE'?1:a?.chemicalBasis==='RE'?2:0,'milkNutrition.folateIndex':Math.max(0,['UNKNOWN','DFE','NATURAL_FOLATE','FOLIC_ACID'].indexOf(folate?.chemicalBasis||'UNKNOWN')),'milkNutrition.choIndex':Math.max(0,['UNKNOWN','TOTAL_CARBOHYDRATE','AVAILABLE_CARBOHYDRATE'].indexOf(cho?.chemicalBasis||'UNKNOWN'))}:{}),...(!replace?{'milkNutrition.energyUnitIndex':previous.fields.find(f=>f.code==='ENERGY_KCAL')?.value?previous.energyUnitIndex:energy?.unitCode==='KILOCALORIE'?1:0,'milkNutrition.aIndex':previous.fields.find(f=>f.code==='VITAMIN_A_RAE')?.value?previous.aIndex:a?.chemicalBasis==='RAE'?1:a?.chemicalBasis==='RE'?2:0,'milkNutrition.folateIndex':previous.fields.find(f=>f.code==='FOLATE')?.value?previous.folateIndex:Math.max(0,['UNKNOWN','DFE','NATURAL_FOLATE','FOLIC_ACID'].indexOf(folate?.chemicalBasis||'UNKNOWN')),'milkNutrition.choIndex':previous.fields.find(f=>f.code==='CARBOHYDRATE')?.value?previous.choIndex:Math.max(0,['UNKNOWN','TOTAL_CARBOHYDRATE','AVAILABLE_CARBOHYDRATE'].indexOf(cho?.chemicalBasis||'UNKNOWN'))}:{}),milkLabelNote:'已填入可识别项目，请核对产品、基准、月龄与冲调说明。'+(c.warnings.length?' '+c.warnings.join('；'):''),milkLabelMatches:result.matches||[]});
+    }catch(e){if(sequence===this._milkLabelSequence)this.setData({milkLabelError:e instanceof Error?e.message:'识别暂未完成，可重试或手工填写'})}finally{if(sequence===this._milkLabelSequence)this.setData({milkLabelBusy:false})}
+  },
+  reuseMilkLabel(e:WechatMiniprogram.TouchEvent){const id=String(e.currentTarget.dataset.id);if(!this.data.milkLabelMatches.some(m=>m.revisionId===id))return;this.setData({'milkNutrition.manual':false});this.chooseMilkNutrition(e)},
   beginMilkProduct(){
-    if(this.data.milkNutrition.saving)return;
+    if(this.data.milkNutrition.saving)return;this._milkLabelEvidenceRef='';this.setData({milkLabelNote:'',milkLabelMatches:[]});
     const names:Record<string,string>={ENERGY_KCAL:'能量',PROTEIN:'蛋白质',FAT_TOTAL:'脂肪',CARBOHYDRATE:'碳水化合物',FIBER_DIETARY:'膳食纤维',CALCIUM:'钙',IRON:'铁',ZINC:'锌',IODINE:'碘',SODIUM:'钠',VITAMIN_A_RAE:'维生素A',VITAMIN_C:'维生素C',FOLATE:'叶酸'};
     const gram=['PROTEIN','FAT_TOTAL','CARBOHYDRATE','FIBER_DIETARY'],micro=['IODINE','VITAMIN_A_RAE','FOLATE'];
     this._milkNutritionSaved=null;this._milkNutritionEditing=null;this.setData({'milkNutrition.manual':true,'milkNutrition.error':'','milkNutrition.name':'','milkNutrition.source':'用户核对产品营养成分表','milkNutrition.makeDefault':true,'milkNutrition.basisIndex':0,'milkNutrition.ageFrom':'6','milkNutrition.ageTo':'72','milkNutrition.powderGrams':'','milkNutrition.preparedVolumeMl':'','milkNutrition.aIndex':0,'milkNutrition.folateIndex':0,'milkNutrition.energyUnitIndex':0,'milkNutrition.choIndex':0,'milkNutrition.fields':Object.keys(names).map(code=>({code,name:names[code],unit:code==='ENERGY_KCAL'?'千焦':gram.includes(code)?'克':micro.includes(code)?'微克':'毫克',unitCode:code==='ENERGY_KCAL'?'KILOCALORIE':gram.includes(code)?'GRAM':micro.includes(code)?'MICROGRAM':'MILLIGRAM',value:''}))});
@@ -415,6 +448,7 @@ Page({
   milkNutritionPicker(e:WechatMiniprogram.PickerChange){if(this.data.milkNutrition.saving||this._milkNutritionSaved)return;const field=String(e.currentTarget.dataset.field);if(['basisIndex','aIndex','folateIndex','energyUnitIndex','choIndex'].includes(field))this.setData({['milkNutrition.'+field]:Number(e.detail.value),...(field==='energyUnitIndex'?{'milkNutrition.fields':this.data.milkNutrition.fields.map(f=>f.code==='ENERGY_KCAL'?{...f,unit:Number(e.detail.value)===0?'千焦':'千卡'}:f)}:{})});},
   toggleMilkDefault(){if(!this.data.milkNutrition.saving)this.setData({'milkNutrition.makeDefault':!this.data.milkNutrition.makeDefault})},
   async saveMilkProduct(){
+    if(this.data.milkLabelBusy)return;if(![0,1].includes(this.data.milkNutrition.basisIndex)){this.setData({'milkNutrition.error':'请先核对营养基准'});return;}
     if(this.data.milkNutrition.saving||!canRecordBaby())return;
     const p=this.data.milkPanel,n=this.data.milkNutrition,type=milkTypeLabels[p.milkTypeIndex]?.key;
     if(!type||!n.name.trim()){this.setData({'milkNutrition.error':'请填写奶类产品名称'});return;}
@@ -422,8 +456,8 @@ Page({
     try {
       if((await context()).subjectId!==subject)throw Error('宝宝已切换，请返回重新打开');
       if(!this._milkNutritionSaved){
-        const profile={name:n.name,milkTypes:this._milkNutritionEditing?.milkTypes||[type],ageFromMonths:Number(n.ageFrom),ageToMonthsExclusive:Number(n.ageTo),basis:n.basisIndex?'PER_100G_POWDER':'PER_100ML_PREPARED',powderGrams:n.powderGrams||null,preparedVolumeMl:n.preparedVolumeMl||null,source:n.source,
-          nutrients:n.fields.map(f=>({nutrientCode:f.code,unitCode:f.code==='ENERGY_KCAL'?(n.energyUnitIndex===0?'KILOJOULE':'KILOCALORIE'):f.code==='VITAMIN_A_RAE'&&n.aIndex===1?'MICROGRAM_RAE':f.code==='FOLATE'&&n.folateIndex===1?'MICROGRAM_DFE':f.unitCode,value:f.value||null,status:f.value?'NUMERIC':!f.touched&&['TRACE','SOURCE_CONFLICT'].includes(f.originalStatus||'')?f.originalStatus:'MISSING',chemicalBasis:f.code==='CARBOHYDRATE'?['UNKNOWN','TOTAL_CARBOHYDRATE','AVAILABLE_CARBOHYDRATE'][n.choIndex]:f.code==='VITAMIN_A_RAE'?['UNKNOWN','RAE','RE'][n.aIndex]:f.code==='FOLATE'?['UNKNOWN','DFE','NATURAL_FOLATE','FOLIC_ACID'][n.folateIndex]:'STANDARD'}))};
+        const profile={name:n.name,milkTypes:this._milkNutritionEditing?.milkTypes||[type],ageFromMonths:Number(n.ageFrom),ageToMonthsExclusive:Number(n.ageTo),basis:n.basisIndex?'PER_100G_POWDER':'PER_100ML_PREPARED',powderGrams:n.powderGrams||null,preparedVolumeMl:n.preparedVolumeMl||null,source:n.source,...(this._milkLabelEvidenceRef?{evidenceRef:this._milkLabelEvidenceRef}:{}),
+          nutrients:n.fields.map(f=>({nutrientCode:f.code,...(f.labelRawText?{labelRawText:f.labelRawText}:{}),unitCode:f.code==='ENERGY_KCAL'?(n.energyUnitIndex===0?'KILOJOULE':'KILOCALORIE'):f.code==='VITAMIN_A_RAE'?(n.aIndex===1?'MICROGRAM_RAE':n.aIndex===2?'MICROGRAM_RE':'MICROGRAM'):f.code==='FOLATE'?(n.folateIndex===1?'MICROGRAM_DFE':'MICROGRAM'):f.unitCode,value:f.value||null,status:f.value?'NUMERIC':!f.touched&&['TRACE','SOURCE_CONFLICT'].includes(f.originalStatus||'')?f.originalStatus:'MISSING',chemicalBasis:f.code==='CARBOHYDRATE'?['UNKNOWN','TOTAL_CARBOHYDRATE','AVAILABLE_CARBOHYDRATE'][n.choIndex]:f.code==='VITAMIN_A_RAE'?['UNKNOWN','RAE','RE'][n.aIndex]:f.code==='FOLATE'?['UNKNOWN','DFE','NATURAL_FOLATE','FOLIC_ACID'][n.folateIndex]:'STANDARD'}))};
         this._milkNutritionSaved=await submitRecord<{revisionId:string;profile?:{name:string}}>('milk-profile:'+subject,`/subjects/${subject}/milk-nutrition-profiles`,'POST','SAVE_MILK_NUTRITION_PROFILE',{...(this._milkNutritionEditing?{profileId:this._milkNutritionEditing.profileId,expectedRevision:this._milkNutritionEditing.expectedRevision}:{}),profile});
         this._milkNutritionSavedOwner=owner;
       }

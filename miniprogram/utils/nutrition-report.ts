@@ -1,3 +1,4 @@
+import {aiSourceView,type AiSourceBreakdown} from './ai-source'
 import {specialReferenceView,type SpecialReferenceData,type SpecialReferenceView} from './nutrient-special-reference'
 import { displayInteger } from './quantity-format'
 import { ApiError, request, getAuth } from './api'
@@ -7,6 +8,7 @@ import type { SubjectSummary } from './session'
 
 export interface WeightEnergyEvidence {version:string;weightKg:string;measuredOn:string;estimatedKcal:string}
 export interface AssessmentNutrient {
+  sourceBreakdown?:AiSourceBreakdown
   specialReference?:SpecialReferenceData
   nutrientCode: string
   status: string
@@ -68,6 +70,7 @@ export interface NutrientSource {
 }
 
 export interface NutrientView {
+  hasAiValue?:boolean;aiAmountText?:string;aiShareText?:string;regularAmountText?:string
   weightEnergy?:WeightEnergyEvidence
   specialReferenceView?:SpecialReferenceView
   nutrientCode: string
@@ -349,6 +352,7 @@ export function nutrientView(item: AssessmentNutrient, sources: NutrientSource[]
     progressLabel,
     progressTone: nutrientProgressTone(item.nutrientCode),
     showProgress: !informational && progressRatio !== null,
+    ...aiSourceView(item.sourceBreakdown,unitNames[item.unitCode]||''),
     amountText: item.averageDailyValue === null ? '暂无数值' : formatNumber(item.averageDailyValue),
     numericValue,
     unitText: unitNames[item.unitCode] || '单位待核对', status: item.status,
@@ -410,23 +414,23 @@ export function milkContributionEvidence(milk?:MilkEvidence):{records:ReportReco
     facts:(milk?.facts||[]).filter(f=>!f.excludedDuplicate).map(f=>({mealItemId:'milk:'+f.milkRecordId,foodId:'milk:'+f.milkRecordId,nutrientCode:f.nutrientCode,contribution:f.contribution,nutrientFactId:f.nutritionProfileRevisionId||undefined,sourceVersion:f.sourceVersion||'未绑定营养资料'}))};
 }
 function buildSources(records: ReportRecord[], facts: ReportFact[]): Map<string,NutrientSource[]> {
-  const grouped = new Map<string,Map<string,{foodId:string;name:string;value:number}>>()
+  const grouped = new Map<string,Map<string,{foodId:string;name:string;value:number;mealItemId?:string}>>()
   for (const fact of facts) {
     if (fact.contribution === null) continue
     const value=Number(fact.contribution)
     if (!Number.isFinite(value) || value < 0) continue
     const name=records.find(r=>r.mealItemId===fact.mealItemId)?.name || '已确认食物'
-    const foods=grouped.get(fact.nutrientCode) || new Map<string,{foodId:string;name:string;value:number}>()
-    const previous=foods.get(fact.foodId)
-    foods.set(fact.foodId,{foodId:fact.foodId,name,value:(previous?.value || 0)+value})
+    const foods=grouped.get(fact.nutrientCode) || new Map<string,{foodId:string;name:string;value:number;mealItemId?:string}>()
+    const sourceKey=fact.foodId||('ai-item:'+fact.mealItemId);const previous=foods.get(sourceKey)
+    foods.set(sourceKey,{foodId:fact.foodId,mealItemId:fact.foodId?undefined:fact.mealItemId,name,value:(previous?.value || 0)+value})
     grouped.set(fact.nutrientCode,foods)
   }
   return new Map([...grouped].map(([code,foods])=>{
     const rows=[...foods.values()].sort((a,b)=>b.value-a.value || a.foodId.localeCompare(b.foodId))
     const total=rows.reduce((sum,r)=>sum+r.value,0)
     return [code,rows.map(row=>{
-      const usedRecords=records.filter(r=>r.foodId===row.foodId)
-      const usedFacts=facts.filter(f=>f.foodId===row.foodId && f.nutrientCode===code)
+      const usedRecords=records.filter(r=>row.foodId?r.foodId===row.foodId:r.mealItemId===row.mealItemId)
+      const usedFacts=facts.filter(f=>(row.foodId?f.foodId===row.foodId:f.mealItemId===row.mealItemId) && f.nutrientCode===code)
       return {...row,badge:row.name.slice(0,1),valueText:formatNumber(row.value),percent:total>0?Math.round(row.value/total*100):0,
         recordWeightText:usedRecords[0]?.sourceKind==='MILK'?(usedRecords.some(r=>r.volumeMl===null)?'奶量未知':formatNumber(usedRecords.reduce((sum,r)=>sum+Number(r.volumeMl),0))+' ml'):(usedRecords.some(r=>r.weightOrigin==='USER_ACCEPTED_ESTIMATE')?'约':'')+formatNumber(usedRecords.reduce((sum,r)=>sum+Number(r.consumedGrams),0))+' 克',
         sourceVersionText:[...new Set(usedFacts.map(f=>f.sourceVersion))].sort().join('、'),
